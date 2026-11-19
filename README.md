@@ -1,4 +1,22 @@
-# Modular Blazor WebAssembly client
+# ModularBlazor.Platform
+
+The ModularBlazor platform: the WebApi host and its core modules, the identity service, the Blazor WebAssembly client
+(BlzWebClient), the Aspire lab, and the NuGet packages plus Module SDK that modules build against. It replaces the
+earlier `soft-square-net/ModularBlazor` repository.
+
+Modules live in their own repositories and build against the packages (see
+[Modules outside this repo](#modules-outside-this-repo-the-platform-packages)):
+
+| Repository | Holds |
+| --- | --- |
+| [ModularBlazor.ModuleTemplate](https://github.com/soft-square-net/ModularBlazor.ModuleTemplate) | the `dotnet new` template for a new module |
+| [ModularBlazor.Samples](https://github.com/soft-square-net/ModularBlazor.Samples) | small demo modules |
+| [ModularBlazor.Module.Content](https://github.com/soft-square-net/ModularBlazor.Module.Content) | newsroom posts, taxonomy, review and publishing |
+| [ModularBlazor.Module.Shifts](https://github.com/soft-square-net/ModularBlazor.Module.Shifts) | desks, shifts and rota |
+| [ModularBlazor.Module.Storage](https://github.com/soft-square-net/ModularBlazor.Module.Storage) | file storage |
+| [ModularBlazor.Module.Elsa](https://github.com/soft-square-net/ModularBlazor.Module.Elsa) | the Elsa 3 workflow engine |
+
+## Modular Blazor WebAssembly client
 
 A standalone Blazor WebAssembly app that loads its features as **modules** (`.dll` or `.nupkg`) at runtime,
 with pluggable **layouts** that are modules too.

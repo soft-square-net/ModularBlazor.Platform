@@ -22,8 +22,8 @@
     <IsPackable>true</IsPackable>
     <Authors>soft-square-net</Authors>
     <Company>soft-square-net</Company>
-    <PackageProjectUrl>https://github.com/soft-square-net/ModularBlazor</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/soft-square-net/ModularBlazor</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/soft-square-net/ModularBlazor.Platform</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/soft-square-net/ModularBlazor.Platform</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>modularblazor;modules;blazor;webapi</PackageTags>
     <IncludeSymbols>true</IncludeSymbols>
