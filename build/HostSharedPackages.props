@@ -1,0 +1,35 @@
+<Project>
+
+  <!--
+    The third-party packages the host ships and every module must use the host's copy of: compiled against, never copied
+    into a module (one type identity; EF Core's caches stay controllable). Referenced directly, with
+    ExcludeAssets="$(HostSharedExclude)", so they stay out of the output even when a private package of the module
+    (Elsa, for example) depends on them too.
+    One list for both kinds of module: in this repo SharedKernel.props and SharedData.props use it, and the Module SDK
+    package carries a copy (src/ModularBlazor.Module.Sdk). Keep the versions in step with WebApi.SharedKernel.csproj
+    and WebApi.Data.csproj.
+  -->
+  <PropertyGroup>
+    <_HostSharedPackagesImported>true</_HostSharedPackagesImported>
+  </PropertyGroup>
+
+  <!-- With the shared kernel (Domain and Application layers). -->
+  <ItemGroup>
+    <HostSharedKernelPackage Include="Ardalis.Specification" Version="9.3.1" />
+  </ItemGroup>
+
+  <!-- With the shared data layer (the entry assembly of a module that stores data). -->
+  <ItemGroup>
+    <HostSharedDataPackage Include="Microsoft.EntityFrameworkCore" Version="10.0.14" />
+    <HostSharedDataPackage Include="Microsoft.EntityFrameworkCore.Abstractions" Version="10.0.14" />
+    <HostSharedDataPackage Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.14" />
+    <HostSharedDataPackage Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <HostSharedDataPackage Include="Npgsql" Version="10.0.3" />
+    <HostSharedDataPackage Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.14" />
+    <HostSharedDataPackage Include="MySql.EntityFrameworkCore" Version="10.0.12" />
+    <HostSharedDataPackage Include="Oracle.EntityFrameworkCore" Version="10.23.26400" />
+    <HostSharedDataPackage Include="System.Security.Cryptography.Pkcs" Version="10.0.15" />
+    <HostSharedDataPackage Include="Ardalis.Specification.EntityFrameworkCore" Version="9.3.1" />
+  </ItemGroup>
+
+</Project>

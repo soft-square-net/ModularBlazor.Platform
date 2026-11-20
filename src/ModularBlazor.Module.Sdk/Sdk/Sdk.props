@@ -27,6 +27,7 @@
   -->
 
   <Import Project="$(MSBuildThisFileDirectory)Platform.props" Condition="Exists('$(MSBuildThisFileDirectory)Platform.props')" />
+  <Import Project="$(MSBuildThisFileDirectory)HostSharedPackages.props" Condition="Exists('$(MSBuildThisFileDirectory)HostSharedPackages.props') And '$(_HostSharedPackagesImported)' != 'true'" />
 
   <PropertyGroup>
     <HostSharedExclude Condition="'$(EfDesignAssets)' != 'all'">runtime;native</HostSharedExclude>

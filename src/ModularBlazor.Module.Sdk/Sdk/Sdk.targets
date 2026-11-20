@@ -22,6 +22,7 @@
 
   <ItemGroup Condition="'$(ModuleLayer)' == 'Domain' Or '$(ModuleLayer)' == 'Application'">
     <PackageReference Include="soft.square.net.WebApi.SharedKernel" Version="$(ModularBlazorPlatformVersion)" ExcludeAssets="$(HostSharedExclude)" />
+    <PackageReference Include="@(HostSharedKernelPackage)" ExcludeAssets="$(HostSharedExclude)" />
   </ItemGroup>
 
   <!-- The entry assembly: endpoints (Carter) and, with data, the shared data layer and the EF Core design tools. -->
@@ -31,6 +32,8 @@
 
   <ItemGroup Condition="'$(_ModuleUsesData)' == 'true'">
     <PackageReference Include="soft.square.net.WebApi.Data" Version="$(ModularBlazorPlatformVersion)" ExcludeAssets="$(HostSharedExclude)" />
+    <!-- Referenced directly too, so a private package that depends on them (Elsa) cannot copy them in. -->
+    <PackageReference Include="@(HostSharedKernelPackage);@(HostSharedDataPackage)" ExcludeAssets="$(HostSharedExclude)" />
     <!-- Design time only (dotnet ef migrations add, with EfDesignAssets=all). -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="$(ModuleEfCoreVersion)" PrivateAssets="all" ExcludeAssets="$(HostSharedExclude)" />
   </ItemGroup>
