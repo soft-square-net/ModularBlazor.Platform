@@ -7,12 +7,11 @@
 //                                  └─► tenant data (Postgres)  tenant store + per-tenant databases
 //
 //   Observability: every replica exports OpenTelemetry (traces, metrics, logs) to the Aspire dashboard.
+//   Published (aspire publish), the same model becomes Docker Compose files or a Helm chart: see Deploy.cs.
 //   Not modelled locally: the CDN (static Blazor _framework files) and edge TLS; see README.md.
 
 using Aspire.Hosting.Yarp;
 using Aspire.Hosting.Yarp.Transforms;
-using Google.Protobuf.WellKnownTypes;
-using k8s.ClientSets;
 using Yarp.ReverseProxy.Transforms;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -73,23 +72,24 @@ if (engines.Contains("oracle"))
 // ---------------------------------------------------------------- identity service (OpenIddict, its own database)
 
 // Issues tenant-bound JWT access tokens (audience "modular-webapi") for every pool. A fixed port keeps the issuer
-// stable: resource servers validate tokens with Authority = IdentityIssuer and read the keys from its JWKS.
+// stable: resource servers validate tokens with Authority = the issuer (deploy.IdentityIssuer) and read the keys from its JWKS.
 // Not routed through the gateway: the issuer is one URL, and in production it gets its own host name.
 const int IdentityPort = 5090;
-const string IdentityIssuer = "http://localhost:5090/";
 // ModularBlazor.BlzWebClient's port: its redirect URIs and CORS origin are registered for it (see the client below).
 const int BlzWebClientPort = 5070;
-const string BlzWebClientOrigin = "http://localhost:5070";
+const int GatewayPort = 5080;
+// Run mode: the localhost values above. Publish mode: public host names from parameters, Production, and the
+// Compose or Kubernetes specifics (shared module catalog volume, identity certificates, ingresses).
+var deploy = new Deployment(builder, IdentityPort, GatewayPort, BlzWebClientPort);
 // Resource "identity-db" (names are unique across resources), database "identity", passed as ConnectionStrings:identity.
 var identityDb = tenantData.AddDatabase("identity-db", databaseName: "identity");
 var identity = builder.AddProject<Projects.WebApi_Identity_Server>("identity", launchProfileName: null)
     .WithHttpEndpoint(port: IdentityPort)
     .WithExternalHttpEndpoints()
-    .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
-    .WithEnvironment("Identity__Issuer", IdentityIssuer)
     .WithEnvironment("Identity__ElsaClient__ClientSecret", elsaClientSecret)
     .WithReference(identityDb, connectionName: "identity").WaitFor(identityDb)
     .WithHttpHealthCheck("/health");
+deploy.ConfigureIdentity(identity);
 
 // ---------------------------------------------------------------- module pools (same image, different config)
 
@@ -110,13 +110,13 @@ foreach (var replica in workflow)
         .WithEnvironment("Identity__ElsaClient__ClientId", "elsa-workflows")
         .WithEnvironment("Identity__ElsaClient__ClientSecret", elsaClientSecret)
         .WithEnvironment("Elsa__Schema", "elsa")
-        .WithEnvironment("Elsa__IdentityAuthority", IdentityIssuer)
-        .WithEnvironment("Elsa__PlatformApiBaseUrl", "http://localhost:5080");
+        .WithEnvironment("Elsa__IdentityAuthority", deploy.IdentityIssuer)
+        .WithEnvironment("Elsa__PlatformApiBaseUrl", deploy.GatewayUrl);
 
 // ---------------------------------------------------------------- edge: YARP gateway
 
 var gateway = builder.AddYarp("gateway")
-    .WithHostPort(5080)
+    .WithHostPort(GatewayPort)
     .WithConfiguration(yarp =>
     {
         // One cluster per pool with every replica as a destination: YARP balances per request (L7).
@@ -137,10 +137,14 @@ var gateway = builder.AddYarp("gateway")
 
         // Lab only: reach one pool directly (its admin API, /api/pool, /openapi, /scalar) through the gateway.
         // X-Forwarded-Prefix tells the pool which path it was reached through, so its Scalar and OpenAPI URLs keep it.
-        PoolRoute("core", coreCluster);
-        PoolRoute("sales", salesCluster);
-        PoolRoute("worker", workerCluster);
-        PoolRoute("workflow", workflowCluster);
+        // Not published: production reaches the pools only through the module routes above.
+        if (!deploy.Publishing)
+        {
+            PoolRoute("core", coreCluster);
+            PoolRoute("sales", salesCluster);
+            PoolRoute("worker", workerCluster);
+            PoolRoute("workflow", workflowCluster);
+        }
 
         void PoolRoute(string pool, YarpCluster cluster) =>
             yarp.AddRoute($"/pools/{pool}/{{**catch-all}}", cluster)
@@ -153,8 +157,7 @@ var gateway = builder.AddYarp("gateway")
 // the gateway the matching discovery entries.
 foreach (var replica in core.Concat(sales).Concat(worker).Concat(workflow))
     gateway.WithReference(replica).WaitFor(replica);
-
-
+deploy.ConfigureGateway(gateway);
 
 // soft.square.net.ModularBlazor.BlzWebClient: the Blazor WebAssembly client of the WebApi platform, served by the
 // WebAssembly dev server on a fixed port. The port is part of its identity: the identity service registers
@@ -162,12 +165,16 @@ foreach (var replica in core.Concat(sales).Concat(worker).Concat(workflow))
 // the origin for CORS; the pools allow it too (Cors__AllowedOrigins in AddPool). The browser signs in at the identity
 // service (5090) and calls the gateway (5080) with the access token; wwwroot/appsettings.json holds both addresses,
 // because a WebAssembly app reads no server-side environment.
-builder.AddProject<Projects.ModularBlazor_BlzWebClient>("blzwebclient", launchProfileName: null)
-    .WithHttpEndpoint(port: BlzWebClientPort)
-    .WithExternalHttpEndpoints()
-    .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
-    .WaitFor(identity)
-    .WaitFor(gateway);
+// Published, it is an nginx image instead (Deploy.AddClient).
+if (deploy.Publishing)
+    deploy.AddClient(BlzWebClientPort);
+else
+    builder.AddProject<Projects.ModularBlazor_BlzWebClient>("blzwebclient", launchProfileName: null)
+        .WithHttpEndpoint(port: BlzWebClientPort)
+        .WithExternalHttpEndpoints()
+        .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
+        .WaitFor(identity)
+        .WaitFor(gateway);
 
 builder.Build().Run();
 
@@ -179,7 +186,6 @@ IResourceBuilder<ProjectResource>[] AddPool(string name, string role, int replic
     {
         var replica = builder.AddProject<Projects.WebApi>($"{name}-{n}", launchProfileName: null)
             .WithHttpEndpoint()
-            .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
             .WithEnvironment("Modules__Pool", name)
             .WithEnvironment("Modules__Role", role)
             // One module catalog for every pool (stand-in for the modules table): each pool applies the modules it
@@ -190,13 +196,14 @@ IResourceBuilder<ProjectResource>[] AddPool(string name, string role, int replic
             .WithReference(tenantStore).WaitFor(tenantStore)
             .WithEnvironment("DatabaseServers__TenantStore__Provider", "PostgreSql")
             // Tokens from the identity service: JwtBearer reads its discovery document and JWKS (http in the lab).
-            .WithEnvironment("Auth__Authority", IdentityIssuer)
+            .WithEnvironment("Auth__Authority", deploy.IdentityIssuer)
             .WithEnvironment("Auth__Audience", "modular-webapi")
             // The Blazor WebAssembly client calls the gateway from its own origin; YARP passes the preflight through.
-            .WithEnvironment("Cors__AllowedOrigins__0", BlzWebClientOrigin)
+            .WithEnvironment("Cors__AllowedOrigins__0", deploy.ClientOrigin)
             .WaitFor(identity)
             .WithHttpHealthCheck("/health");
 
+        deploy.ConfigurePoolReplica(replica); // environment; publish mode: the shared module catalog volume
         foreach (var server in databaseServers) server(replica); // tenant-data plus the Lab:Engines servers
         for (var i = 0; i < modules.Length; i++)
             replica.WithEnvironment($"Modules__Enabled__{i}", modules[i]);

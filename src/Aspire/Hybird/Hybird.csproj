@@ -17,6 +17,9 @@
     <PackageReference Include="Aspire.Hosting.RabbitMQ" Version="13.6.5" />
     <PackageReference Include="Aspire.Hosting.Redis" Version="13.6.5" />
     <PackageReference Include="Aspire.Hosting.Yarp" Version="13.6.5" />
+    <!-- Publishers: aspire publish writes Docker Compose files and a Helm chart (see Deploy.cs, README "Deploying"). -->
+    <PackageReference Include="Aspire.Hosting.Docker" Version="13.6.5" />
+    <PackageReference Include="Aspire.Hosting.Kubernetes" Version="13.6.5-preview.1.26559.7" />
     <!-- Optional tenant database servers (Lab:Engines): SQL Server, MySQL, Oracle. -->
     <PackageReference Include="Aspire.Hosting.SqlServer" Version="13.6.5" />
     <PackageReference Include="Aspire.Hosting.MySql" Version="13.6.5" />

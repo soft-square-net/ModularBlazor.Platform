@@ -18,3 +18,10 @@ artifacts/
 # node toolchains
 node_modules/
 /docs/astro-modular-blazor-docs/curved-chasm/yarn.lock
+
+# aspire publish output: .env holds the deployment secrets once filled, certs/ the identity certificates.
+deploy/**/.env
+deploy/**/certs/
+*.pfx
+aspire.config.json
+**/aspire-output/
