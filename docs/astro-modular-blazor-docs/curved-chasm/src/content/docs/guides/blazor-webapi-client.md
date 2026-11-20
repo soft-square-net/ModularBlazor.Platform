@@ -208,8 +208,10 @@ other users get the change on their next check.
 | `POST …/modules/{id}/versions/{version}/activate`, `DELETE …/versions/{version}` | |
 | `DELETE /api/client-modules/modules/{id}` | Not for core modules, nor for a module others depend on (409) |
 
-The catalog is `client-modules.json` and the files under `ClientModules:Path` (default `App_Data/client-modules`),
-shared by the replicas of the pool. Uploads are limited to `ClientModules:MaxPackageMegabytes` (50).
+The catalog is `client-modules.json` and the files under `ClientModules:Path` (default `App_Data/client-modules`,
+relative to the WebApi's content root), shared by the replicas of the pool. To put it somewhere else on one host, set
+the host override `Modules__Settings__client-modules__ClientModules__Path`. Module playgrounds use it to keep their
+catalog out of the platform checkout, which the Hybird lab uses as well. Uploads are limited to `ClientModules:MaxPackageMegabytes` (50).
 
 ## MudTail pages
 
