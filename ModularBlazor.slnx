@@ -36,6 +36,7 @@
     <File Path="build-modules.sh" />
     <File Path="Directory.Build.props" />
     <File Path="extract-solution.ps1" />
+    <File Path="PACKIGINGMODULE.md" />
     <File Path="README.md" />
   </Folder>
   <Folder Name="/src/">
@@ -45,10 +46,6 @@
       <Deploy />
     </Project>
     <Project Path="src/Share.All/Share.All.csproj" Id="1e77fb8d-d73a-4160-b58a-b98df7a9e673" />
-  </Folder>
-  <Folder Name="/src/api/">
-    <File Path="PACKIGINGMODULE.md" />
-    <Project Path="src/api/ModularBlazor.Host/ModularBlazor.Host.csproj" />
   </Folder>
   <Folder Name="/src/api/_Framework/">
     <Project Path="src/api/_Framework/Core/Core.csproj" />
@@ -61,7 +58,6 @@
     <Project Path="src/apps/blazor/ModularBlazor.Infrastructure/ModularBlazor.Infrastructure.csproj" Id="3712d96f-77e9-468d-8e44-ea93a1537de3" />
   </Folder>
   <Folder Name="/src/Aspire/">
-    <Project Path="src/Aspire/Host/Host.csproj" />
     <Project Path="src/Aspire/Hybird/Hybird.csproj" />
   </Folder>
   <Folder Name="/src/migrations/">
@@ -75,9 +71,7 @@
     <Project Path="modules/client/Layouts.Admin/Layouts.Admin.csproj" />
     <Project Path="modules/client/Layouts.Default/Layouts.Default.csproj" />
     <Project Path="modules/client/Module.Admin/Module.Admin.csproj" />
-    <Project Path="modules/client/Module.Auth/Module.Auth.csproj" />
     <Project Path="modules/client/Module.Tenants/Module.Tenants.csproj" />
-    <Project Path="modules/client/Module.ToDo/Module.ToDo.csproj" />
   </Folder>
   <Folder Name="/src/WebApi/">
     <Project Path="src/WebApi/WebApi.Client/WebApi.Client.csproj" />

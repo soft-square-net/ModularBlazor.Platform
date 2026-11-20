@@ -9,10 +9,6 @@ artifacts/
 /src/migrations/SqlServer/Migrations
 /.playwright-mcp
 
-# Module store (uploaded packages, generated build inputs)
-/src/api/ModularBlazor.Host/assets/modules/
-# Media store (images uploaded through /api/v1/media/images)
-/src/api/ModularBlazor.Host/assets/media/
 /modules/client/Layouts.Admin/node-app/node_modules
 *.json
 /modules/client/Layouts.Admin/node-app/package-lock.json
@@ -21,7 +17,6 @@ artifacts/
 /src/apps/blazor/ModularBlazor.Client/wwwroot/modules/user-modules.admin.json
 /src/apps/blazor/ModularBlazor.Client/wwwroot/modules/soft.square.net.Layouts.Default.dll
 /src/apps/blazor/ModularBlazor.Client/wwwroot/modules/soft.square.net.Module.Admin.dll
-/src/apps/blazor/ModularBlazor.Client/wwwroot/modules/soft.square.net.Module.Auth.dll
 
 # node toolchains
 node_modules/
