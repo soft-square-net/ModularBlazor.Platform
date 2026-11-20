@@ -38,6 +38,10 @@ public sealed class ModuleRuntimeOptions
     /// </summary>
     public Dictionary<string, string> Local { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
+    // Modules:Settings:{id}:{key} (read by ModuleRuntime when it loads a module, not bound here): the host's overrides of
+    // a module's settings, e.g. Modules__Settings__client-modules__ClientModules__Path=/data/client-modules. They win over
+    // the catalog's settings (manifest defaults and the admin's values) on this instance and never reach modules.json.
+
     /// <summary>How long a module's hosted services may take to start, and (all together) to stop.</summary>
     public TimeSpan HostedServiceTimeout { get; set; } = TimeSpan.FromSeconds(10);
 
@@ -653,11 +657,20 @@ internal sealed partial class ModuleRuntime
 
             var services = new ServiceCollection();
             var moduleSettings = new Dictionary<string, string?>(record.Settings, StringComparer.OrdinalIgnoreCase);
+            var hostConfiguration = _hostRoot.GetRequiredService<IConfiguration>();
+
+            // The host's own overrides (Modules:Settings:{id}:{key}): applied over the catalog's settings on this
+            // instance only, never written to modules.json. For what differs per deployment, e.g. a folder.
+            var overrides = hostConfiguration.GetSection($"Modules:Settings:{record.Id}")
+                .AsEnumerable(makePathsRelative: true).Where(p => p.Value is not null).ToList();
+            foreach (var (key, value) in overrides) moduleSettings[key] = value;
+            if (overrides.Count > 0)
+                _log.LogInformation("Module {Id}: host configuration overrides {Keys}", record.Id, string.Join(", ", overrides.Select(p => p.Key)));
+
             if (record.Id.Equals("elsa", StringComparison.OrdinalIgnoreCase))
             {
                 // Elsa is the only module allowed these runtime secrets. They are injected from the host's secret
                 // provider into this module's private configuration and never copied into modules.json.
-                var hostConfiguration = _hostRoot.GetRequiredService<IConfiguration>();
                 moduleSettings["ConnectionStrings:elsa"] = hostConfiguration.GetConnectionString("elsa");
                 moduleSettings["Identity:ElsaClient:ClientId"] = hostConfiguration["Identity:ElsaClient:ClientId"];
                 moduleSettings["Identity:ElsaClient:ClientSecret"] = hostConfiguration["Identity:ElsaClient:ClientSecret"];

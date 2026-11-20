@@ -111,6 +111,7 @@ Tenant rules (headers, status codes) are in [Tenancy and tenant data](/backend/t
 | `ConnectionStrings:broker` | none | RabbitMQ connection; when set, lifecycle changes are broadcast on the `modules.state` fanout exchange |
 | `OpenApi:Enabled` | `false` (on in Development) | Serves the OpenAPI documents and Scalar outside Development |
 | `Modules:CorePath` | `CoreModules` | Folder of the core-module packages shipped with the release |
+| `Modules:Settings:{id}:{key}` | none | The host's override of a module setting, e.g. `Modules__Settings__client-modules__ClientModules__Path=/data/client-modules`. Wins over the catalog's settings (manifest defaults and the admin's values) on this instance; never written to `modules.json` |
 | `Modules:Local:{id}` | none | Development only: a module's build output folder, installed like an upload on startup when its files changed (first time Active). Used by the module repos' playgrounds; ignored, with a warning, in other environments |
 | `Auth:Authority` | none | Identity service (OIDC discovery, JWKS). Without it, `Authentication:Schemes:Bearer` applies (`dotnet user-jwts`) |
 | `Auth:Audience` | `modular-webapi` | Expected token audience |
