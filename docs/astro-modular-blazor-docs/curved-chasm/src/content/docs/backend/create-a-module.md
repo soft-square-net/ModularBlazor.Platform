@@ -60,8 +60,9 @@ entry, the default route prefix (`/api/notes`), the database schema and the `Mod
 A module lives in a repository of its own, next to the platform's, and builds against the platform's NuGet packages
 through the **Module SDK**. [Repositories and packages](/backend/repositories/) explains the packages, the feed token and
 the CI workflow; this step only creates the files. Copy `global.json`, `NuGet.Config`, `Directory.Build.props` and
-`.github/workflows/build.yml` from `ModularBlazor.Module.Content`. The `dotnet new` template
-(`ModularBlazor.ModuleTemplate`) is still a scaffold. Then:
+`.github/workflows/build.yml` from `ModularBlazor.Module.Content`. Or skip the manual steps: the
+[Clean Architecture module template](/backend/module-template-clean-architecture/) (`dotnet new platform-module-ca`)
+generates all of it, with an example feature. By hand:
 
 ```bash
 mkdir ModularBlazor.Module.Notes && cd ModularBlazor.Module.Notes
