@@ -13,31 +13,31 @@ and measures its limits.
 | --- | --- |
 | `WebApi` | The host. `Modularity/` holds the runtime. The same image runs as every pool. |
 | `WebApi.Contracts` | `IRuntimeModule`, `ModuleManifest` and `IModulePipeline`. The host references it, so it is always shared. |
-| `Modules/Core/*` | Core modules (`Identity`, `Tenancy`), shipped with every WebApi release. |
-| `Modules/Custom/WebApi.Modules.Greeting` | A sample custom module. The host does **not** reference it: its build output is zipped and uploaded. |
-| `Modules/Custom/Inventory` | A sample custom module split into Domain, Application and Infrastructure projects. |
-| `Modules/Custom/Shifts`, `Modules/Custom/Content` | The newsroom modules (layered): rota and shift grants; Posts and their workflow. See [Contents](/modules/contents/). |
-| `Modules/Custom/Elsa` | Elsa 3.9 as a runtime module with a private pipeline and `HotUnload = false`. See [Elsa](/modules/elsa/). |
-| `Modules/Custom/WebApi.Modules.Pulse` | A sample module with a private pipeline and a hosted service. |
+| `Modules/Core/*` | Core modules (`identity`, `tenancy`, `client-modules`), shipped with every WebApi release. |
+| `ModularBlazor.Samples`: `samples/Greeting` | A sample custom module (one project). The host does **not** reference it: its build output is zipped and uploaded. |
+| `ModularBlazor.Samples`: `samples/Inventory` | A sample custom module split into Domain, Application and Infrastructure projects. |
+| `ModularBlazor.Samples`: `samples/Pulse` | A sample module with a private pipeline and a hosted service. |
+| `ModularBlazor.Module.Shifts`, `ModularBlazor.Module.Content` | The newsroom modules (layered): rota and shift grants; Posts and their workflow. See [Contents](/modules/contents/). |
+| `ModularBlazor.Module.Elsa` | Elsa 3.9 as a runtime module with a private pipeline and `HotUnload = false`. See [Elsa](/modules/elsa/). |
 | `Aspire/Hybird` | A runnable lab: gateway, four pools, identity service, broker, Redis, PostgreSQL. See [Hybrid architecture lab](/backend/hybrid-lab/). |
 
-All paths are under `src/WebApi/`, except `Aspire/Hybird` (`src/Aspire/Hybird`). Step-by-step instructions for
+Paths are under `src/WebApi/` of `ModularBlazor.Platform`, except `Aspire/Hybird` (`src/Aspire/Hybird`); the custom
+modules live in their own repositories ([Repositories and packages](/backend/repositories/)). Step-by-step instructions for
 building, packing and deploying your own module: [Create a module, A to Z](/backend/create-a-module/).
 
 ## Core and custom modules
 
-`src/WebApi/Modules/` has two folders. Their modules work the same way at runtime (same load context, overlay
+Core modules live in `src/WebApi/Modules/Core/`, custom modules in their own repositories. Both work the same way at runtime (same load context, overlay
 container, swap and broadcast); they differ in how they arrive:
 
-| Folder | Built | Arrives in the catalog | Removable |
+| Kind | Built | Arrives in the catalog | Removable |
 | --- | --- | --- | --- |
-| `Core/` | By the WebApi build, with every release; output copied to `CoreModules/<AssemblyName>/` | Seeded as `Active` on startup | Can be deactivated, unloaded and reconfigured, but not uninstalled or replaced by an upload (`409`); upgraded only by a release |
-| `Custom/` | On their own, outside the WebApi release | Uploaded by an admin (`POST /api/admin/modules`) | Fully: install, activate, deactivate, unload, uninstall |
+| Core (`Modules/Core/`) | By the WebApi build, with every release; output copied to `CoreModules/<AssemblyName>/` | Seeded as `Active` on startup | Can be deactivated, unloaded and reconfigured, but not uninstalled or replaced by an upload (`409`); upgraded only by a release |
+| Custom (module repos) | On their own, with the Module SDK, outside the WebApi release | Uploaded by an admin (`POST /api/admin/modules`) | Fully: install, activate, deactivate, unload, uninstall |
 
-- `Modules/Directory.Build.props` holds the shared settings for layered modules (`<Name>.Domain`,
-  `<Name>.Application`, `<Name>.Infrastructure`). The Infrastructure project is the module's entry assembly.
-- `Core/Directory.Build.props` marks core modules and sets up their packaging.
-- `Custom/Directory.Build.props` only imports the shared settings: custom modules are never part of a WebApi release.
+- `Modules/Directory.Build.props` and `Core/Directory.Build.props` set up the core modules and their packaging.
+- The Module SDK (`soft.square.net.ModularBlazor.Module.Sdk`) gives custom modules the same layer rules (`<Name>.Domain`,
+  `<Name>.Application`, `<Name>.Infrastructure`) from NuGet. The Infrastructure project is the module's entry assembly.
 - A pool applies either kind only if its `Modules:Enabled` list includes it, or the list is empty.
 
 ### The core modules
@@ -62,19 +62,19 @@ version for real releases.
 
 ## Layered modules
 
-Business modules (content, shifts, sales, the `Custom/Inventory` sample) use clean-architecture layers. Small glue
+Business modules (content, shifts, sales, the Inventory sample) use clean-architecture layers. Small glue
 modules (`identity`, `tenancy`, `greeting`) stay single projects: three projects there add build and packaging
 overhead without protecting any domain logic.
 
 ```text
-Modules/Custom/<Name>/
+ModularBlazor.Module.<Name>/src/
   WebApi.Modules.<Name>.Domain          aggregates, rules, DomainException      → WebApi.SharedKernel
   WebApi.Modules.<Name>.Application     use cases, specifications, DTOs         → Domain, WebApi.Contracts
   WebApi.Modules.<Name>.Infrastructure  IRuntimeModule, endpoints, DbContext,   → Application, WebApi.Data, Carter
                                         migrations (the entry assembly)
 ```
 
-- **Build setup:** `Modules/Directory.Build.props` picks each layer's references by project-name suffix, so a layer
+- **Build setup:** the Module SDK picks each layer's references by project-name suffix, so a layer
   project only references the layer below it. Every host-shipped assembly (SharedKernel, Contracts, Data, EF Core,
   Ardalis, Carter) is compiled against and never shipped: the package is the module's three assemblies only.
 - **Endpoints live in the entry assembly:** the runtime maps only the `ICarterModule` types of the assembly that holds

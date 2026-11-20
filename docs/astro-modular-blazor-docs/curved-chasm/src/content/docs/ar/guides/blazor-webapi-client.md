@@ -5,9 +5,10 @@ sidebar:
   order: 6
 ---
 
-`src/apps/blazor/ModularBlazor.BlzWebClient` هو عميل Blazor WebAssembly لمنصة WebApi. وهو يحل محل
-`ModularBlazor.Client` الذي يخاطب المشروع المتقادم `api/ModularBlazor.Host`. يحتفظ بنظام الوحدات في العميل القديم
-(الكتالوج والمحمل والتخطيطات والموجه)، ويغير ثلاثة أشياء:
+`src/apps/blazor/ModularBlazor.BlzWebClient` هو عميل Blazor WebAssembly لمنصة WebApi. وقد حل محل
+`ModularBlazor.Client` الذي كان يخاطب `api/ModularBlazor.Host` القديم؛ وقد أزيل كلاهما من `ModularBlazor.Platform` ولم يبقيا
+إلا في مستودع `ModularBlazor` المتقادم. احتفظ بنظام الوحدات في العميل القديم (الكتالوج والمحمل والتخطيطات والموجه)، وغير
+أربعة أشياء:
 
 | | `ModularBlazor.Client` (القديم) | `ModularBlazor.BlzWebClient` |
 | --- | --- | --- |
@@ -146,20 +147,21 @@ sequenceDiagram
 | الوحدة | تشحن كـ | تحمل |
 | --- | --- | --- |
 | `Layouts.Default` | `.dll` | Startup، للجميع: التخطيط الافتراضي والسمة ووقت تشغيل MudTail |
-| `Module.Dashboard` | `.dll` | Lazy، ‏`/dashboard`، للمستخدمين المسجلين |
-| `Module.Reports` | `.nupkg` | Lazy، ‏`/reports`، للمستخدمين المسجلين |
 | `Module.Tenants` | مجلد: `.dll` + `soft.square.net.WebApi.Modules.Core.Tenancy.Client.dll` | Lazy، ‏`/tenants`، للدور `platform-admin` فقط |
 | `Module.Admin` | `.dll` | Lazy، ‏`/admin`، للدور `platform-admin` فقط؛ وتجلب معها `Layouts.Admin` |
 | `Layouts.Admin` | `.dll` | مع `Module.Admin` (اعتماديتها): التخطيط `admin` |
 
-عند البدء تزرعها الوحدة الأساسية كوحدات **أساسية (core)**، بإعدادات `[assembly: ClientModule]` في كل منها. والبناء
+كانت `Module.Dashboard` ‏(`.dll`، ‏`/dashboard`) و`Module.Reports` ‏(`.nupkg`، ‏`/reports`) تشحنان هنا أيضا؛ وهما الآن نموذجان في
+`ModularBlazor.Samples` يثبتهما المسؤول في `/client-modules` كأي وحدة أخرى. وWebApi التي زرعتهما من قبل تحررهما عند بدئها
+التالي: تبقيان مثبتتين، لكنهما لم تعودا أساسيتين (يستطيع المسؤول تعطيلهما أو إزالتهما).
+
+عند البدء تزرع الوحدة الأساسية الوحدات المشحونة كوحدات **أساسية (core)**، بإعدادات `[assembly: ClientModule]` في كل منها. والبناء
 الجديد بملفات أخرى يصبح الإصدار النشط، وتبقى إعدادات المدير. وتقارن حزمة `.nupkg` بمحتواها، فإعادة تحزيم الشيفرة نفسها
 ليست إصدارا جديدا. ولتخطي بناء الوحدات استخدم `-p:BuildClientModules=false`.
 
 ولشحن وحدة أخرى، أضف عنصر `CoreClientModule` إلى `WebApi.csproj`: عاديا لملف `.dll`، أو `Pack="true"` لحزمة
 `.nupkg` (يضبط المشروع `PackageId`)، أو `Folder="<name>"` نفسه على كل تجميعات وحدة تحتاج تجميعات خاصة (مثل
-`Module.Tenants` وعميلها المولد). ولا تشحن هاتان لأنهما لا تعملان إلا مع Host القديم:
-`Module.Auth` و`Module.ToDo`.
+`Module.Tenants` وعميلها المولد).
 
 `ModuleManager` و`ActiveModuleService` وخدمات المصادقة **scoped**، لأن `AuthenticationStateProvider` في OIDC كذلك.
 ولـ WebAssembly نطاق واحد للتطبيق كله، و`host.Services` في `Program.cs` هو ذلك النطاق، فتبقى ما بقيت الصفحة.
@@ -277,8 +279,8 @@ ProblemDetails، أو 401 (سجل الدخول مجددا)، أو 403 (لا صل
 | الفحص | النتيجة |
 | --- | --- |
 | البدء | يأتي البيان المجهول من WebApi؛ وتحمل Layouts.Default قبل أول عرض؛ وتعرض الصفحة الرئيسية جدول MudTail |
-| وحدات العميل | في `/client-modules`: يعرض رفع `Module.Dashboard.dll` معرفه وإصداره وصفحته وإعدادات سمته؛ ويضيف تثبيته مدخل القائمة، وفتح `/dashboard` ينزله من `api/client-modules/files/…` مع فحص SHA-256. وتثبت حزمة `.nupkg` بالطريقة نفسها. ويزيله التعطيل من القائمة ويعيده التفعيل، وتطبق تغييرات إعداداته (Preload وعنوان قائمة جديد) فورا. ويعرف الملف نفسه مرة أخرى بأنه مثبت؛ ويرفض ملف `.txt` (400) |
-| وحدات العميل المشحونة | يضع بناء WebApi الوحدات Layouts.Default وDashboard وReports ومجلد Module.Tenants في `CoreClientModules/`؛ ويزرع أول تشغيل الأربع، ولا يحصل المجهول إلا على التخطيط، وإعادة التشغيل بعد التحزيم مجددا لا تزرع شيئا |
+| وحدات العميل | في `/client-modules`: يعرض رفع `Module.Dashboard.dll` (مخرجات بناء نموذج Dashboard) معرفه وإصداره وصفحته وإعدادات سمته؛ ويضيف تثبيته مدخل القائمة، وفتح `/dashboard` ينزله من `api/client-modules/files/…` مع فحص SHA-256. وتثبت حزمة `.nupkg` بالطريقة نفسها. ويزيله التعطيل من القائمة ويعيده التفعيل، وتطبق تغييرات إعداداته (Preload وعنوان قائمة جديد) فورا. ويعرف الملف نفسه مرة أخرى بأنه مثبت؛ ويرفض ملف `.txt` (400) |
+| وحدات العميل المشحونة | يضع بناء WebApi الوحدات Layouts.Default وLayouts.Admin وModule.Admin ومجلد Module.Tenants في `CoreClientModules/` (ووقت هذا الفحص أيضا Dashboard وReports، وهما نموذجان الآن)؛ ويزرعها أول تشغيل، ولا يحصل المجهول إلا على التخطيط، وإعادة التشغيل بعد التحزيم مجددا لا تزرع شيئا |
 | الدخول | ‏`/login` ← صفحة دخول خدمة الهوية (MudTail) ← رد النداء ← الدخول كمدير المنصة؛ وتظهر وحدات المستخدم |
 | إعادة التحميل | تبقى الجلسة بعد إعادة تحميل الصفحة؛ والرابط المباشر إلى `/dashboard` ينزل Module.Dashboard |
 | وحدة `.nupkg` | يحمل `/reports` الوحدة Module.Reports وورقة أنماطها من الحزمة |

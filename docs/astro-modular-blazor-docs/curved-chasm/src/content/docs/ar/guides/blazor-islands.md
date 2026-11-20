@@ -21,8 +21,9 @@ sidebar:
 
 ## لماذا مضيف منفصل
 
-يضيف ملف `Program.cs` في العميل المكون `App` إلى `#app` ويحمل وحدات بدء التشغيل قبل أول عرض. وفي صفحة Astro لا
-يوجد `#app`، ولا داعي لتنزيل القوالب ووحدة تسجيل الدخول من أجل أداة صغيرة. المضيف المنفصل يبقى صغيرا ويبدأ
+يضيف ملف `Program.cs` في العميل (`ModularBlazor.BlzWebClient`) المكون `App` إلى `#app`، ويجلب بيان وحدات العميل، ويحمل
+وحدات بدء التشغيل قبل أول عرض. وفي صفحة Astro لا
+يوجد `#app`، ولا داعي لتنزيل القوالب وفهرس الوحدات من أجل أداة صغيرة. المضيف المنفصل يبقى صغيرا ويبدأ
 بسرعة.
 
 ## 1. مضيف الجزر
@@ -37,45 +38,64 @@ sidebar:
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ModularBlazor.Infrastructure\ModularBlazor.Infrastructure.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Authentication" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <!-- A generated API client from a module repo, here the Content client (or its package). -->
+    <ProjectReference Include="..\..\..\..\..\ModularBlazor.Module.Content\src\WebApi.Modules.Content.Client\WebApi.Modules.Content.Client.csproj" />
   </ItemGroup>
 </Project>
 ```
 
 ```csharp title="src/apps/blazor/ModularBlazor.Islands/Program.cs"
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-using soft.square.net.ModularBlazor.Infrastructure.Auth;
+using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
 // Each island gets a name that Astro pages use. Parameters are passed as JSON from the page.
-builder.RootComponents.RegisterForJavaScript<TodoSummary>(identifier: "todo-summary");
+builder.RootComponents.RegisterForJavaScript<LatestPosts>(identifier: "latest-posts");
 builder.RootComponents.RegisterForJavaScript<LeagueTable>(identifier: "league-table");
 
-// The same typed API clients the client uses (ApiBaseUrl from appsettings.json).
-builder.Services.AddApiClients(builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5100");
+// The same OIDC settings as the client ("Oidc" in wwwroot/appsettings.json), so the islands see the user the client
+// signed in (same origin, same tab). Islands never start a sign-in themselves: they link to /app/login.
+builder.Services.AddOidcAuthentication(o => builder.Configuration.Bind("Oidc", o.ProviderOptions));
+
+// The gateway ("WebApi:BaseUrl"), like the client's AddWebApiClient: "WebApi" with the token, "WebApi.Public" without.
+var gateway = new Uri(builder.Configuration["WebApi:BaseUrl"] ?? "http://localhost:5080/");
+builder.Services.AddHttpClient("WebApi", c => c.BaseAddress = gateway)
+    .AddHttpMessageHandler(sp => sp.GetRequiredService<AuthorizationMessageHandler>()
+        .ConfigureHandler(authorizedUrls: [gateway.ToString()]));
+builder.Services.AddHttpClient("WebApi.Public", c => c.BaseAddress = gateway);
 
 await builder.Build().RunAsync();
 ```
 
+
 مكونات الجزر مكونات Razor عادية. اجعلها مكتفية بذاتها: تأخذ مدخلاتها معاملات، وتعرض روابط بدلا من التنقل،
 ولا تعتمد على قالب.
 
-```razor title="TodoSummary.razor"
-@inject IApiClient Api
+```razor title="LatestPosts.razor"
+@inject IHttpClientFactory Http
 
 <section class="mud-card">
   <h3 class="mud-card__title">@Title</h3>
-  @if (_open is null) { <p>Loading…</p> }
-  else { <p>@_open open tasks · <a href="/app/todo">Open the app</a></p> }
+  @if (_count is null) { <p>Loading…</p> }
+  else { <p>@_count posts on your desk · <a href="/app/">Open the app</a></p> }
 </section>
 
 @code {
-  [Parameter] public string Title { get; set; } = "My tasks";
-  private int? _open;
-  protected override async Task OnInitializedAsync() => _open = await Api.CountOpenTodosAsync(); // your API call
+  [Parameter] public string Title { get; set; } = "My desk";
+  private int? _count;
+
+  protected override async Task OnInitializedAsync()
+  {
+    var content = new ContentClient(Http.CreateClient("WebApi")); // signed-in user's token
+    try { _count = (await content.ListPostsAsync(PostView.Desk)).Count; }
+    catch (AccessTokenNotAvailableException) { _count = 0; }   // not signed in: render the fallback text
+  }
 }
 ```
+
 
 ## 2. تشغيل البيئة من صفحة Astro
 
@@ -214,22 +234,22 @@ import BlazorIsland from '../../components/BlazorIsland.astro';
 ## وحدات وقت التشغيل
 
 لا يعرف مضيف الجزر إلا المكونات التي بني معها. والمكونات الموجودة في **وحدة تحمل أثناء التشغيل**
-(`Module.ToDo`، `Module.Reports`) لا يمكن تسجيلها مباشرة، لأن `RegisterForJavaScript` يحتاج النوع قبل بناء المضيف.
+(نموذجا Dashboard وReports، أو أي وحدة يثبتها المسؤول) لا يمكن تسجيلها مباشرة، لأن `RegisterForJavaScript` يحتاج النوع قبل بناء المضيف.
 وهناك طريقان:
 
 - **الإشارة إلى مشروع الوحدة** من مضيف الجزر. بسيط، لكن الجزيرة تشحن مع المضيف ولم تعد تتبع إصدارات الوحدة.
 - **مكون عام `ModuleIsland`.** سجل مكونا واحدا (`"module-island"`) يأخذ معرف وحدة واسم نوع مكون، فينزل
   الوحدة ويعرض النوع عبر `DynamicComponent`. يتطلب ذلك محمل الوحدات الموجود اليوم في
-  `ModularBlazor.Client/Services` (`ModuleManager.EnsureLoadedAsync`)، والذي يجب نقله أولا إلى مكتبة مشتركة مع
-  قارئات الحزم ومخزن الأصول.
+  `ModularBlazor.BlzWebClient/Services` ‏(`ModuleManager` وقارئات الحزم ومخزن الأصول)، والذي يجب نقله أولا إلى مكتبة
+  مشتركة.
 
 ابدأ بالخيار الأول، ولا تنتقل إلى الثاني إلا حين تحتاج عدة وحدات إلى جزر.
 
 ## قائمة التحقق
 
 - [ ] مضيف الجزر منشور في `/islands/` على **الأصل نفسه** الذي عليه موقع Astro.
-- [ ] ملف `appsettings.json` الخاص به يضبط `ApiBaseUrl`، والقائمة `Cors:Origins` في الواجهة البرمجية تتضمن أصل
-  الموقع.
+- [ ] ملف `appsettings.json` الخاص به فيه قيم `Oidc` و`WebApi:BaseUrl` نفسها التي في العميل، والقائمة
+  `Cors:AllowedOrigins` في المجموعات تتضمن أصل الموقع.
 - [ ] كل جزيرة تعرض بديلا مفيدا في فتحتها.
 - [ ] الجزر تعرض روابط بدلا من التنقل، وتمرر البيانات معاملات.
 - [ ] MudTail ينسق الجزيرة: فهي تستخدم أصناف CSS نفسها التي يستخدمها باقي الصفحة.

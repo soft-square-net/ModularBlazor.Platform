@@ -12,27 +12,30 @@ sidebar:
 | --- | --- |
 | `WebApi` | المضيف. يحمل مجلد `Modularity/` بيئة التشغيل. والصورة نفسها تعمل في كل مجموعة. |
 | `WebApi.Contracts` | `IRuntimeModule` و`ModuleManifest`. يشير إليه المضيف، فهو مشترك دائما. |
-| `Modules/Core/*` | الوحدات الأساسية (`Identity` و`Tenancy`)، تشحن مع كل إصدار من WebApi. |
-| `Modules/Custom/WebApi.Modules.Greeting` | وحدة مخصصة نموذجية. **لا** يشير إليها المضيف: تضغط مخرجات بنائها وترفع. |
-| `Modules/Custom/Inventory` | وحدة مخصصة نموذجية مقسمة إلى مشاريع Domain وApplication وInfrastructure. |
-| `Aspire/Hybird` | مختبر قابل للتشغيل: بوابة، وثلاث مجموعات، ووسيط، وRedis، وPostgreSQL. انظر [مختبر البنية الهجينة](/ar/backend/hybrid-lab/). |
+| `Modules/Core/*` | الوحدات الأساسية (`identity` و`tenancy` و`client-modules`)، تشحن مع كل إصدار من WebApi. |
+| `ModularBlazor.Samples`: ‏`samples/Greeting` | وحدة مخصصة نموذجية (مشروع واحد). **لا** يشير إليها المضيف: تضغط مخرجات بنائها وترفع. |
+| `ModularBlazor.Samples`: ‏`samples/Inventory` | وحدة مخصصة نموذجية مقسمة إلى مشاريع Domain وApplication وInfrastructure. |
+| `ModularBlazor.Samples`: ‏`samples/Pulse` | وحدة نموذجية لها خط معالجة خاص وخدمة مستضافة. |
+| `ModularBlazor.Module.Shifts` و`ModularBlazor.Module.Content` | وحدات غرفة الأخبار (بطبقات): المناوبات، والمنشورات وسير عملها. انظر [المحتوى](/ar/modules/contents/). |
+| `ModularBlazor.Module.Elsa` | Elsa 3.9 وحدة تشغيل بخط معالجة خاص و`HotUnload = false`. انظر [Elsa](/ar/modules/elsa/). |
+| `Aspire/Hybird` | مختبر قابل للتشغيل: بوابة، وأربع مجموعات، وخدمة الهوية، ووسيط، وRedis، وPostgreSQL. انظر [مختبر البنية الهجينة](/ar/backend/hybrid-lab/). |
 
-كل المسارات تحت `src/WebApi/`.
+المسارات تحت `src/WebApi/` في `ModularBlazor.Platform`، عدا `Aspire/Hybird` ‏(`src/Aspire/Hybird`)؛ أما الوحدات المخصصة
+فتعيش في مستودعاتها الخاصة ([المستودعات والحزم](/ar/backend/repositories/)).
 
 ## الوحدات الأساسية والمخصصة
 
-في `src/WebApi/Modules/` مجلدان. تعمل وحداتهما بالطريقة نفسها أثناء التشغيل (سياق التحميل نفسه، والحاوية الفوقية،
-والتبديل والبث)؛ ويختلفان في طريقة وصولها:
+تعيش الوحدات الأساسية في `src/WebApi/Modules/Core/`، والمخصصة في مستودعاتها الخاصة. ويعمل النوعان بالطريقة نفسها أثناء التشغيل (سياق التحميل نفسه، والحاوية الفوقية،
+والتبديل والبث)؛ ويختلفان في طريقة وصولهما:
 
-| المجلد | البناء | الوصول إلى الفهرس | الإزالة |
+| النوع | البناء | الوصول إلى الفهرس | الإزالة |
 | --- | --- | --- | --- |
-| `Core/` | يبنيها WebApi مع كل إصدار؛ وتنسخ مخرجاتها إلى `CoreModules/<AssemblyName>/` | تزرع بحالة `Active` عند البدء | يمكن إلغاء تفعيلها وتفريغها وإعادة ضبطها، لكن لا يمكن إلغاء تثبيتها ولا استبدالها برفع (`409`)؛ ولا تُرقى إلا بإصدار |
-| `Custom/` | تبنى وحدها، خارج إصدار WebApi | يرفعها المسؤول (`POST /api/admin/modules`) | بالكامل: تثبيت وتفعيل وإلغاء تفعيل وتفريغ وإلغاء تثبيت |
+| أساسية (`Modules/Core/`) | يبنيها WebApi مع كل إصدار؛ وتنسخ مخرجاتها إلى `CoreModules/<AssemblyName>/` | تزرع بحالة `Active` عند البدء | يمكن إلغاء تفعيلها وتفريغها وإعادة ضبطها، لكن لا يمكن إلغاء تثبيتها ولا استبدالها برفع (`409`)؛ ولا تُرقى إلا بإصدار |
+| مخصصة (مستودعات الوحدات) | تبنى وحدها بـ Module SDK، خارج إصدار WebApi | يرفعها المسؤول (`POST /api/admin/modules`) | بالكامل: تثبيت وتفعيل وإلغاء تفعيل وتفريغ وإلغاء تثبيت |
 
-- يحمل `Modules/Directory.Build.props` الإعدادات المشتركة للوحدات ذات الطبقات (`<Name>.Domain` و`<Name>.Application`
-  و`<Name>.Infrastructure`). ومشروع Infrastructure هو التجميعة الرئيسية للوحدة.
-- يعلم `Core/Directory.Build.props` الوحدات الأساسية ويضبط تحزيمها.
-- لا يفعل `Custom/Directory.Build.props` سوى استيراد الإعدادات المشتركة: فالوحدات المخصصة ليست جزءا من إصدار WebApi أبدا.
+- يضبط `Modules/Directory.Build.props` و`Core/Directory.Build.props` الوحدات الأساسية وتحزيمها.
+- تعطي Module SDK ‏(`soft.square.net.ModularBlazor.Module.Sdk`) الوحدات المخصصة قواعد الطبقات نفسها (`<Name>.Domain`
+  و`<Name>.Application` و`<Name>.Infrastructure`) من NuGet. ومشروع Infrastructure هو التجميعة الرئيسية للوحدة.
 - لا تطبق المجموعة أيا من النوعين إلا إذا تضمنته قائمة `Modules:Enabled` الخاصة بها، أو كانت القائمة فارغة.
 
 ### الوحدات الأساسية
@@ -54,19 +57,19 @@ sidebar:
 
 ## الوحدات ذات الطبقات
 
-تستخدم وحدات الأعمال (المحتوى، والمناوبات، والمبيعات، والوحدة النموذجية `Custom/Inventory`) طبقات البنية النظيفة. أما وحدات
+تستخدم وحدات الأعمال (المحتوى، والمناوبات، والمبيعات، ووحدة Inventory النموذجية) طبقات البنية النظيفة. أما وحدات
 الربط الصغيرة (`identity` و`tenancy` و`greeting`) فتبقى مشاريع مفردة: ثلاثة مشاريع هناك تضيف عبء بناء وتحزيم دون أن تحمي
 أي منطق نطاق.
 
 ```text
-Modules/Custom/<Name>/
+ModularBlazor.Module.<Name>/src/
   WebApi.Modules.<Name>.Domain          aggregates, rules, DomainException      → WebApi.SharedKernel
   WebApi.Modules.<Name>.Application     use cases, specifications, DTOs         → Domain, WebApi.Contracts
   WebApi.Modules.<Name>.Infrastructure  IRuntimeModule, endpoints, DbContext,   → Application, WebApi.Data, Carter
                                         migrations (the entry assembly)
 ```
 
-- **إعداد البناء:** يختار `Modules/Directory.Build.props` مراجع كل طبقة بحسب لاحقة اسم المشروع، فلا يشير مشروع الطبقة إلا
+- **إعداد البناء:** تختار Module SDK مراجع كل طبقة بحسب لاحقة اسم المشروع، فلا يشير مشروع الطبقة إلا
   إلى الطبقة التي تحته. وكل تجميعة يشحنها المضيف (SharedKernel وContracts وData وEF Core وArdalis وCarter) يبنى عليها ولا تشحن
   أبدا: فالحزمة هي تجميعات الوحدة الثلاث فقط.
 - **نقاط النهاية في تجميعة الدخول:** لا تربط بيئة التشغيل إلا أصناف `ICarterModule` في التجميعة التي تحوي `IRuntimeModule`.

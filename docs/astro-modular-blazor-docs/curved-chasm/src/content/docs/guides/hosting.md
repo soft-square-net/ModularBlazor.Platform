@@ -7,40 +7,45 @@ sidebar:
 
 ## Local development
 
-Run each part with its own tool; they talk over HTTP.
+The Hybird Aspire lab starts the platform; the Astro site and MudTail run with their own tools. They talk over HTTP.
 
 | Part | Command | URL |
 | --- | --- | --- |
-| API | `dotnet run --project src/api/ModularBlazor.Host` | http://localhost:5100 |
-| Blazor client | `dotnet run --project src/apps/blazor/ModularBlazor.Client` | http://localhost:5000 |
+| Platform lab | `dotnet run --project src/Aspire/Hybird --launch-profile http` | dashboard link in the console |
+| Gateway (WebApi pools) | started by the lab | http://localhost:5080 |
+| Identity service | started by the lab | http://localhost:5090 |
+| Blazor client | started by the lab (`ModularBlazor.BlzWebClient`) | http://localhost:5070 |
 | Astro site | `npm run dev` in the Astro project | http://localhost:4321 |
 | MudTail demo | `npx vite --port 3001` in `src/MudTail` | http://localhost:3001 |
 
 In development the Astro site and the client are on **different origins** (ports), so they do not share
-`localStorage`. To test the shared theme and sign-in, proxy the client through Astro's dev server:
+browser storage. To test the shared theme and sign-in, proxy the client through Astro's dev server:
 
 ```js title="astro.config.mjs"
 export default defineConfig({
   vite: {
     server: {
-      proxy: { '/app': { target: 'http://localhost:5000', changeOrigin: true } },
+      proxy: { '/app': { target: 'http://localhost:5070', changeOrigin: true } },
     },
   },
 });
 ```
 
-The client must then be built with `<base href="/app/">`.
+The client must then be built with `<base href="/app/">`, the identity service must accept
+`http://localhost:4321/app/authentication/login-callback` as a redirect URI (`Identity:BlazorClient:RedirectUris`), and
+`http://localhost:4321` must be in `Cors:AllowedOrigins` of the pools and the identity service.
 
 ## Production: one nginx site
 
-The client image already serves the Blazor app with nginx (`src/apps/blazor/ModularBlazor.Client/nginx`). Put the
-Astro output at the root and the client under `/app/`:
+The Blazor client is static files (`dotnet publish` output, `wwwroot/`), so any static server works; nginx is used
+here. Put the Astro output at the root and the client under `/app/`. Modules are not files of the site: the client
+downloads them from the WebApi (`api/client-modules/files/…`), checked against the SHA-256 in the manifest.
 
 ```text
 /usr/share/nginx/html/
   index.html, news/, sport/, _astro/, 404.html     Astro (dist/)
   app/
-    index.html, _framework/, css/, modules/         Blazor client (publish output, base href /app/)
+    index.html, _framework/, css/, js/              Blazor client (publish output, base href /app/)
   islands/                                          optional islands host
 ```
 
@@ -49,12 +54,9 @@ root /usr/share/nginx/html;
 include /etc/nginx/mime.types;
 types { application/wasm wasm; application/octet-stream dll; }
 
-# Modules: raw bytes, never the SPA fallback, never stale.
-location ^~ /app/modules/ {
-    gzip off;
-    default_type application/octet-stream;
+# The client's own settings (gateway and identity addresses): never stale.
+location = /app/appsettings.json {
     add_header Cache-Control "no-cache";
-    try_files $uri =404;
 }
 
 # Blazor client: unknown paths under /app/ go to its index.html and the Router handles them.
@@ -77,12 +79,12 @@ location /_astro/ {
 
 :::caution
 Keep the `/app/` fallback scoped to `/app/`. A site-wide `try_files … /index.html` would answer every missing
-Astro page, and every missing module, with the Blazor shell instead of a 404.
+Astro page with the Blazor shell instead of a 404.
 :::
 
 ## Docker
 
-Extend the client's Dockerfile with an Astro stage and copy both outputs into the nginx image:
+Build the Astro site and publish the client in two stages, and copy both outputs into one nginx image:
 
 ```dockerfile
 FROM node:22 AS astro
@@ -92,7 +94,10 @@ RUN npm ci
 COPY docs/astro-site/ ./
 RUN npm run build
 
-# … the existing .NET publish stage of the client, publishing to /app/publish …
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS publish
+WORKDIR /src
+COPY . .
+RUN dotnet publish src/apps/blazor/ModularBlazor.BlzWebClient -c Release -o /app/publish
 
 FROM nginx:alpine
 COPY --from=astro /site/dist/ /usr/share/nginx/html/
@@ -103,8 +108,9 @@ Replace `docs/astro-site` with the folder of your Astro project. If the site imp
 `src/MudTail` into the stage and build it first (`npm --prefix src/MudTail ci && npm --prefix src/MudTail run build`),
 because its `file:` dependency points at that folder.
 
-Under Aspire the client container already bind-mounts `wwwroot/modules`. With the client under `/app/`, mount it
-at `/usr/share/nginx/html/app/modules` instead.
+Write the production `wwwroot/appsettings.json` (the `Oidc:Authority` and `WebApi:BaseUrl` of that environment) into
+the image, or mount it at `/usr/share/nginx/html/app/appsettings.json`: a WebAssembly app reads no server-side
+environment.
 
 ## This documentation site
 

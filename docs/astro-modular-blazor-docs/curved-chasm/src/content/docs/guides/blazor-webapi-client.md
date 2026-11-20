@@ -5,9 +5,10 @@ sidebar:
   order: 6
 ---
 
-`src/apps/blazor/ModularBlazor.BlzWebClient` is the Blazor WebAssembly client of the WebApi platform. It replaces
-`ModularBlazor.Client`, which talks to the obsolete `api/ModularBlazor.Host`. It keeps the old client's module system
-(catalog, loader, layouts, router), and changes three things:
+`src/apps/blazor/ModularBlazor.BlzWebClient` is the Blazor WebAssembly client of the WebApi platform. It replaced
+`ModularBlazor.Client`, which talked to the old `api/ModularBlazor.Host`; both are gone from `ModularBlazor.Platform`
+and remain only in the obsolete `ModularBlazor` repository. It kept the old client's module system (catalog, loader,
+layouts, router), and changed four things:
 
 | | `ModularBlazor.Client` (old) | `ModularBlazor.BlzWebClient` |
 | --- | --- | --- |
@@ -152,21 +153,23 @@ build and publish output (`BuildCoreClientModules` in `src/WebApi/WebApi/WebApi.
 | Module | Shipped as | Loaded |
 | --- | --- | --- |
 | `Layouts.Default` | `.dll` | Startup, for everyone: the default layout, the theme and the MudTail runtime |
-| `Module.Dashboard` | `.dll` | Lazy, `/dashboard`, signed-in users |
-| `Module.Reports` | `.nupkg` | Lazy, `/reports`, signed-in users |
 | `Module.Tenants` | folder: `.dll` + `soft.square.net.WebApi.Modules.Core.Tenancy.Client.dll` | Lazy, `/tenants`, `platform-admin` only |
 | `Module.Admin` | `.dll` | Lazy, `/admin`, `platform-admin` only; pulls in `Layouts.Admin` |
 | `Layouts.Admin` | `.dll` | With `Module.Admin` (its dependency): the `admin` layout |
 
-On startup the core module seeds them as **core** modules, with the settings of each one's `[assembly: ClientModule]`.
+`Module.Dashboard` (`.dll`, `/dashboard`) and `Module.Reports` (`.nupkg`, `/reports`) used to ship here too; they are
+now samples in `ModularBlazor.Samples` and are installed by an admin on `/client-modules` like any other module. A
+WebApi that seeded them before releases them on its next start: they stay installed, but are no longer core (an admin
+can disable or remove them).
+
+On startup the core module seeds the shipped ones as **core** modules, with the settings of each one's `[assembly: ClientModule]`.
 A new build with other files becomes the active version; an admin's settings are kept. A `.nupkg` is compared by its
 content, so packing the same code again is not a new version. Skip the module build with
 `-p:BuildClientModules=false`.
 
 To ship another module, add a `CoreClientModule` item to `WebApi.csproj`: plain for a `.dll`, `Pack="true"` for a
 `.nupkg` (the project sets `PackageId`), or the same `Folder="<name>"` on every assembly of a module that needs
-private assemblies (like `Module.Tenants` and its generated client). Not shipped, because they only work with the old
-Host: `Module.Auth` and `Module.ToDo`.
+private assemblies (like `Module.Tenants` and its generated client).
 
 `ModuleManager`, `ActiveModuleService` and the auth services are **scoped**, because the OIDC
 `AuthenticationStateProvider` is scoped. WebAssembly has one scope for the whole app, and `host.Services` in
@@ -292,8 +295,8 @@ the request fails before it gets an answer (gateway down, or the origin missing 
 | Check | Result |
 | --- | --- |
 | Startup | The anonymous manifest comes from the WebApi; Layouts.Default loads before the first render; the home page shows the MudTail table |
-| Client modules | On `/client-modules`: uploading `Module.Dashboard.dll` shows its id, version, page and attribute settings; installing it adds the menu entry, and opening `/dashboard` downloads it from `api/client-modules/files/…` with its SHA-256 checked. A `.nupkg` installs the same way. Disable removes it from the menu, enable brings it back, and changing its settings (Preload, a new menu title) applies at once. The same file again is recognised as installed; a `.txt` is refused (400) |
-| Shipped client modules | A WebApi build puts Layouts.Default, Dashboard, Reports and the Module.Tenants folder in `CoreClientModules/`; the first start seeds all four, anonymous callers get only the layout, and a restart after packing again seeds nothing |
+| Client modules | On `/client-modules`: uploading `Module.Dashboard.dll` (the Dashboard sample's build output) shows its id, version, page and attribute settings; installing it adds the menu entry, and opening `/dashboard` downloads it from `api/client-modules/files/…` with its SHA-256 checked. A `.nupkg` installs the same way. Disable removes it from the menu, enable brings it back, and changing its settings (Preload, a new menu title) applies at once. The same file again is recognised as installed; a `.txt` is refused (400) |
+| Shipped client modules | A WebApi build puts Layouts.Default, Layouts.Admin, Module.Admin and the Module.Tenants folder in `CoreClientModules/` (at the time of this check also Dashboard and Reports, which are samples now); the first start seeds them, anonymous callers get only the layout, and a restart after packing again seeds nothing |
 | Sign-in | `/login` → identity service sign-in page (MudTail) → callback → signed in as the platform admin; the user modules appear |
 | Reload | The session survives a page reload; a deep link to `/dashboard` downloads Module.Dashboard |
 | `.nupkg` module | `/reports` loads Module.Reports and its stylesheet from the package |

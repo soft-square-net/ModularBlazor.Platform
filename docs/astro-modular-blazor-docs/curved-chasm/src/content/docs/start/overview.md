@@ -5,9 +5,11 @@ sidebar:
   order: 1
 ---
 
-The Modular Blazor project is a **standalone Blazor WebAssembly client** that downloads its features as modules
-(`.dll` or `.nupkg`) at runtime, an **ASP.NET Core API** (module catalog, identity, tenants, host modules) and
-**MudTail**, the UI kit its layouts are built on. Astro fits next to it as the tool for pages that should be
+The Modular Blazor platform ([`ModularBlazor.Platform`](https://github.com/soft-square-net/ModularBlazor.Platform)) is a
+**standalone Blazor WebAssembly client** (`ModularBlazor.BlzWebClient`) that downloads its features as modules (`.dll`
+or `.nupkg`) at runtime, an **ASP.NET Core WebApi** behind a YARP gateway (runtime modules, client module catalog,
+tenants), an **OpenIddict identity service**, and **MudTail**, the UI kit its layouts are built on. Feature modules
+live in their own repositories ([Repositories and packages](/backend/repositories/)). Astro fits next to it as the tool for pages that should be
 plain, fast, indexable HTML.
 
 ## Why add Astro
@@ -31,7 +33,7 @@ added as **islands**: small components that hydrate on their own, when you ask t
 | Signed-in app, admin, modules | links to it | renders it, loads modules on navigation | catalog, auth, tenants |
 | Look and feel | MudTail CSS + `data-mud` behaviours | MudTail through `Layouts.Default` | — |
 | Interactive widget on a public page | hosts a **Blazor island** or a small JS island | provides the component | serves its data |
-| Sign-in | link to `/app/login` | `Module.Auth`, JWT in local storage | `POST /api/v1/identity/tokens` |
+| Sign-in | link to `/app/login` | OpenID Connect (code + PKCE), user in `sessionStorage` | the identity service issues the tokens; the WebApi checks them |
 
 ## The three ways to combine them
 

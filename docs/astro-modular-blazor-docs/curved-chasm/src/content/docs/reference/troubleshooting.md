@@ -9,10 +9,18 @@ sidebar:
 
 The SPA fallback is site-wide. Scope it to `/app/` (see [Hosting](/guides/hosting/#production-one-nginx-site)).
 
-## The client loads, but modules return 404 or index.html
+## The client loads, but modules fail to load
 
 - `<base href>` in the client's `index.html` must be `/app/` when it is served from `/app/`.
-- The `location ^~ /app/modules/` block must come with `^~`, so the `.dll` rule cannot take those files over.
+- Modules come from the WebApi (`api/client-modules/files/…`), not from the site: check `WebApi:BaseUrl` in the
+  client's `appsettings.json` and the browser's network tab. A SHA-256 mismatch means a stale cache in front of the
+  gateway.
+
+## Sign-in fails with "invalid redirect_uri"
+
+The identity service accepts only the redirect URIs listed for `blazor-client`
+(`Identity:BlazorClient:RedirectUris`). Add `<site>/app/authentication/login-callback` and the matching
+`logout-callback` when the client moves under `/app/`.
 
 ## "Could not find any element matching selector '#app'"
 
@@ -28,7 +36,8 @@ with `RegisterForJavaScript` and does not add `App` to `#app`.
 
 ## CORS errors from the browser
 
-Add the page's exact origin (scheme, host and port) to `Cors:Origins` in the API settings.
+Add the page's exact origin (scheme, host and port) to `Cors:AllowedOrigins` of the WebApi pools and of the identity
+service (in the lab, `Cors__AllowedOrigins__<n>` in `src/Aspire/Hybird/AppHost.cs`).
 
 ## Dark mode differs between the site and the app
 

@@ -7,7 +7,7 @@ sidebar:
 
 This page walks through one module from start to finish. The example is a small **Notes** module (`notes`): a
 tenant-scoped `Note` aggregate, two endpoints, one permission and one setting. Every step names the real files and
-commands of this repository. How the runtime works underneath: [Runtime modules](/backend/runtime-modules/).
+commands of the platform repo and of the module's own repo. How the runtime works underneath: [Runtime modules](/backend/runtime-modules/).
 
 ```mermaid
 flowchart LR
@@ -36,47 +36,56 @@ Answer these before you create a project. Each answer changes a later step.
 Pick a module **id** now. It must be lowercase `a-z`, `0-9`, `.`, `-`, and it never changes: it names the catalog
 entry, the default route prefix (`/api/notes`), the database schema and the `Modules:Enabled` entries of pools.
 
-## 2. Scaffold the projects
+## 2. Scaffold the repository
 
-Layered custom modules live in `src/WebApi/Modules/Custom/<Name>/`. The build settings come from
-`src/WebApi/Modules/Directory.Build.props`, which recognises each layer by its **project-name suffix**, so the names
-matter.
+A module lives in a repository of its own, next to the platform's, and builds against the platform's NuGet packages
+through the **Module SDK**. [Repositories and packages](/backend/repositories/) explains the packages, the feed token and
+the CI workflow; this step only creates the files. Copy `global.json`, `NuGet.Config` and `Directory.Build.props` from
+an existing module repo (or start from `ModularBlazor.ModuleTemplate`), then:
 
 ```bash
-cd src/WebApi/Modules/Custom
-dotnet new classlib -n WebApi.Modules.Notes.Domain -o Notes/WebApi.Modules.Notes.Domain
-dotnet new classlib -n WebApi.Modules.Notes.Application -o Notes/WebApi.Modules.Notes.Application
-dotnet new classlib -n WebApi.Modules.Notes.Infrastructure -o Notes/WebApi.Modules.Notes.Infrastructure
+mkdir ModularBlazor.Module.Notes && cd ModularBlazor.Module.Notes
+git init -b main
+dotnet new classlib -n WebApi.Modules.Notes.Domain -o src/WebApi.Modules.Notes.Domain
+dotnet new classlib -n WebApi.Modules.Notes.Application -o src/WebApi.Modules.Notes.Application
+dotnet new classlib -n WebApi.Modules.Notes.Infrastructure -o src/WebApi.Modules.Notes.Infrastructure
+dotnet new sln --format slnx -n ModularBlazor.Module.Notes
+dotnet sln ModularBlazor.Module.Notes.slnx add src/*/*.csproj
 ```
 
-Delete the generated `Class1.cs` files and reduce each project file to what the shared props don't already provide.
-`TargetFramework`, `Nullable`, `ImplicitUsings` and the `soft.square.net.` assembly/namespace prefix come from the
-repository's root `Directory.Build.props`.
+Restoring needs `GITHUB_PACKAGES_TOKEN` in the environment (a PAT with `read:packages`).
 
-```xml title="Notes/WebApi.Modules.Notes.Domain/WebApi.Modules.Notes.Domain.csproj"
+Delete the generated `Class1.cs` files and reduce each project file to the SDK line and its references.
+`TargetFramework`, `Nullable`, `ImplicitUsings` and the `soft.square.net.` assembly/namespace prefix come from the
+repository's `Directory.Build.props`; the SDK version comes from `global.json`.
+
+```xml title="src/WebApi.Modules.Notes.Domain/WebApi.Modules.Notes.Domain.csproj"
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- References WebApi.SharedKernel (compile only) through Modules/Directory.Build.props. -->
+  <Sdk Name="soft.square.net.ModularBlazor.Module.Sdk" />
+  <!-- References WebApi.SharedKernel (compile only). -->
 </Project>
 ```
 
-```xml title="Notes/WebApi.Modules.Notes.Application/WebApi.Modules.Notes.Application.csproj"
+```xml title="src/WebApi.Modules.Notes.Application/WebApi.Modules.Notes.Application.csproj"
 <Project Sdk="Microsoft.NET.Sdk">
+  <Sdk Name="soft.square.net.ModularBlazor.Module.Sdk" />
   <ItemGroup>
     <ProjectReference Include="..\WebApi.Modules.Notes.Domain\WebApi.Modules.Notes.Domain.csproj" />
   </ItemGroup>
 </Project>
 ```
 
-```xml title="Notes/WebApi.Modules.Notes.Infrastructure/WebApi.Modules.Notes.Infrastructure.csproj"
+```xml title="src/WebApi.Modules.Notes.Infrastructure/WebApi.Modules.Notes.Infrastructure.csproj"
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- The entry assembly. NOT referenced by WebApi: its build output is zipped and uploaded. -->
+  <Sdk Name="soft.square.net.ModularBlazor.Module.Sdk" />
+  <!-- The entry assembly. Its build output is zipped and uploaded. -->
   <ItemGroup>
     <ProjectReference Include="..\WebApi.Modules.Notes.Application\WebApi.Modules.Notes.Application.csproj" />
   </ItemGroup>
 </Project>
 ```
 
-What the suffixes give you:
+The SDK recognises each layer by its **project-name suffix**, so the names matter:
 
 | Layer | Gets automatically | Never ships |
 | --- | --- | --- |
@@ -88,14 +97,8 @@ Host-shipped assemblies are compiled against but excluded from the output, so th
 assemblies and your private dependencies. **Do not** add your own `PackageReference` to EF Core, Carter or
 Ardalis.Specification: the host's copies are used at runtime whatever version you compile against.
 
-Add the projects to the solution so the IDE and `dotnet build` of the solution see them:
-
-```bash
-dotnet sln ModularBlazor.slnx add --solution-folder src/WebApi/Modules/Custom/Notes src/WebApi/Modules/Custom/Notes/*/*.csproj
-```
-
-Never add a `ProjectReference` from `WebApi` to a custom module. If the host referenced it, its types would load
-into the default context and could never be unloaded or upgraded.
+The module never references platform source, and the platform never references the module. If the host referenced
+it, its types would load into the default context and could never be unloaded or upgraded.
 
 ## 3. Domain: the aggregate and its rules
 
@@ -282,20 +285,22 @@ Optional extras:
 ## 6. Migrations for all four engines
 
 A tenant's database can run on PostgreSQL, SQL Server, MySQL or Oracle, so a module ships **one migration set per
-engine** in `Migrations/<Provider>`. The script `src/WebApi/scripts/Add-Migration.ps1` runs `dotnet ef` once per
-engine and keeps the four model snapshots apart:
+engine** in `Migrations/<Provider>`. The platform script `src/WebApi/scripts/Add-Migration.ps1` runs `dotnet ef` once per
+engine and keeps the four model snapshots apart. Run it from the `ModularBlazor.Platform` folder, with the module repo
+cloned next to it:
 
 ```powershell
-./src/WebApi/scripts/Add-Migration.ps1 -Project src/WebApi/Modules/Custom/Notes/WebApi.Modules.Notes.Infrastructure -Name InitialCreate
+./src/WebApi/scripts/Add-Migration.ps1 -Project ../ModularBlazor.Module.Notes/src/WebApi.Modules.Notes.Infrastructure -Name InitialCreate
 ```
 
-It sets `EfDesignAssets=all` while it runs, because dotnet-ef needs the host-shipped assemblies next to the project.
+It sets `EfDesignAssets=all` while it runs, because dotnet-ef needs the host-shipped assemblies next to the project (the
+Module SDK copies them only then).
 Check that the model and all four sets agree:
 
 ```powershell
 $env:EfDesignAssets = 'all'
 foreach ($p in 'PostgreSql','SqlServer','MySql','Oracle') {
-  dotnet ef migrations has-pending-model-changes --project src/WebApi/Modules/Custom/Notes/WebApi.Modules.Notes.Infrastructure -- --provider $p
+  dotnet ef migrations has-pending-model-changes --project ../ModularBlazor.Module.Notes/src/WebApi.Modules.Notes.Infrastructure -- --provider $p
 }
 Remove-Item Env:EfDesignAssets
 ```
@@ -316,11 +321,11 @@ activated**, for every active tenant, and again when a tenant is created. Nothin
 
 ## 7. Build and pack
 
-A package is a `.zip` of the **contents** of the Infrastructure project's output folder.
+A package is a `.zip` of the **contents** of the Infrastructure project's output folder. Run these in the module repo.
 
 ```powershell
 Remove-Item Env:EfDesignAssets -ErrorAction SilentlyContinue
-$proj = 'src/WebApi/Modules/Custom/Notes/WebApi.Modules.Notes.Infrastructure'
+$proj = 'src/WebApi.Modules.Notes.Infrastructure'
 dotnet build $proj -c Release
 Compress-Archive -Path "$proj/bin/Release/net10.0/*" -DestinationPath notes-1.0.0.zip -Force
 ```
@@ -328,7 +333,7 @@ Compress-Archive -Path "$proj/bin/Release/net10.0/*" -DestinationPath notes-1.0.
 The same in bash:
 
 ```bash
-proj=src/WebApi/Modules/Custom/Notes/WebApi.Modules.Notes.Infrastructure
+proj=src/WebApi.Modules.Notes.Infrastructure
 dotnet build "$proj" -c Release
 (cd "$proj/bin/Release/net10.0" && zip -r "$OLDPWD/notes-1.0.0.zip" .)
 ```
@@ -708,7 +713,7 @@ modules: one would tie every module release to a host release. `Content` is the 
 
 ```mermaid
 flowchart LR
-    E["Carter endpoints<br/>.WithName(&quot;Content_ListPosts&quot;)"] -->|Export-ModuleOpenApi.ps1| D["Content/openapi/content.json<br/>committed: the API contract"]
+    E["Carter endpoints<br/>.WithName(&quot;Content_ListPosts&quot;)"] -->|Export-ModuleOpenApi.ps1| D["src/openapi/content.json<br/>committed: the API contract"]
     D -->|"NSwag, on build"| C["WebApi.Modules.Content.Client<br/>ContentClient : IContentClient"]
     D -->|openapi-typescript| T["Astro islands<br/>(TypeScript types)"]
     C --> B["Blazor client module<br/>ships the client dll"]
@@ -734,12 +739,12 @@ content.MapGet("/presses", (TaxonomyService taxonomy, CancellationToken ct) => t
 ### 2. Export the document
 
 ```powershell
-./src/WebApi/scripts/Export-ModuleOpenApi.ps1 -Project src/WebApi/Modules/Custom/Content/WebApi.Modules.Content.Infrastructure -ModuleId content
+./src/WebApi/scripts/Export-ModuleOpenApi.ps1 -Project ../ModularBlazor.Module.Content/src/WebApi.Modules.Content.Infrastructure -ModuleId content
 ```
 
 A module's document exists only while the module is routed, so the script builds the host and the module, starts a
 throwaway host (Development, no tenants, no database, no lab), installs and activates the module with a
-`dotnet user-jwts` admin token, saves `/openapi/modules/content.json` to `Content/openapi/content.json` and stops the
+`dotnet user-jwts` admin token, saves `/openapi/modules/content.json` to `src/openapi/content.json` in the module repo and stops the
 host. Commit the file: reviews then show every API change as a diff.
 
 In CI, `-Check` exports to a temporary file and exits with 1 when it differs from the committed one.
@@ -754,7 +759,7 @@ The host shapes module documents for generators (`ModularOpenApi`):
 
 ### 3. Generate the C# client
 
-`Content/WebApi.Modules.Content.Client` is a plain class library: no reference to the WebApi, and no runtime
+`src/WebApi.Modules.Content.Client` (in `ModularBlazor.Module.Content`) is a plain class library: no reference to the WebApi, and no runtime
 dependency beyond `HttpClient` and `System.Text.Json`, so a Blazor client module can reference it and ship it inside
 its own package. NSwag (`NSwag.MSBuild`) runs on build when `content.json` or `nswag.json` changed, and writes
 `Generated/ContentClient.g.cs`, which is committed.
@@ -773,7 +778,7 @@ In a Blazor client module:
 ```csharp
 @inject IHttpClientFactory HttpClients
 
-private IContentClient Content => new ContentClient(HttpClients.CreateClient("ModularBlazor.API")); // ApiClientNames.Authenticated
+private IContentClient Content => new ContentClient(HttpClients.CreateClient(HttpClientNames.WebApi)); // "WebApi": the gateway, with the token
 
 var desk = await Content.ListPostsAsync(PostView.Desk);
 try { await Content.PublishPostAsync(post.Id, new VersionRequest { Version = post.Version }); }
@@ -785,24 +790,24 @@ catch (ContentApiException e) when (e.StatusCode == 409) { /* someone else chang
 Copy `WebApi.Modules.Content.Client` next to the module's other projects, rename it, set the namespace, the exception
 class and the document path in `nswag.json` and the `.csproj`, export the document, and build.
 
-A **single-project** module (like Greeting or Pulse) has no folder of its own around the project, so the client goes
-next to it as `WebApi.Modules.<Name>.Client` (never inside the module's folder, where the module would compile it).
-Pass `-Output` to the export so the document lands in the module's folder:
+A **single-project** module (like Greeting or Pulse in `ModularBlazor.Samples`) keeps its client next to the project as
+`WebApi.Modules.<Name>.Client` (never inside the module's project folder, where the module would compile it). Pass
+`-Output` to the export so the document lands in the module's folder:
 
 ```powershell
-./src/WebApi/scripts/Export-ModuleOpenApi.ps1 -Project src/WebApi/Modules/Custom/WebApi.Modules.Greeting `
-  -ModuleId greeting -Output src/WebApi/Modules/Custom/WebApi.Modules.Greeting/openapi/greeting.json
+./src/WebApi/scripts/Export-ModuleOpenApi.ps1 -Project ../ModularBlazor.Samples/samples/Greeting/src/WebApi.Modules.Greeting `
+  -ModuleId greeting -Output ../ModularBlazor.Samples/samples/Greeting/src/WebApi.Modules.Greeting/openapi/greeting.json
 ```
 
-Every custom module has a client today:
+Every custom module with endpoints has a client today:
 
-| Module | Document | Client project | Clients |
-| --- | --- | --- | --- |
-| Content | `Content/openapi/content.json` | `Content/WebApi.Modules.Content.Client` | `ContentClient` (21 operations) |
-| Shifts | `Shifts/openapi/shifts.json` | `Shifts/WebApi.Modules.Shifts.Client` | `ShiftsClient` (15) |
-| Inventory | `Inventory/openapi/inventory.json` | `Inventory/WebApi.Modules.Inventory.Client` | `InventoryClient` (4) |
-| Greeting | `WebApi.Modules.Greeting/openapi/greeting.json` | `WebApi.Modules.Greeting.Client` | `GreetingClient` (3) |
-| Pulse | `WebApi.Modules.Pulse/openapi/pulse.json` | `WebApi.Modules.Pulse.Client` | `PulseClient` (1: `/status`) |
+| Module | Repository | Document | Client project | Clients |
+| --- | --- | --- | --- | --- |
+| Content | `ModularBlazor.Module.Content` | `src/openapi/content.json` | `src/WebApi.Modules.Content.Client` | `ContentClient` (21 operations) |
+| Shifts | `ModularBlazor.Module.Shifts` | `src/openapi/shifts.json` | `src/WebApi.Modules.Shifts.Client` | `ShiftsClient` (15) |
+| Inventory | `ModularBlazor.Samples` | `samples/Inventory/src/openapi/inventory.json` | `samples/Inventory/src/WebApi.Modules.Inventory.Client` | `InventoryClient` (4) |
+| Greeting | `ModularBlazor.Samples` | `samples/Greeting/src/WebApi.Modules.Greeting/openapi/greeting.json` | `samples/Greeting/src/WebApi.Modules.Greeting.Client` | `GreetingClient` (3) |
+| Pulse | `ModularBlazor.Samples` | `samples/Pulse/src/WebApi.Modules.Pulse/openapi/pulse.json` | `samples/Pulse/src/WebApi.Modules.Pulse.Client` | `PulseClient` (1: `/status`) |
 
 Core modules work the same way, with two differences. They are active as soon as the host starts, so the export
 installs nothing: `Export-ModuleOpenApi.ps1 -CoreModuleId tenancy` writes
@@ -832,7 +837,7 @@ with `-HostDocument` (no module is installed):
 | `HealthClient` | `GetAsync` (throws `WebApiException` with status 503 when the replica is unhealthy) |
 
 ```csharp
-var modules = new ModulesClient(http);   // http: the "ModularBlazor.API" client, signed in as a platform admin
+var modules = new ModulesClient(http);   // http: the "WebApi" client, signed in as a platform admin
 await using var zip = File.OpenRead("greeting.zip");
 var record = await modules.InstallAsync(new FileParameter(zip, "greeting.zip", "application/zip"));
 var status = await modules.ActivateAsync(record.Id!);   // status.Routes: the live routes on the replica that answered
@@ -854,10 +859,9 @@ OpenAPI setup does this for every `IFormFile`), which is what makes NSwag genera
 For TypeScript (Astro islands), generate types from the same document with `openapi-typescript` and call the API
 with `openapi-fetch`.
 
-The old `src/ModularBlazor.Abstractions/Api/ApiClient.cs` was generated from the previous API
-(`http://localhost:5100/openapi/v1.json`) and does not cover the runtime modules. The hand-written `IModuleAdminApi`
-behind the Blazor "Module Management" page also calls the previous API (`/api/v1/modules/...`); the runtime lifecycle
-is in `WebApi.Client`'s `ModulesClient`, which the new Blazor client's **Host modules** page uses (see
+`src/ModularBlazor.Abstractions/Api/ApiClient.cs` and the hand-written `IModuleAdminApi` are left over from the old
+`ModularBlazor.Host` API (`/api/v1/modules/...`) and do not cover the runtime modules; nothing in the platform uses
+them any more. The runtime lifecycle is in `WebApi.Client`'s `ModulesClient`, which the new Blazor client's **Host modules** page uses (see
 [The Blazor client for WebApi](/guides/blazor-webapi-client/#host-module-management)).
 
 ## Making it a core module instead
@@ -876,7 +880,8 @@ Core modules can be deactivated, unloaded and configured, but not uninstalled or
 ## Checklist
 
 - [ ] Id and route prefix chosen; lowercase; unique among installed modules.
-- [ ] Project names end in `.Domain`, `.Application`, `.Infrastructure`; no reference from `WebApi` to the module.
+- [ ] Its own repository with `global.json` (Module SDK version), `NuGet.Config` and a CI workflow that reads `PACKAGES_TOKEN`.
+- [ ] Project names end in `.Domain`, `.Application`, `.Infrastructure`; no reference to platform source.
 - [ ] Exactly one public `IRuntimeModule` with a parameterless constructor, in the Infrastructure project.
 - [ ] Every `RequirePermission` name is declared in `Manifest.Permissions`.
 - [ ] Every tenant entity implements `ITenantOwned`; the `DbContext` derives from `TenantDbContext` with its own `Schema`.

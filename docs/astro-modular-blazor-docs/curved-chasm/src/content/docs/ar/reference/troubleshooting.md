@@ -9,10 +9,16 @@ sidebar:
 
 بديل SPA مفعل على مستوى الموقع كله. احصره في `/app/` (راجع [الاستضافة](/ar/guides/hosting/#الإنتاج-موقع-nginx-واحد)).
 
-## العميل يحمل، لكن الوحدات تعيد 404 أو index.html
+## العميل يحمل، لكن الوحدات لا تحمل
 
 - يجب أن تكون `<base href>` في `index.html` الخاص بالعميل هي `/app/` حين يخدم من `/app/`.
-- يجب أن تأتي الكتلة `location ^~ /app/modules/` مع `^~`، كي لا تستحوذ قاعدة `.dll` على تلك الملفات.
+- تأتي الوحدات من WebApi ‏(`api/client-modules/files/…`) لا من الموقع: تحقق من `WebApi:BaseUrl` في `appsettings.json`
+  الخاص بالعميل ومن تبويب الشبكة في المتصفح. وعدم تطابق SHA-256 يعني ذاكرة تخزين قديمة أمام البوابة.
+
+## يفشل تسجيل الدخول برسالة "invalid redirect_uri"
+
+لا تقبل خدمة الهوية إلا عناوين إعادة التوجيه المسجلة للعميل `blazor-client` ‏(`Identity:BlazorClient:RedirectUris`).
+أضف `<site>/app/authentication/login-callback` و`logout-callback` المقابل حين ينتقل العميل إلى `/app/`.
 
 ## "Could not find any element matching selector '#app'"
 
@@ -28,7 +34,8 @@ sidebar:
 
 ## أخطاء CORS في المتصفح
 
-أضف أصل الصفحة بدقة (البروتوكول والمضيف والمنفذ) إلى `Cors:Origins` في إعدادات الواجهة البرمجية.
+أضف أصل الصفحة بدقة (البروتوكول والمضيف والمنفذ) إلى `Cors:AllowedOrigins` في مجموعات WebApi وفي خدمة الهوية (في المختبر:
+`Cors__AllowedOrigins__<n>` في `src/Aspire/Hybird/AppHost.cs`).
 
 ## الوضع الداكن يختلف بين الموقع والتطبيق
 

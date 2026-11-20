@@ -5,8 +5,9 @@ sidebar:
   order: 1
 ---
 
-الواجهة البرمجية (`ModularBlazor.Host`) **تطبيق موحد معياري**: كل وحدة (Auth وCatalog وMultitenancy وMedia
-وTodo وغيرها) تعيش في حل واحد، ولها مشاريع Domain وApplication وInfrastructure خاصة بها. يشرح هذا القسم كيف
+الواجهة البرمجية (`src/WebApi/WebApi` في `ModularBlazor.Platform`) **تطبيق موحد معياري**: صورة واحدة تشغل كل الوحدات
+(الهوية والمستأجرين ووحدات العميل والمحتوى والمناوبات وغيرها) داخل العملية نفسها، ولكل وحدة مشاريع Domain وApplication
+وInfrastructure خاصة بها. الوحدات الأساسية تشحن معها؛ والبقية تبنى في مستودعاتها الخاصة وترفع والواجهة تعمل. يشرح هذا القسم كيف
 تنشر هذه الواجهة وكيف تتوسع وكيف تمدد:
 
 - **شيفرة واحدة وطريقتان للنشر.** شغل الصورة نفسها نسخا متطابقة (السيناريو A)، أو قسم الوحدات إلى مجموعات
@@ -31,24 +32,23 @@ Edge load balancer + YARP gateway        TLS, JWT, rate limit, tenant resolution
    OpenTelemetry: traces, metrics, logs (tenant + correlation ids) across everything
 ```
 
-## أين تعيش في المستودع
+## أين تعيش
 
 | المسار | ما هو |
 | --- | --- |
-| `src/api/ModularBlazor.Host` | مضيف الواجهة الإنتاجي ووحداته المدمجة (`HostModules`) |
-| `src/WebApi/WebApi` | النموذج الأولي لوحدات التشغيل: صورة واحدة تعمل كأي مجموعة |
+| `src/WebApi/WebApi` | مضيف الواجهة: صورة واحدة تعمل كأي مجموعة |
 | `src/WebApi/WebApi.Contracts` | `IRuntimeModule` و`ModuleManifest`، وعقود المستأجرين والأمان التي تراها الوحدات |
 | `src/WebApi/WebApi.Data` | طبقة بيانات يشحنها المضيف: `TenantDbContext`، ومخزن المستأجرين، وأربعة مزودين لـ EF Core |
 | `src/WebApi/WebApi.SharedKernel` | أنواع نطاق أساسية وواجهات مستودعات يشحنها المضيف (دون EF) |
-| `src/WebApi/Identity/WebApi.Identity.Server` | خدمة الهوية OpenIddict (في الفرع `claude/identity-service-da759e`، ولم تدمج بعد) |
-| `src/WebApi/Modules/Core/` | **الوحدات الأساسية** (`Identity` و`Tenancy`): تبنى مع كل إصدار من WebApi وتفعل افتراضيا |
-| `src/WebApi/Modules/Custom/` | **الوحدات المخصصة**: تبنى وحدها وترفع والتطبيق يعمل |
-| `src/WebApi/Modules/Custom/WebApi.Modules.Greeting` | وحدة مخصصة نموذجية، ترفع كحزمة |
-| `src/WebApi/Modules/Custom/Inventory` | وحدة مخصصة نموذجية بطبقات (Domain وApplication وInfrastructure) |
-| `src/Aspire/Hybird` | مختبر Aspire: بوابة، وثلاث مجموعات، وRabbitMQ وRedis وPostgreSQL |
+| `src/WebApi/Identity/WebApi.Identity.Server` | خدمة الهوية OpenIddict (المنفذ 5090 في المختبر) |
+| `src/WebApi/Modules/Core/` | **الوحدات الأساسية** (`identity` و`tenancy` و`client-modules`): تبنى مع كل إصدار من WebApi وتفعل افتراضيا |
+| `src/ModularBlazor.Module.Sdk` | حزمة Module SDK التي تبنى بها الوحدات المخصصة، وتنشر مع حزم العقود |
+| `src/Aspire/Hybird` | مختبر Aspire: بوابة، وأربع مجموعات، وخدمة الهوية، وRabbitMQ وRedis وPostgreSQL |
+| `ModularBlazor.Samples` (مستودع) | وحدات مخصصة نموذجية: Greeting وInventory (بطبقات) وPulse، ووحدتا العميل Dashboard وReports |
+| `ModularBlazor.Module.*` (مستودعات) | **الوحدات المخصصة**: Content وShifts وStorage وElsa؛ تبنى وحدها وترفع والتطبيق يعمل |
 
-يحمل `src/WebApi/Modules/Directory.Build.props` الإعدادات المشتركة للوحدات ذات الطبقات؛ ويضيف كل من `Core/` و`Custom/`
-ملف `Directory.Build.props` خاصا به فوقه. والنوعان وحدات تشغيل عادية: لا يختلفان إلا في طريقة وصولهما (مع الإصدار، أو
+يحمل `src/WebApi/Modules/Directory.Build.props` إعدادات الوحدات الأساسية؛ وتأخذ الوحدات المخصصة القواعد نفسها من
+Module SDK (انظر [المستودعات والحزم](/ar/backend/repositories/)). والنوعان وحدات تشغيل عادية: لا يختلفان إلا في طريقة وصولهما (مع الإصدار، أو
 برفع من المسؤول). انظر [وحدات أثناء التشغيل](/ar/backend/runtime-modules/).
 
 ## اقرأ بهذا الترتيب
