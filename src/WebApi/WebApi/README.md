@@ -7,7 +7,7 @@ from an uploaded `.dll`, `.zip` (build output) or `.nupkg`. No restart needed fo
 |---|---|
 | `WebApi` | Host. `Modularity/` holds the runtime. |
 | `WebApi.Contracts` | `IRuntimeModule` + `ModuleManifest`. Referenced by the host, so it is always shared. |
-| `WebApi.Modules.Greeting` | Sample module, **not** referenced by the host. Zip its `bin/<Configuration>/net10.0` and upload it. |
+| `greeting` | Sample module, in [ModularBlazor.Samples](https://github.com/soft-square-net/ModularBlazor.Samples/tree/main/samples/Greeting). Zip its `bin/<Configuration>/net10.0` and upload it. |
 | `Modules/Core/WebApi.Modules.Core.*` | Core modules: ship with every release and are seeded as `Active` on first start. See [Core modules](#core-modules). |
 | `WebApi.Modules.Pulse` | Sample for [module hosted services and pipelines](#module-hosted-services-pipelines-and-hotunload): a `BackgroundService` and a private pipeline. |
 | `Modules/Custom/Shifts`, `Modules/Custom/Content` | Newsroom modules (uploaded like any custom module). See [Newsroom modules](#newsroom-modules-shifts-and-content). |
@@ -549,11 +549,14 @@ content: article workflow ─► IAccessScopes.HasPermissionAsync(permission, [p
 
 ## Try it
 
+The Greeting sample lives in [ModularBlazor.Samples](https://github.com/soft-square-net/ModularBlazor.Samples). In a
+checkout of it:
+
 ```bash
-dotnet build src/WebApi/Modules/Custom/WebApi.Modules.Greeting
+dotnet build samples/Greeting/src/WebApi.Modules.Greeting
 ```
 
-Zip the *contents* of `src/WebApi/Modules/Custom/WebApi.Modules.Greeting/bin/Debug/net10.0`, run the host
+Zip the *contents* of its `bin/Debug/net10.0`, run the host
 (`dotnet run --project src/WebApi/WebApi --launch-profile http`), then use `WebApi.http`.
 
 Pulse (hosted services and pipeline) works the same way: build `src/WebApi/Modules/Custom/WebApi.Modules.Pulse`, zip
