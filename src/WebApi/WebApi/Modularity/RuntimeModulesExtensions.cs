@@ -47,14 +47,15 @@ public static class RuntimeModulesExtensions
     }
 
     /// <summary>
-    /// Startup: seed the core modules this release ships, then converge on the catalog (modules marked Active come
-    /// back online). If seeding changed the catalog, replicas that are already running are told to re-sync.
+    /// Startup: seed the core modules this release ships (and, in Development, the Modules:Local build outputs), then
+    /// converge on the catalog (modules marked Active come back online). If seeding changed the catalog, replicas that are already running are told to re-sync.
     /// </summary>
     private sealed class ModuleReconciler(ModuleRuntime runtime) : IHostedService
     {
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            var seeded = await runtime.SeedCoreModulesAsync(cancellationToken);
+            var seeded = (await runtime.SeedCoreModulesAsync(cancellationToken))
+                .Concat(await runtime.SeedLocalModulesAsync(cancellationToken)).ToList();
             await runtime.SyncAsync(cancellationToken);
             if (seeded.Count > 0) await runtime.PublishCoreSeededAsync(seeded, cancellationToken);
         }

@@ -30,6 +30,14 @@ public sealed class ModuleRuntimeOptions
     /// <summary>Core module packages shipped with this release (one folder per module), relative to the app base directory.</summary>
     public string CorePath { get; set; } = "CoreModules";
 
+    /// <summary>
+    /// Development only (ignored in other environments): modules loaded from a build output folder, by module id, e.g.
+    /// <c>Modules:Local:content = ../Module.Content/src/.../bin/Debug/net10.0</c>. On every start the folder is installed
+    /// like an upload (and activated the first time) when its files changed, so rebuilding the module and restarting the
+    /// WebApi shows the change without packing or uploading. Used by the module repos' playgrounds.
+    /// </summary>
+    public Dictionary<string, string> Local { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>How long a module's hosted services may take to start, and (all together) to stop.</summary>
     public TimeSpan HostedServiceTimeout { get; set; } = TimeSpan.FromSeconds(10);
 
@@ -71,11 +79,13 @@ internal sealed partial class ModuleRuntime
     private readonly IModuleStateBus _bus;
     private readonly ILogger<ModuleRuntime> _log;
     private readonly ModuleRuntimeOptions _options;
+    private readonly IHostEnvironment _environment;
 
     public ModuleRuntime(IOptions<ModuleRuntimeOptions> options, IHostEnvironment environment, ModuleEndpointDataSource endpoints,
         HostServices host, IServiceProvider hostRoot, IModuleStateBus bus, ILogger<ModuleRuntime> log)
     {
         _options = options.Value;
+        _environment = environment;
         _root = Path.GetFullPath(options.Value.Path, environment.ContentRootPath);
         _routeBase = "/" + options.Value.RoutePrefix.Trim('/');
         Directory.CreateDirectory(_root);
@@ -275,79 +285,121 @@ internal sealed partial class ModuleRuntime
 
         var changed = new List<string>();
         foreach (var folder in Directory.EnumerateDirectories(source).Order(StringComparer.OrdinalIgnoreCase))
+            if (await SeedFolderAsync(folder, core: true, ct) is { } id) changed.Add(id);
+        return changed;
+    }
+
+    /// <summary>
+    /// Development only: installs each <see cref="ModuleRuntimeOptions.Local"/> build output folder like an upload when its
+    /// files differ from the catalog's copy (first time: Active; afterwards the admin's state and settings are kept).
+    /// Runs on startup next to <see cref="SeedCoreModulesAsync"/>. Returns the ids that changed.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> SeedLocalModulesAsync(CancellationToken ct)
+    {
+        if (_options.Local.Count == 0) return [];
+        if (!_environment.IsDevelopment())
         {
-            string entry;
-            ModuleManifest manifest;
-            try
+            _log.LogWarning("Modules:Local is ignored: local modules load only in the Development environment");
+            return [];
+        }
+
+        var changed = new List<string>();
+        foreach (var (name, path) in _options.Local.OrderBy(p => p.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            var folder = Path.GetFullPath(path, _environment.ContentRootPath);
+            if (!Directory.Exists(folder))
             {
-                (entry, manifest) = Inspect(folder);
-                Validate(manifest);
-            }
-            catch (Exception e) when (e is ModuleException or IOException or BadImageFormatException or TypeLoadException)
-            {
-                _log.LogError(e, "Core module package {Folder} is invalid; skipped", Path.GetFileName(folder));
+                _log.LogError("Local module {Name}: folder {Folder} does not exist (build the module first)", name, folder);
                 continue;
             }
-            var hash = HashFolder(folder);
-
-            await _gate.WaitAsync(ct);
-            try
-            {
-                using (await _store.LockAsync(ct))
-                {
-                    ReloadRecords();
-                    _records.TryGetValue(manifest.Id, out var previous);
-                    if (previous is { Core: true } && previous.PackageHash == hash) continue;
-                    if (previous is { Core: true } && CompareVersions(manifest.Version, previous.Version) < 0)
-                    {
-                        _log.LogInformation("Core module {Id}: catalog has {Catalog}, this release ships {Shipped}; keeping the newer one",
-                            manifest.Id, previous.Version, manifest.Version);
-                        continue;
-                    }
-                    if (previous is { Core: false })
-                        _log.LogWarning("Uploaded module {Id} is replaced by the core module this release ships", manifest.Id);
-
-                    var prefix = manifest.RoutePrefix.Trim('/');
-                    var clash = _records.Values.FirstOrDefault(r => r.Id != manifest.Id && r.RoutePrefix.Equals(prefix, StringComparison.OrdinalIgnoreCase));
-                    if (clash is not null)
-                    {
-                        _log.LogError("Core module {Id} not seeded: route prefix '{Prefix}' is used by module {Other}", manifest.Id, prefix, clash.Id);
-                        continue;
-                    }
-
-                    var moduleFolder = Path.Combine(_root, manifest.Id);
-                    if (Directory.Exists(moduleFolder)) Directory.Delete(moduleFolder, recursive: true); // replicas load from bytes
-                    CopyFolder(folder, Path.Combine(moduleFolder, manifest.Version));
-
-                    var settings = new Dictionary<string, string?>(manifest.DefaultSettings);
-                    if (previous is not null)
-                        foreach (var (key, value) in previous.Settings)
-                            if (settings.ContainsKey(key)) settings[key] = value;
-
-                    _records[manifest.Id] = new ModuleRecord
-                    {
-                        Id = manifest.Id,
-                        Name = manifest.Name,
-                        Version = manifest.Version,
-                        RoutePrefix = prefix,
-                        Description = manifest.Description,
-                        HotUnload = manifest.HotUnload,
-                        EntryAssembly = entry,
-                        Settings = settings,
-                        DesiredState = previous?.DesiredState ?? ModuleState.Active,
-                        InstalledAt = DateTimeOffset.UtcNow,
-                        Core = true,
-                        PackageHash = hash,
-                        Permissions = manifest.Permissions.ToList()
-                    };
-                    _store.Save(_records.Values);
-                    changed.Add(manifest.Id);
-                    _log.LogInformation("Seeded core module {Id} {Version} ({Mode})", manifest.Id, manifest.Version, previous is null ? "new" : "upgrade");
-                }
-            }
-            finally { _gate.Release(); }
+            if (await SeedFolderAsync(folder, core: false, ct) is { } id) changed.Add(id);
         }
         return changed;
+    }
+
+    /// <summary>
+    /// Copies one module folder (a core package or a local build output) into the catalog when its files differ from the
+    /// catalog's copy, under the store lock. Returns the module id when the catalog changed.
+    /// </summary>
+    private async Task<string?> SeedFolderAsync(string folder, bool core, CancellationToken ct)
+    {
+        var kind = core ? "Core" : "Local";
+        string entry;
+        ModuleManifest manifest;
+        try
+        {
+            (entry, manifest) = Inspect(folder);
+            Validate(manifest);
+        }
+        catch (Exception e) when (e is ModuleException or IOException or BadImageFormatException or TypeLoadException)
+        {
+            _log.LogError(e, "{Kind} module package {Folder} is invalid; skipped", kind, core ? Path.GetFileName(folder) : folder);
+            return null;
+        }
+        var hash = HashFolder(folder);
+
+        await _gate.WaitAsync(ct);
+        try
+        {
+            using (await _store.LockAsync(ct))
+            {
+                ReloadRecords();
+                _records.TryGetValue(manifest.Id, out var previous);
+                if (previous is not null && previous.Core == core && previous.PackageHash == hash) return null;
+                if (core && previous is { Core: true } && CompareVersions(manifest.Version, previous.Version) < 0)
+                {
+                    _log.LogInformation("Core module {Id}: catalog has {Catalog}, this release ships {Shipped}; keeping the newer one",
+                        manifest.Id, previous.Version, manifest.Version);
+                    return null;
+                }
+                if (!core && previous is { Core: true })
+                {
+                    _log.LogError("Local module {Id} not installed: it is a core module, upgraded only by a WebApi release", manifest.Id);
+                    return null;
+                }
+                if (core && previous is { Core: false })
+                    _log.LogWarning("Uploaded module {Id} is replaced by the core module this release ships", manifest.Id);
+
+                var prefix = manifest.RoutePrefix.Trim('/');
+                var clash = _records.Values.FirstOrDefault(r => r.Id != manifest.Id && r.RoutePrefix.Equals(prefix, StringComparison.OrdinalIgnoreCase));
+                if (clash is not null)
+                {
+                    _log.LogError("{Kind} module {Id} not installed: route prefix '{Prefix}' is used by module {Other}", kind, manifest.Id, prefix, clash.Id);
+                    return null;
+                }
+
+                var moduleFolder = Path.Combine(_root, manifest.Id);
+                if (Directory.Exists(moduleFolder)) Directory.Delete(moduleFolder, recursive: true); // replicas load from bytes
+                CopyFolder(folder, Path.Combine(moduleFolder, manifest.Version));
+
+                var settings = new Dictionary<string, string?>(manifest.DefaultSettings);
+                if (previous is not null)
+                    foreach (var (key, value) in previous.Settings)
+                        if (settings.ContainsKey(key)) settings[key] = value;
+
+                _records[manifest.Id] = new ModuleRecord
+                {
+                    Id = manifest.Id,
+                    Name = manifest.Name,
+                    Version = manifest.Version,
+                    RoutePrefix = prefix,
+                    Description = manifest.Description,
+                    HotUnload = manifest.HotUnload,
+                    EntryAssembly = entry,
+                    Settings = settings,
+                    DesiredState = previous?.DesiredState ?? ModuleState.Active,
+                    InstalledAt = DateTimeOffset.UtcNow,
+                    Core = core,
+                    PackageHash = hash,
+                    Permissions = manifest.Permissions.ToList()
+                };
+                _store.Save(_records.Values);
+                _log.LogInformation("Installed {Kind} module {Id} {Version} ({Mode})", kind.ToLowerInvariant(), manifest.Id, manifest.Version,
+                    previous is null ? "new" : "upgrade");
+                return manifest.Id;
+            }
+        }
+        finally { _gate.Release(); }
     }
 
     /// <summary>Tells every other replica that core modules were seeded (startup, after the first sync).</summary>

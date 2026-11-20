@@ -108,6 +108,11 @@ unloadable and upgradeable.
 - **Pools:** no special case. A core module is in the shared catalog for every pool, and a pool applies it only if
   `Modules:Enabled` lists it (or the list is empty).
 - `Modules:CorePath` (default `CoreModules`, relative to the app base directory) points elsewhere if needed.
+- **Local modules (Development only):** `Modules:Local:{id}` names a module's build output folder, e.g.
+  `Modules__Local__content=<repo>/src/WebApi.Modules.Content.Infrastructure/bin/Debug/net10.0`. On startup it is
+  installed like an upload when its files changed (first time `Active`; afterwards the admin's state and settings are
+  kept), so rebuild + restart shows a module change without packing or uploading. A local module never replaces a
+  core one. Outside Development the setting is ignored with a warning. The module repos' playgrounds use it.
 - **Dev note:** a rebuild changes the package hash, so a restarted replica re-seeds (swap) the module even at the
   same version. In a lab that runs replicas from different builds of the same version they would keep re-seeding;
   bump the version for real releases.
