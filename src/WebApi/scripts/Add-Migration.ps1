@@ -11,7 +11,7 @@
   The design-time factory reads the engine from "-- --provider <Provider>" (see TenantDbDesignTime).
 
 .EXAMPLE
-  ./src/WebApi/scripts/Add-Migration.ps1 -Project src/WebApi/Modules/Inventory/WebApi.Modules.Inventory.Infrastructure -Name AddReorderLevel
+  ./src/WebApi/scripts/Add-Migration.ps1 -Project ../ModularBlazor.Samples/samples/Inventory/src/WebApi.Modules.Inventory.Infrastructure -Name AddReorderLevel
 
 .EXAMPLE
   ./src/WebApi/scripts/Add-Migration.ps1 -Project src/WebApi/WebApi.Data -Context TenantStoreDbContext -Name AddPlan `

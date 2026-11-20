@@ -343,6 +343,13 @@ internal sealed class ClientModuleCatalog
                 }
                 _log.LogInformation("Seeded core client module {Module} {Version}", record.Id, record.ActiveVersion);
             }
+            // A core module this release no longer ships (moved to its own repo, for example) keeps its files and
+            // settings but becomes an ordinary module, so an admin can delete it or upload a newer version.
+            foreach (var record in records.Where(r => r.Core && !packages.Any(p => p.Id.Equals(r.Id, StringComparison.OrdinalIgnoreCase))))
+            {
+                record.Core = false;
+                _log.LogInformation("Client module {Module} is no longer shipped with the WebApi: kept as an ordinary module.", record.Id);
+            }
             return true;
         }, ct);
     }
