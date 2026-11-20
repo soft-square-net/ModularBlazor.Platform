@@ -32,8 +32,6 @@
   <Folder Name="/Solution/">
     <File Path=".dockerignore" />
     <File Path=".gitignore" />
-    <File Path="build-modules.ps1" />
-    <File Path="build-modules.sh" />
     <File Path="Directory.Build.props" />
     <File Path="extract-solution.ps1" />
     <File Path="PACKIGINGMODULE.md" />
@@ -53,9 +51,7 @@
   </Folder>
   <Folder Name="/src/apps/" />
   <Folder Name="/src/apps/blazor/">
-    <Project Path="src/apps/blazor/ModularBlazor.Client/ModularBlazor.Client.csproj" />
     <Project Path="src/apps/blazor/ModularBlazor.BlzWebClient/ModularBlazor.BlzWebClient.csproj" />
-    <Project Path="src/apps/blazor/ModularBlazor.Infrastructure/ModularBlazor.Infrastructure.csproj" Id="3712d96f-77e9-468d-8e44-ea93a1537de3" />
   </Folder>
   <Folder Name="/src/Aspire/">
     <Project Path="src/Aspire/Hybird/Hybird.csproj" />

@@ -2,8 +2,6 @@ bin/
 obj/
 artifacts/
 .vs/
-/src/apps/blazor/ModularBlazor.Client/wwwroot/modules/*.dll
-/src/apps/blazor/ModularBlazor.Client/wwwroot/modules/*.nupkg
 /src/migrations/MySql/Migrations
 /src/migrations/PostgreSql/Migrations
 /src/migrations/SqlServer/Migrations
@@ -13,10 +11,6 @@ artifacts/
 *.json
 /modules/client/Layouts.Admin/node-app/package-lock.json
 /modules/client/Layouts.Admin/node-app/yarn.lock
-/src/apps/blazor/ModularBlazor.Client/wwwroot/modules/soft.square.net.Layouts.Admin.dll
-/src/apps/blazor/ModularBlazor.Client/wwwroot/modules/user-modules.admin.json
-/src/apps/blazor/ModularBlazor.Client/wwwroot/modules/soft.square.net.Layouts.Default.dll
-/src/apps/blazor/ModularBlazor.Client/wwwroot/modules/soft.square.net.Module.Admin.dll
 
 # node toolchains
 node_modules/

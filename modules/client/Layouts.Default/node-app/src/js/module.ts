@@ -1,6 +1,6 @@
 // Default layout script -> wwwroot/js/module.js
 //
-// moduleHost (ModularBlazor.Client/wwwroot/moduleHost.js) imports this file from a blob URL when the layout
+// moduleHost (ModularBlazor.BlzWebClient/wwwroot/moduleHost.js) imports this file from a blob URL when the layout
 // module is activated, so it must stay a single self-contained file: MudTail and GSAP are bundled in.
 //
 // On activation it:

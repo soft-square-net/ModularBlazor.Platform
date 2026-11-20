@@ -6,8 +6,7 @@ namespace soft.square.net.ModularBlazor.BlzWebClient.Services;
 
 /// <summary>
 /// The WebApi host's module management API (WebApi.Client, generated from src/WebApi/openapi/webapi.json) behind the
-/// YARP gateway, with the signed-in user's access token. It replaces the old IModuleAdminApi, which called the obsolete
-/// api/ModularBlazor.Host.
+/// YARP gateway, with the signed-in user's access token.
 /// Every pool has its own /api/admin/modules (the module catalog is shared, and lifecycle changes are broadcast to every
 /// replica). Through the gateway's catch-all route the call reaches the core pool; the lab gateway also exposes each pool
 /// at /pools/{pool}/..., which <see cref="Modules(string?)"/> uses when a pool is named.
