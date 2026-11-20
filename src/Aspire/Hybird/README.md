@@ -51,6 +51,44 @@ running; they then keep the data volumes in use, and the next run needs them sto
 `GET /api/pool`, or `GET /pools/{pool}/api/pool`, shows which pool, role and replica answered, and which
 connections it was wired to.
 
+## Logs (OpenSearch)
+
+An optional logs stack, **on by default** (`Logs.cs`). Every .NET service (identity, all pool replicas) sends its
+OpenTelemetry logs and traces to an **OpenTelemetry Collector**. The Collector stores them in **OpenSearch** and, in the
+lab, also forwards everything to the Aspire dashboard, so the dashboard works as before.
+
+```
+identity, core-1 … workflow-2 ──OTLP──► otel-collector ──► opensearch ◄── opensearch-dashboards (http://localhost:5601)
+                                              └──────────► Aspire dashboard (lab only)
+```
+
+| Resource | What it is |
+|---|---|
+| `opensearch` | OpenSearch 3.9, single node, volume `hybird-logs-data`. Daily indices `otel-logs-yyyy.MM.dd` and `otel-traces-yyyy.MM.dd`. |
+| `opensearch-dashboards` | Search the logs: **Discover**, index pattern `otel-logs-*` (the default) or `otel-traces-*`. |
+| `otel-collector` | OpenTelemetry Collector (contrib). Its configuration is in `Logs.cs`, passed in an environment variable. |
+| `logs-setup` | Applies the retention policy (delete indices older than `Logs:RetentionDays`) and creates the index patterns, on every start. |
+
+Settings, in `appsettings.json` or on the command line:
+
+| Setting | Default | |
+|---|---|---|
+| `Logs:Enabled` | `true` | `false` removes the stack; the services send their telemetry straight to the Aspire dashboard again. |
+| `Logs:RetentionDays` | `7` | Days to keep logs and traces. |
+| `Logs:JavaOptions` | `-Xms1g -Xmx1g` | OpenSearch heap. |
+
+```bash
+dotnet run --project src/Aspire/Hybird --launch-profile http -- --Logs:Enabled=false
+```
+
+All four images are free and open source: OpenSearch and Dashboards (Apache 2.0), the Collector (Apache 2.0) and curl.
+OpenSearch runs with its security plugin off, which is fine on a developer machine. Expect about 1.5 GB more memory.
+
+Published, the stack replaces the Aspire dashboard (Compose and Kubernetes). Dashboards has no sign-in, so it is not
+public: Compose binds it to `127.0.0.1:5601` on the host (use an SSH tunnel), and on Kubernetes use
+`kubectl -n modularblazor port-forward svc/opensearch-dashboards-service 5601`. Turn on the OpenSearch security plugin
+before exposing it any further. Publish with `Logs__Enabled=false` to leave the stack out and keep the Aspire dashboard.
+
 ## Deploying
 
 The same model publishes to **Docker Compose** or to a **Helm chart**. `Deploy.cs` holds everything that differs from

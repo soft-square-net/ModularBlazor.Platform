@@ -27,6 +27,7 @@ internal sealed class Deployment
 
     private readonly IDistributedApplicationBuilder _builder;
     private readonly IResourceBuilder<KubernetesEnvironmentResource>? _kubernetes;
+    private readonly IResourceBuilder<Aspire.Hosting.Docker.DockerComposeEnvironmentResource>? _compose;
     private readonly IResourceBuilder<KubernetesPersistentVolumeResource>? _catalogVolume;
     private readonly IResourceBuilder<ParameterResource>? _identityHost, _gatewayHost, _clientHost;
 
@@ -69,7 +70,7 @@ internal sealed class Deployment
         switch (Target)
         {
             case "compose":
-                builder.AddDockerComposeEnvironment("compose")
+                _compose = builder.AddDockerComposeEnvironment("compose")
                     .ConfigureComposeFile(file => file.AddVolume(new Volume { Name = "modules-catalog" }));
                 break;
             case "kubernetes":
@@ -87,9 +88,26 @@ internal sealed class Deployment
         }
     }
 
+    /// <summary>The optional logs stack (Logs.cs); null when Logs:Enabled is false.</summary>
+    public LogsStack? Logs { get; set; }
+
+    /// <summary>
+    /// Docker Compose interpolates $NAME and ${NAME} in environment values and commands; text meant for the container
+    /// (a shell script, a config with ${env:...}) has every $ doubled when the target is Compose.
+    /// </summary>
+    public string EscapeForCompose(string text) => Target == "compose" ? text.Replace("$", "$$") : text;
+
+    /// <summary>With the logs stack, published deployments use OpenSearch Dashboards instead of the Aspire dashboard.</summary>
+    public void UseLogsStackInsteadOfAspireDashboard()
+    {
+        _compose?.WithDashboard(false);
+        _kubernetes?.WithDashboard(false);
+    }
+
     /// <summary>Production settings every .NET service gets.</summary>
     public void ConfigureService(IResourceBuilder<ProjectResource> service)
     {
+        Logs?.Collect(service); // OTLP to the Collector instead of the Aspire dashboard (logs stack on)
         service.WithEnvironment("ASPNETCORE_ENVIRONMENT", Environment);
         // Behind the ingress / reverse proxy / gateway: take scheme and host from X-Forwarded-*, so the identity
         // service sees https (OpenIddict requires it outside Development) and links use the public host name.

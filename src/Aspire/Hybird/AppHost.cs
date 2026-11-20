@@ -85,6 +85,9 @@ const int GatewayPort = 5080;
 // Run mode: the localhost values above. Publish mode: public host names from parameters, Production, and the
 // Compose or Kubernetes specifics (shared module catalog volume, identity certificates, ingresses).
 var deploy = new Deployment(builder, IdentityPort, GatewayPort, BlzWebClientPort);
+// Optional logs stack (Logs.cs): OpenTelemetry Collector -> OpenSearch + Dashboards. On by default; Logs:Enabled=false
+// turns it off. The services added below send their telemetry to it through deploy.ConfigureService.
+deploy.Logs = LogsStack.AddIfEnabled(builder, deploy);
 // Resource "identity-db" (names are unique across resources), database "identity", passed as ConnectionStrings:identity.
 var identityDb = tenantData.AddDatabase("identity-db", databaseName: "identity");
 var identity = builder.AddProject<Projects.WebApi_Identity_Server>("identity", launchProfileName: null)
