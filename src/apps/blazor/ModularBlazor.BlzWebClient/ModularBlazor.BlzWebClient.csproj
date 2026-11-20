@@ -9,7 +9,7 @@
       * manages the host (WebApi) modules through WebApi.Client (install, activate, deactivate, unload, uninstall),
         and the client modules through WebApi.Modules.Core.ClientModules.Client (/client-modules);
       * uses MudTail (shipped by the Layouts.Default module) for its tables, forms and buttons.
-    It replaces ModularBlazor.Client, which talks to the obsolete api/ModularBlazor.Host.
+    It replaced ModularBlazor.Client, the client of the old API host (both removed).
   -->
 
   <PropertyGroup>
