@@ -2,9 +2,6 @@ bin/
 obj/
 artifacts/
 .vs/
-/src/migrations/MySql/Migrations
-/src/migrations/PostgreSql/Migrations
-/src/migrations/SqlServer/Migrations
 /.playwright-mcp
 
 /modules/client/Layouts.Admin/node-app/node_modules

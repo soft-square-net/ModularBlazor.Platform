@@ -1,34 +1,4 @@
 <Solution>
-  <Folder Name="/modules/host/Auth/">
-    <Project Path="modules/host/Auth/Auth.Application/Auth.Application.csproj" />
-    <Project Path="modules/host/Auth/Auth.Domain/Auth.Domain.csproj" />
-    <Project Path="modules/host/Auth/Auth.Infrastructure/Auth.Infrastructure.csproj" />
-  </Folder>
-  <Folder Name="/modules/host/Catalog/">
-    <Project Path="modules/host/Catalog/Catalog.Application/Catalog.Application.csproj" />
-    <Project Path="modules/host/Catalog/Catalog.Domain/Catalog.Domain.csproj" />
-    <Project Path="modules/host/Catalog/Catalog.Infrastructure/Catalog.Infrastructure.csproj" />
-  </Folder>
-  <Folder Name="/modules/host/ElsaHost/">
-    <Project Path="modules/host/ElsaHost/ElsaHost.Application/ElsaHost.Application.csproj" />
-    <Project Path="modules/host/ElsaHost/ElsaHost.Infrastructure/ElsaHost.Infrastructure.csproj" />
-  </Folder>
-  <Folder Name="/modules/host/Identity/" />
-  <Folder Name="/modules/host/Media/">
-    <Project Path="modules/host/Media/Media.Application/Media.Application.csproj" />
-    <Project Path="modules/host/Media/Media.Domain/Media.Domain.csproj" />
-    <Project Path="modules/host/Media/Media.Infrastructure/Media.Infrastructure.csproj" />
-  </Folder>
-  <Folder Name="/modules/host/Multitenancy/">
-    <Project Path="modules/host/Multitenancy/Multitenancy.Application/Multitenancy.Application.csproj" />
-    <Project Path="modules/host/Multitenancy/Multitenancy.Domain/Multitenancy.Domain.csproj" />
-    <Project Path="modules/host/Multitenancy/Multitenancy.Infrastructure/Multitenancy.Infrastructure.csproj" />
-  </Folder>
-  <Folder Name="/modules/host/Todo/">
-    <Project Path="modules/host/Todo/Todo.Application/Todo.Application.csproj" />
-    <Project Path="modules/host/Todo/Todo.Domain/Todo.Domain.csproj" />
-    <Project Path="modules/host/Todo/Todo.Infrastructure/Todo.Infrastructure.csproj" />
-  </Folder>
   <Folder Name="/Solution/">
     <File Path=".dockerignore" />
     <File Path=".gitignore" />
@@ -45,10 +15,6 @@
     </Project>
     <Project Path="src/Share.All/Share.All.csproj" Id="1e77fb8d-d73a-4160-b58a-b98df7a9e673" />
   </Folder>
-  <Folder Name="/src/api/_Framework/">
-    <Project Path="src/api/_Framework/Core/Core.csproj" />
-    <Project Path="src/api/_Framework/Infrastructure/Infrastructure.csproj" />
-  </Folder>
   <Folder Name="/src/apps/" />
   <Folder Name="/src/apps/blazor/">
     <Project Path="src/apps/blazor/ModularBlazor.BlzWebClient/ModularBlazor.BlzWebClient.csproj" />
@@ -56,12 +22,6 @@
   <Folder Name="/src/Aspire/">
     <Project Path="src/Aspire/Hybird/Hybird.csproj" />
   </Folder>
-  <Folder Name="/src/migrations/">
-    <Project Path="src/migrations/MySql/MySql.csproj" />
-    <Project Path="src/migrations/PostgreSql/PostgreSql.csproj" />
-    <Project Path="src/migrations/SqlServer/SqlServer.csproj" />
-  </Folder>
-  <Folder Name="/modules/host/" />
   <Folder Name="/modules/" />
   <Folder Name="/modules/client/">
     <Project Path="modules/client/Layouts.Admin/Layouts.Admin.csproj" />

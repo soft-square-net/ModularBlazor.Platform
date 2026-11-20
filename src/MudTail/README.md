@@ -419,7 +419,7 @@ host.appendChild(editor.getElement());
   - `stream` sends one request per size. The body is the image bytes (`Content-Type: image/webp`), with `X-File-Name`, `X-Image-Size`, `X-Image-Width` and `X-Image-Height` headers, and `{name}` in the URL is replaced with the size's name. On the server, read `Request.Body` directly; the image is never buffered. The recipe goes to `upload.recipeUrl` as JSON, with `upload.method`.
   - `includeOriginal: true` also sends the untouched original, the exact bytes that were opened (not the edited full-size image, which is the `original` size). Multipart adds it as an `original` file part. Stream mode sends it first, to `upload.originalUrl`, with `Content-Type` and `X-File-Name`. The upload fails if the original's bytes could not be read, for example an image from another site without CORS. It is off by default.
   - Use `onSave(files)` instead to save in your own way.
-- **Saving to the Modular Blazor API:** the `Media` host module (`modules/host/Media`) implements both modes:
+- **Saving to a server, an example:** the `Media` module of the old API host (since removed) implemented both modes like this:
 
   ```js
   // multipart: one request
