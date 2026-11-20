@@ -51,6 +51,77 @@ running; they then keep the data volumes in use, and the next run needs them sto
 `GET /api/pool`, or `GET /pools/{pool}/api/pool`, shows which pool, role and replica answered, and which
 connections it was wired to.
 
+## Deploying
+
+The same model publishes to **Docker Compose** or to a **Helm chart**. `Deploy.cs` holds everything that differs from
+the lab; run mode is unchanged.
+
+```bash
+aspire publish --apphost src/Aspire/Hybird/Hybird.csproj -o deploy/compose
+```
+
+```bash
+Deploy__Target=kubernetes aspire publish --apphost src/Aspire/Hybird/Hybird.csproj -o deploy/helm
+```
+
+`aspire publish` writes files only and builds no images. `aspire deploy` also builds the images and, for Compose,
+starts them.
+
+### What publish mode changes
+
+| | Run (lab) | Published |
+|---|---|---|
+| Environment | `Development`, dev certificates, dev accounts | `Production`, `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` |
+| Public URLs | `http://localhost:5090`, `:5080`, `:5070` | `https://` + parameters `public-identity-host`, `public-gateway-host`, `public-client-host` |
+| Identity | dev signing keys, seeded dev users | `signing.pfx` + `encryption.pfx` from `/certs` (password `identity-certificate-password`), one platform admin (`admin-email`, `admin-password`), redirect URIs and CORS for the client host only |
+| Module catalog | `App_Data/modules-catalog` in the project folder | a volume every pool replica mounts at `/app/App_Data/modules-catalog` (Compose: named volume; Kubernetes: a `ReadWriteMany` PVC whose storage class is the `modules-storage-class` parameter) |
+| Client | WebAssembly dev server | nginx image (`src/apps/blazor/ModularBlazor.BlzWebClient/Dockerfile`); `OIDC_AUTHORITY` and `WEBAPI_BASE_URL` are written into `appsettings.json` when it starts |
+| Gateway | host port 5080, `/pools/*` routes | public endpoint, no `/pools/*` routes |
+| Kubernetes only | | one ingress per public host (class `nginx`, TLS Secret `<name>-ingress-tls`) |
+
+Parameters (passwords, host names) become entries in `.env` (Compose) or `values.yaml` (Helm). TLS ends in front of
+the services: at the ingress, or at a reverse proxy in front of Compose.
+
+### Compose
+
+1. Fill `.env`: the parameters, each `*_IMAGE` (images you built and pushed, or let `aspire deploy` do it) and each
+   `*_PORT` (`8080` for the .NET images).
+2. Put `signing.pfx` and `encryption.pfx` in `certs/` next to `docker-compose.yaml`.
+3. `docker compose up -d`. The gateway listens on 5080, identity on 5090, the client on 5070. Put a TLS proxy in front
+   that maps the three public host names to them.
+
+### Kubernetes (Helm)
+
+```bash
+kubectl create namespace modularblazor
+```
+
+```bash
+kubectl -n modularblazor create secret generic identity-certificates --from-file=signing.pfx --from-file=encryption.pfx
+```
+
+```bash
+helm upgrade --install modularblazor deploy/helm -n modularblazor -f prod-values.yaml
+```
+
+`prod-values.yaml` sets the `parameters.*` values: the images in your registry, the host names, the passwords and
+`modules_catalog.modules_storage_class` (for example `azurefile`, `efs-sc` or an NFS class). The TLS Secrets come from
+cert-manager or are created by hand. The pool replicas become StatefulSets because they mount the catalog volume.
+
+### Terraform
+
+Aspire has no Terraform output. Use Terraform for what the chart runs on (the cluster, the registry, DNS, and managed
+PostgreSQL, Redis and RabbitMQ if you replace the containers), and install the chart with the `helm_release` resource,
+passing the `parameters.*` values from Terraform outputs.
+
+### Not covered yet
+
+- Each pool replica is its own resource, so the output names ten images (`core-1`, `core-2`, ...) that are all the
+  WebApi image: point them at one tag.
+- PostgreSQL, Redis and RabbitMQ are still containers with volumes. For production, use managed services and pass
+  their connection strings instead.
+- Not deployed to a real cluster yet: the output was checked with `docker compose config` and `helm lint`.
+
 ## Verified
 
 - **Gateway balancing (L7):** the gateway balances **per request** across replicas. With 12 requests each: core 6/6, sales 3/3/3/3, worker 6/6.
