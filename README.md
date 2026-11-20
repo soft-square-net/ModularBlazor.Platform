@@ -44,8 +44,6 @@ src/ModularBlazor.Abstractions          client-module contracts: [ClientModule],
 src/apps/blazor/ModularBlazor.BlzWebClient  the client: ModuleManager, ActiveModuleService, App.razor (Router), ModuleRouteView
 src/WebApi                              the server: WebApi host, contracts, data layer, core modules, identity service
 src/Aspire/Hybird                       Aspire lab: gateway, WebApi pools, identity, client, PostgreSQL, Redis, RabbitMQ
-src/api/_Framework                      shared kernel and infrastructure of the host modules below (being removed)
-modules/host/...                        host modules of the removed API host (being removed)
 modules/client/Layouts.Default          startup   - sidebar layout, MudTail runtime   [LayoutKey("default")]
 modules/client/Layouts.Admin            lazy      - admin top-bar layout (dependency of Module.Admin) [LayoutKey("admin")]
 modules/client/Module.Admin             lazy      - /admin, /admin/members (role: platform-admin)
