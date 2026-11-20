@@ -23,7 +23,13 @@ public sealed class GrpcDemoModule : IRuntimeModule, IModulePipeline
     internal static readonly Version AssemblyVersion = typeof(GrpcDemoModule).Assembly.GetName().Version ?? new Version(1, 0, 0);
     public const string ReadPermission = "grpcdemo.read";
 
-    public ModuleManifest Manifest { get; } = new("grpcdemo", "gRPC demo", $"{AssemblyVersion.Major}.{AssemblyVersion.Minor}.{AssemblyVersion.Build}", "grpcdemo")
+#if MODULE_ID_SALES
+    private const string Id = "sales";
+#else
+    private const string Id = "grpcdemo";
+#endif
+
+    public ModuleManifest Manifest { get; } = new(Id, "gRPC demo", $"{AssemblyVersion.Major}.{AssemblyVersion.Minor}.{AssemblyVersion.Build}", Id)
     {
         Description = "Spike: gRPC and gRPC-Web served from a module's private pipeline.",
         Permissions = [new PermissionDefinition(ReadPermission, "Call the gRPC demo's WhoAmI.")],
@@ -88,7 +94,12 @@ public sealed class GrpcDemoModule : IRuntimeModule, IModulePipeline
     }
 
     // Authorization of every call is decided on the host's catch-all: a signed-in caller, tenant optional.
+#if MODULE_ID_SALES
+    // The lab copy: anonymous, so a test client can call it through the gateway without an identity-service token.
+    public void ConfigureEndpoint(IEndpointConventionBuilder endpoint) => endpoint.AllowAnonymous().TenantOptional();
+#else
     public void ConfigureEndpoint(IEndpointConventionBuilder endpoint) => endpoint.TenantOptional();
+#endif
 }
 
 public sealed class GreeterService(ITenantContext tenant, IAccessScopes access) : Greeter.GreeterBase

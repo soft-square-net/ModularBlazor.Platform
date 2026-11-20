@@ -122,6 +122,19 @@ with the lab's shape: a catch-all route to a "core" cluster with default `HttpRe
 In the lab, `/api/grpcdemo/**` falls through to the core pool's catch-all route. A module placed in another pool needs
 its own route, as for any module.
 
+### On a running dev setup (Module.Content playground)
+
+A second run used the Module.Content playground: one WebApi from the platform's main checkout, without the host fix,
+answering on 5080 directly, with the identity service and the Blazor client. Its pools enable only fixed module ids,
+so the sample was built as `-p:GrpcDemoAsSales=true`: id and prefix `sales`, anonymous catch-all, module-side
+workaround. It was uploaded through the Blazor client's Host modules page.
+
+- gRPC-Web at `http://localhost:5080/api/sales`: **24 of 24** runs OK (unary, streaming and `WhoAmI`), path base
+  `/api/sales`.
+- Native gRPC to 5080: `HTTP_1_1_REQUIRED`, as expected on an HTTP/1.1 endpoint.
+- Side finding: the admin API lists the module (`desiredState: Active`, `loaded: true`), but the Host modules table
+  in the Blazor client doesn't show it. The difference from the other rows is `packageHash: null`.
+
 ## Unload and upgrade
 
 Measured on the standalone host: unload, then `GET /api/admin/modules/unloading` was polled.
@@ -228,8 +241,10 @@ var client = new Greeter.GreeterClient(channel);
 ## Not covered
 
 - The real Blazor client with `Grpc.Net.Client.Web` (a hand-made `fetch` probe stood in for it).
-- The lab's own gateway and multi-replica pools. The lab wasn't serving on 5080 and needs identity-service tokens; a
-  local YARP of the same image was used.
+- The Hybird lab's own gateway and multi-replica pools. They weren't running during the spike; a local YARP of the
+  same image stood in for the gateway, and the Module.Content playground (one replica) for a running dev setup.
+- Unload on the playground: its module list doesn't show the module, and the admin API needs an identity-service
+  token.
 - Client streaming and bidirectional streaming. They aren't possible over gRPC-Web, and native gRPC was only tested
   with unary and server streaming.
 - gRPC reflection, health checks, compression, deadlines across a swap.

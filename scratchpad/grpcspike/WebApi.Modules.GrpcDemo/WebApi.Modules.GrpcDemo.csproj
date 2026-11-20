@@ -13,6 +13,8 @@
     <DefineConstants Condition="'$(GrpcDemoHotUnload)' == 'false'">$(DefineConstants);NO_HOT_UNLOAD</DefineConstants>
     <DefineConstants Condition="'$(GrpcDemoNoWorkaround)' == 'true'">$(DefineConstants);HOST_APPLIES_ROUTE_OPTIONS</DefineConstants>
     <DefineConstants Condition="'$(GrpcDemoMethodAuth)' == 'true'">$(DefineConstants);METHOD_AUTHORIZATION</DefineConstants>
+    <!-- -p:GrpcDemoAsSales=true: id and prefix "sales", for a lab whose pools enable only fixed module ids. -->
+    <DefineConstants Condition="'$(GrpcDemoAsSales)' == 'true'">$(DefineConstants);MODULE_ID_SALES</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
