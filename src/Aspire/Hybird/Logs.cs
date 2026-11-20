@@ -53,7 +53,7 @@ internal sealed class LogsStack
         var collector = builder.AddContainer("otel-collector", CollectorImage, CollectorTag)
             .WithArgs("--config=env:COLLECTOR_CONFIG")
             .WithEndpoint(targetPort: 4317, name: "grpc", scheme: "http")
-            .WithEnvironment("COLLECTOR_CONFIG", deploy.EscapeForCompose(CollectorConfig(forwardToAspireDashboard: !deploy.Publishing)))
+            .WithEnvironment("COLLECTOR_CONFIG", deploy.EscapeForCompose(CollectorConfig(forwardToAspireDashboard: !deploy.Publishing).ReplaceLineEndings("\n")))
             .WithEnvironment("OPENSEARCH_URL", openSearch.GetEndpoint("http"))
             .WaitFor(openSearch);
         if (!deploy.Publishing)
@@ -64,12 +64,15 @@ internal sealed class LogsStack
                 .WithEnvironment("DASHBOARD_OTLP_API_KEY", builder.Configuration["AppHost:OtlpApiKey"] ?? "");
         }
 
+        // The scripts below are raw strings, so they carry this file's line endings: CRLF in a Windows checkout,
+        // which sh rejects ("set: illegal option -"). They always run on Linux, hence ReplaceLineEndings("\n").
+        //
         // One-off setup, re-applied on every start (idempotent): delete telemetry indices after RetentionDays, and
         // create the "otel-logs-*" / "otel-traces-*" index patterns in Dashboards. Stays up afterwards, because a
         // Kubernetes Deployment must not exit.
         builder.AddContainer("logs-setup", CurlImage, CurlTag)
             .WithEntrypoint("sh")
-            .WithArgs("-c", deploy.EscapeForCompose(SetupScript(retentionDays)))
+            .WithArgs("-c", deploy.EscapeForCompose(SetupScript(retentionDays).ReplaceLineEndings("\n")))
             .WithEnvironment("OPENSEARCH_URL", openSearch.GetEndpoint("http"))
             .WithEnvironment("OPENSEARCH_DASHBOARDS_URL", dashboards.GetEndpoint("http"))
             .WaitFor(openSearch)
@@ -157,7 +160,7 @@ internal sealed class LogsStack
         # Single node: no replicas, so the cluster reports green instead of yellow (raise it when adding nodes).
         curl -s -X PUT "$os/_index_template/telemetry" -H 'Content-Type: application/json' \
           -d '{"index_patterns":["otel-logs-*","otel-traces-*"],"template":{"settings":{"number_of_replicas":0} } }'; echo
-        curl -s -X PUT "$os/otel-logs-*,otel-traces-*/_settings" -H 'Content-Type: application/json' -d '{"index":{"number_of_replicas":0}}'; echo
+        curl -s -X PUT "$os/otel-logs-*,otel-traces-*/_settings?allow_no_indices=true" -H 'Content-Type: application/json' -d '{"index":{"number_of_replicas":0}}'; echo
         until curl -sf "$osd/api/status" > /dev/null; do sleep 5; done
         for p in otel-logs otel-traces; do
           curl -s -X POST "$osd/api/saved_objects/index-pattern/$p?overwrite=true" -H 'osd-xsrf: true' -H 'Content-Type: application/json' \
