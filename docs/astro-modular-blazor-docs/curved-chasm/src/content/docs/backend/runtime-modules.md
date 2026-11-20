@@ -330,6 +330,20 @@ credentials and URLs from the host configuration into the module with id `elsa` 
 [Elsa: secrets and settings](/modules/elsa/#secrets-and-settings)). A general, operator-allowlisted mechanism for host
 secrets is still to be designed.
 
+**Host overrides.** `Modules:Settings:{id}:{key}` in an instance's configuration replaces setting `{key}` of module
+`{id}` when that instance loads the module, over the catalog's value. Use it for values that differ per deployment,
+such as `Modules__Settings__client-modules__ClientModules__Path=/data/client-modules`.
+
+- Overrides are never written to the catalog.
+- The log names their keys (not their values) at load.
+- They are read at load time, so a change needs a restart.
+- They are plain configuration, so they are no place for secrets either.
+
+**Local modules (Development only).** `Modules:Local:{id}=<folder>` points the runtime at a module's build output.
+On startup, the runtime installs the folder like an upload when its files changed, and activates it the first time.
+Module playgrounds use it, so a rebuild and a restart show a change without packing or uploading. Outside
+Development the setting is ignored.
+
 ## Not covered yet
 
 - A real modules table instead of `modules.json` and a lock file.

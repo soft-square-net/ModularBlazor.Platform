@@ -83,7 +83,7 @@ flowchart LR
 | `Application` | `*.Application` | SharedKernel وContracts وASP.NET Core |
 | `Infrastructure` | `*.Infrastructure` | Data (‏EF Core والمزودون) وContracts وCarter وASP.NET Core و`EnableDynamicLoading`: تجميعة الدخول |
 | `Module` | أي مشروع خادم آخر | Contracts وCarter وASP.NET Core؛ ويضيف `ModuleUsesData=true` الحزمة Data. والوحدة ذات المشروع الواحد (Greeting) تضبط `EnableDynamicLoading=true` بنفسها |
-| `Client` | مشروع Razor SDK | Abstractions ومنصة المتصفح؛ ويضمن `wwwroot` في التجميعة |
+| `Client` | مشروع Razor SDK، أو `<ModuleLayer>Client</ModuleLayer>` (عميل API مولد) | Abstractions ومنصة المتصفح؛ ويضمن `wwwroot` في التجميعة |
 
 التجميعات التي يشحنها المضيف للبناء فقط، فلا تحوي مخرجات البناء إلا تجميعاتك وتبعياتك الخاصة، حتى حين تعتمد حزمة خاصة
 (Elsa) على EF Core نفسها. لا تضف `PackageReference` خاصا بك إلى EF Core أو Carter أو Ardalis.Specification.
@@ -116,10 +116,11 @@ ModularBlazor.Module.<Name>/
     WebApi.Modules.<Name>.Domain/
     WebApi.Modules.<Name>.Application/
     WebApi.Modules.<Name>.Infrastructure/   entry assembly: its build output is the package
-    WebApi.Modules.<Name>.Client/           generated API client (NSwag), optional
+    WebApi.Modules.<Name>.Client/           generated API client (NSwag), shipped as a hidden client module
+    Module.<Name>/                          Blazor UI client module, optional
     openapi/<id>.json                       the committed API document
   tests/
-  playground/                 (planned) an Aspire AppHost with the platform's containers
+  playground/                 Aspire AppHost: the platform from a Platform checkout next to the repo, with this module
   .github/workflows/build.yml
 ```
 
@@ -179,9 +180,14 @@ jobs:
 
 ### ثبتها وجربها
 
-اضغط محتويات `bin/<Configuration>/net10.0` لمشروع Infrastructure وارفعها في منطقة الإدارة، أو إلى `POST /api/admin/modules`
-(في مختبر Hybird: ‏`/pools/<pool>/api/admin/modules`). وترفع وحدات العميل (`.dll` أو `.nupkg`) في صفحة `/client-modules`
-في العميل. الخطوات بالتفصيل في [الصفحة الإنجليزية: Create a module, A to Z](/backend/create-a-module/).
+أثناء العمل، شغل الوحدة في **ساحة التجربة** الخاصة بها (`dotnet run --project playground`). ففي بيئة Development يحمل
+WebApi الجزء الخادمي مباشرة من مخرجات بنائه (`Modules:Local`). ويكتب بناء ساحة التجربة كذلك كل جزء جاهزا للرفع في
+`playground/out/`.
+
+ولتثبيتها في مكان آخر، اضغط محتويات `bin/<Configuration>/net10.0` لمشروع Infrastructure. ثم ارفع الملف المضغوط في منطقة
+الإدارة (`/host-modules`)، أو إلى `POST /api/admin/modules` (في مختبر Hybird: ‏`/pools/<pool>/api/admin/modules`).
+أما وحدات العميل (`.dll` أو `.nupkg` أو `.zip`) فترفع في صفحة `/client-modules` في العميل: عميل API المخفي أولا، ثم
+الواجهة. الخطوات بالتفصيل في [الصفحة الإنجليزية: Create a module, A to Z](/backend/create-a-module/)، الخطوات من 7 إلى 12.
 
 ### الفروع والإصدارات
 

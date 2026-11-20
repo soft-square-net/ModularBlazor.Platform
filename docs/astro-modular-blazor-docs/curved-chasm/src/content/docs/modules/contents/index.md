@@ -42,6 +42,16 @@ The starter code (repository `ModularBlazor.Module.Content`, module `content` 0.
 - **A versioned Post document.** `SchemaId` and `SchemaVersion` identify the field contract. `DocumentJson` holds a `PostDocument` with separate `content` and `style` JSON objects and a tree of nested `PostNode` children. The current code only checks the document's structure (see [Post document](/modules/contents/posts/#post-document-implemented)).
 - **A published snapshot.** Publishing copies the title, body and document into `PublishedTitle`, `PublishedBody` and `PublishedDocumentJson`. Anonymous readers get only that snapshot from `GET /api/content/public/{publicId}`.
 - **The newsroom workflow**, its permissions and the automation endpoints Elsa calls. See [Workflow and module integrations](/modules/contents/workflow-and-integrations/#serviceapi-boundary).
+- **The browser side**, as two client modules:
+  - `WebApi.Modules.Content.Client`, the generated API client, ships as a hidden client module.
+  - `Module.Content` is the **Contents Management** UI, with its menu item and pages under `/contents`:
+    - a post list by view (mine, queue, review, desk) and state;
+    - a post page with the workflow actions (submit, accept, assign, approve, return, schedule, publish), editing and history;
+    - presses and categories.
+
+  It needs a tenant sign-in and the `content.*` permissions in that tenant.
+- **A playground** (`playground/`) that runs the platform with the module for development. How to build both parts
+  and the playground for a module of your own: [Create a module, A to Z](/backend/create-a-module/).
 
 Still planned:
 

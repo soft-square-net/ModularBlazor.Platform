@@ -196,8 +196,10 @@ sequenceDiagram
 | `POST …/modules/{id}/versions/{version}/activate` و`DELETE …/versions/{version}` | |
 | `DELETE /api/client-modules/modules/{id}` | لا يجوز لوحدة أساسية، ولا لوحدة تعتمد عليها أخرى (409) |
 
-الكتالوج هو `client-modules.json` والملفات تحت `ClientModules:Path` (افتراضيا `App_Data/client-modules`)، تتشاركها
-نسخ المجموعة. ويحد الرفع بـ `ClientModules:MaxPackageMegabytes` (‏50).
+الكتالوج هو `client-modules.json` والملفات تحت `ClientModules:Path` (افتراضيا `App_Data/client-modules`، نسبة إلى
+جذر محتوى WebApi)، تتشاركها نسخ المجموعة. ولوضعه في مكان آخر على مضيف واحد، اضبط تجاوز المضيف
+`Modules__Settings__client-modules__ClientModules__Path`. وتستعمله ساحات تجربة الوحدات لتبقي كتالوجها خارج نسخة
+المنصة، التي يستعملها مختبر Hybird أيضا. ويحد الرفع بـ `ClientModules:MaxPackageMegabytes` (‏50).
 
 ## صفحات MudTail
 

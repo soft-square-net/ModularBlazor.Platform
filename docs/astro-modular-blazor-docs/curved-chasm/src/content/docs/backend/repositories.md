@@ -84,7 +84,7 @@ it pick the references by the project's **name suffix** (or `<ModuleLayer>` set 
 | `Application` | `*.Application` | SharedKernel, Contracts, ASP.NET Core |
 | `Infrastructure` | `*.Infrastructure` | Data (EF Core, the providers), Contracts, Carter, ASP.NET Core, `EnableDynamicLoading`: the entry assembly |
 | `Module` | any other server project | Contracts, Carter, ASP.NET Core; `ModuleUsesData=true` adds Data. A single-project module (Greeting) sets `EnableDynamicLoading=true` itself |
-| `Client` | a Razor SDK project | Abstractions, the browser platform; `wwwroot` is embedded in the assembly |
+| `Client` | a Razor SDK project, or `<ModuleLayer>Client</ModuleLayer>` (a generated API client) | Abstractions, the browser platform; `wwwroot` is embedded in the assembly |
 
 Host-shipped assemblies are compile-only, so the build output holds your assemblies and your private dependencies
 only, even when a private package (Elsa) depends on EF Core itself. Do not add your own `PackageReference` to EF Core,
@@ -118,10 +118,11 @@ ModularBlazor.Module.<Name>/
     WebApi.Modules.<Name>.Domain/
     WebApi.Modules.<Name>.Application/
     WebApi.Modules.<Name>.Infrastructure/   entry assembly: its build output is the package
-    WebApi.Modules.<Name>.Client/           generated API client (NSwag), optional
+    WebApi.Modules.<Name>.Client/           generated API client (NSwag), shipped as a hidden client module
+    Module.<Name>/                          Blazor UI client module, optional
     openapi/<id>.json                       the committed API document
   tests/
-  playground/                 (planned) an Aspire AppHost with the platform's containers
+  playground/                 Aspire AppHost: the platform from a Platform checkout next to the repo, with this module
   .github/workflows/build.yml
 ```
 
@@ -182,9 +183,15 @@ Clone both repos side by side:
 
 ### Install and try it
 
-Zip the contents of the Infrastructure project's `bin/<Configuration>/net10.0` and upload it in the admin area, or to
-`POST /api/admin/modules` (in the Hybird lab, `/pools/<pool>/api/admin/modules`). Client modules (`.dll` or `.nupkg`)
-are uploaded on the client's `/client-modules` page. Step by step: [Create a module, A to Z](/backend/create-a-module/).
+While you work, run the module in its **playground** (`dotnet run --project playground`). In Development, the WebApi
+loads the server part straight from its build output (`Modules:Local`). The playground's build also writes every
+part ready to upload to `playground/out/`.
+
+To install it elsewhere, zip the contents of the Infrastructure project's `bin/<Configuration>/net10.0`. Upload the
+zip in the admin area (`/host-modules`), or to `POST /api/admin/modules` (in the Hybird lab,
+`/pools/<pool>/api/admin/modules`). The client modules (`.dll`, `.nupkg` or `.zip`) go on the client's
+`/client-modules` page: the hidden API client first, then the UI. Step by step:
+[Create a module, A to Z](/backend/create-a-module/), steps 7 to 12.
 
 ### Branches and releases
 
