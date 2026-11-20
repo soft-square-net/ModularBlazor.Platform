@@ -10,6 +10,8 @@ artifacts/
 !/src/WebApi/WebApi/appsettings.json
 !/src/WebApi/WebApi/appsettings.Development.json
 !/src/apps/blazor/ModularBlazor.BlzWebClient/wwwroot/appsettings.json
+# Launch profiles set ASPNETCORE_ENVIRONMENT=Development, which is what loads user secrets (the lab's passwords).
+!**/Properties/launchSettings.json
 !/modules/client/Layouts.Default/node-app/package.json
 !/src/apps/blazor/ModularBlazor.BlzWebClient/node-app/package.json
 /modules/client/Layouts.Admin/node-app/package-lock.json

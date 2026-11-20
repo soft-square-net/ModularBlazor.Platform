@@ -15,8 +15,12 @@ using Aspire.Hosting.Yarp.Transforms;
 using Yarp.ReverseProxy.Transforms;
 
 var builder = DistributedApplication.CreateBuilder(args);
-// Set with Aspire user-secrets in development and a deployment secret store in production.
-var elsaClientSecret = builder.AddParameter("elsa-client-secret", secret: true);
+// Set with Aspire user-secrets in development and a deployment secret store in production. A fresh clone has no user
+// secret yet: the lab then uses the development value from the identity service's appsettings.Development.json.
+var elsaClientSecret = builder.ExecutionContext.IsPublishMode
+    || !string.IsNullOrEmpty(builder.Configuration["Parameters:elsa-client-secret"])
+    ? builder.AddParameter("elsa-client-secret", secret: true)
+    : builder.AddParameter("elsa-client-secret", "dev-elsa-workflows-secret", secret: true);
 
 // ---------------------------------------------------------------- shared infrastructure
 
