@@ -67,7 +67,6 @@
       * Folder="<name>":      every item with that Folder goes into CoreClientModules/<name>/ and forms one module
                               (the one with [ClientModule], plus its private assemblies, e.g. a generated API client).
     Skip with -p:BuildClientModules=false (the folder from the previous build stays).
-    Not shipped: Module.Auth and Module.ToDo, which only work with the old Host.
   -->
   <PropertyGroup>
     <BuildClientModules Condition="'$(BuildClientModules)' == ''">true</BuildClientModules>

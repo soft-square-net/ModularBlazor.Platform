@@ -112,7 +112,7 @@ The production version is the same shape, with the catalog in the modules table 
 
 ## Not modelled locally
 
-- **Client:** the CDN for the Blazor WASM `_framework` files, and the client itself (see `src/Aspire/Host`).
+- **Client:** the CDN for the Blazor WASM `_framework` files.
 - **Edge:** TLS and the WAF.
 - **Gateway:** JWT validation and rate limiting are described in the research but not configured yet. Tenant resolution runs in every replica (see `src/WebApi/WebApi/README.md`, "Multi-tenancy"); the gateway only forwards the host name.
 - **Tenant hosts:** `acme.localhost` / `globex.localhost` resolve to 127.0.0.1 in most browsers; with curl send `-H "Host: acme.localhost"` to http://localhost:5080.
