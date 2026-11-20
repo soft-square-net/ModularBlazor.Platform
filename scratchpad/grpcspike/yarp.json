@@ -1,0 +1,21 @@
+{
+  "Kestrel": {
+    "Endpoints": {
+      "http": { "Url": "http://0.0.0.0:5081", "Protocols": "Http1" },
+      "h2c": { "Url": "http://0.0.0.0:5082", "Protocols": "Http2" }
+    }
+  },
+  "ReverseProxy": {
+    "Routes": {
+      "grpc-h2": { "ClusterId": "core-h2", "Order": 0, "Match": { "Path": "/{**catch-all}", "Hosts": [ "localhost:5082" ] } },
+      "catch-all": { "ClusterId": "core", "Order": 10, "Match": { "Path": "/{**catch-all}" } }
+    },
+    "Clusters": {
+      "core": { "Destinations": { "core-1": { "Address": "http://host.docker.internal:5398" } } },
+      "core-h2": {
+        "HttpRequest": { "Version": "2", "VersionPolicy": "RequestVersionExact" },
+        "Destinations": { "core-1": { "Address": "http://host.docker.internal:5399" } }
+      }
+    }
+  }
+}

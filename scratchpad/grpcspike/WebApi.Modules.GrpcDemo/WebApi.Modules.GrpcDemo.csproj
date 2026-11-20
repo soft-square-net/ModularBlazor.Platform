@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Spike: a runtime module that serves gRPC (and gRPC-Web) from its private pipeline (IModulePipeline).
+    NOT referenced by WebApi. Point Modules:Local:grpcdemo at bin/Debug/net10.0 (Development) or zip that folder and
+    upload it. -p:GrpcDemoVersion=x.y.z for an upgrade, -p:GrpcDemoHotUnload=false for a HotUnload=false copy.
+  -->
+
+  <PropertyGroup>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <Version>$(GrpcDemoVersion)</Version>
+    <Version Condition="'$(GrpcDemoVersion)' == ''">1.0.0</Version>
+    <DefineConstants Condition="'$(GrpcDemoHotUnload)' == 'false'">$(DefineConstants);NO_HOT_UNLOAD</DefineConstants>
+    <DefineConstants Condition="'$(GrpcDemoNoWorkaround)' == 'true'">$(DefineConstants);HOST_APPLIES_ROUTE_OPTIONS</DefineConstants>
+    <DefineConstants Condition="'$(GrpcDemoMethodAuth)' == 'true'">$(DefineConstants);METHOD_AUTHORIZATION</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <!-- Shared with the host: compile against them, never ship them. -->
+    <PackageReference Include="Carter" Version="10.0.0" ExcludeAssets="runtime" />
+    <ProjectReference Include="../../../src/WebApi/WebApi.Contracts/WebApi.Contracts.csproj" Private="false" />
+    <!-- Private to the module: copied into its output, loaded into its collectible load context. -->
+    <PackageReference Include="Grpc.AspNetCore" Version="2.71.0" />
+    <PackageReference Include="Grpc.AspNetCore.Web" Version="2.71.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Protobuf Include="Protos/greeter.proto" GrpcServices="Server" />
+  </ItemGroup>
+
+</Project>
