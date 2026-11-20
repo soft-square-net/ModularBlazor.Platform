@@ -12,16 +12,18 @@ Astro owns the root of the domain, the Blazor client lives under a sub-path.
 ```text
 https://example.com/                 Astro: home, sections, articles, docs   (static files)
 https://example.com/news/derby-day/  Astro
-https://example.com/app/             Blazor client (index.html + _framework + modules)
-https://example.com/app/reports      Blazor route, loads Module.Reports on navigation
-https://api.example.com/             ModularBlazor.Host (catalog, identity, tenants)
+https://example.com/app/             Blazor client (index.html + _framework)
+https://example.com/app/dashboard    Blazor route, loads its client module on navigation
+https://api.example.com/             WebApi gateway (runtime modules, client module catalog, tenants)
+https://id.example.com/              identity service (OpenID Connect sign-in)
 ```
 
-- The Blazor client needs `<base href="/app/">` in `wwwroot/index.html`. All module URLs and routes are
-  base-relative, so nothing else changes.
-- Both apps are on one origin, so they share `localStorage`: the MudTail theme (`mud_vanilla_theme_config`) and the sign-in
-  token (`authToken`) are visible to both.
-- Astro pages link into the app with plain links (`/app/login`, `/app/reports`). The browser does a full page
+- The Blazor client needs `<base href="/app/">` in `wwwroot/index.html`, and the identity service must list
+  `https://example.com/app/authentication/login-callback` (and `logout-callback`) as redirect URIs of `blazor-client`.
+  Routes are base-relative; module files come from the WebApi, not from the site.
+- Both apps are on one origin, so they share browser storage: the MudTail theme (`mud_vanilla_theme_config` in
+  `localStorage`) and, within a tab, the signed-in user (`oidc.user:…` in `sessionStorage`) are visible to both.
+- Astro pages link into the app with plain links (`/app/login`, `/app/dashboard`). The browser does a full page
   load into Blazor, once.
 
 **Choose it when** the public site and the app are different experiences that can share a header, footer and
@@ -39,7 +41,7 @@ Astro page by a custom element, when it becomes visible.
 ```
 
 - Pays the .NET runtime download on the first island of a visit; everything else on the page stays static.
-- Reuses C# components and API clients (`AddApiClients`) you already have.
+- Reuses C# components and the generated API clients (`ContentClient`, `TenancyClient`, …) you already have.
 - The island host is a separate Blazor project; see [Blazor islands](/guides/blazor-islands/).
 
 **Choose it when** one widget on a public page is complex enough that rewriting it in JS is worse than the

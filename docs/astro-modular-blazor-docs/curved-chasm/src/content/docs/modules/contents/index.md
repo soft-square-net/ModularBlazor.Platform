@@ -35,7 +35,7 @@ The existing [authentication and authorization design](/backend/auth-design/) re
 
 ## What exists versus what is planned
 
-The starter code (`src/WebApi/Modules/Custom/Content`, module `content` 0.1.0) already has:
+The starter code (repository `ModularBlazor.Module.Content`, module `content` 0.1.0) already has:
 
 - **The `Post` aggregate** with `PostKind` (`Article`, `News`, `Video`, `Reportage`, `PhotoStory`, `Other`). The database still uses the deployed names: table `articles`, the kind in column `Type`, history in `article_history`.
 - **A stable public ID.** Every new Post gets a random `PublicId`. Rows that existed before migration `AddPostDocumentAndPublicId` were backfilled with `legacy-{Id}`, the permalink they already had.

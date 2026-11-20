@@ -53,9 +53,9 @@ sidebar:
 | --- | --- |
 | `/`، `/news/…`، `/_astro/…` | مخرجات Astro |
 | `/app/…` | عميل Blazor (بديل SPA إلى `/app/index.html`) |
-| `/app/modules/…` | ملفات الوحدات، بلا بديل |
 | `/islands/…` | مضيف الجزر (اختياري) |
-| `http://localhost:5100/api/…` | ModularBlazor.Host |
+| `http://localhost:5080/api/…` | بوابة WebApi (ملفات الوحدات: `api/client-modules/files/…`) |
+| `http://localhost:5090/connect/…` | خدمة الهوية (OpenID Connect) |
 
 ## إبقاء وحدات الخادم قابلة للفصل
 

@@ -12,16 +12,18 @@ sidebar:
 ```text
 https://example.com/                 Astro: home, sections, articles, docs   (static files)
 https://example.com/news/derby-day/  Astro
-https://example.com/app/             Blazor client (index.html + _framework + modules)
-https://example.com/app/reports      Blazor route, loads Module.Reports on navigation
-https://api.example.com/             ModularBlazor.Host (catalog, identity, tenants)
+https://example.com/app/             Blazor client (index.html + _framework)
+https://example.com/app/dashboard    Blazor route, loads its client module on navigation
+https://api.example.com/             WebApi gateway (runtime modules, client module catalog, tenants)
+https://id.example.com/              identity service (OpenID Connect sign-in)
 ```
 
-- يحتاج عميل Blazor إلى `<base href="/app/">` في الملف `wwwroot/index.html`. كل روابط الوحدات ومساراتها نسبية
-  إلى الأساس، فلا يتغير شيء آخر.
-- التطبيقان على أصل (origin) واحد، فيتشاركان `localStorage`: نسق MudTail (`mud_vanilla_theme_config`) ورمز تسجيل
-  الدخول (`authToken`) مرئيان لكليهما.
-- تربط صفحات Astro بالتطبيق بروابط عادية (`/app/login`، `/app/reports`). فيحمل المتصفح Blazor تحميلا كاملا
+- يحتاج عميل Blazor إلى `<base href="/app/">` في الملف `wwwroot/index.html`، ويجب أن تسجل خدمة الهوية
+  `https://example.com/app/authentication/login-callback` (و`logout-callback`) عناوين إعادة توجيه للعميل `blazor-client`.
+  المسارات نسبية إلى الأساس؛ وملفات الوحدات تأتي من WebApi لا من الموقع.
+- التطبيقان على أصل (origin) واحد، فيتشاركان تخزين المتصفح: نسق MudTail (`mud_vanilla_theme_config` في `localStorage`)
+  و، داخل التبويب نفسه، المستخدم المسجل (`oidc.user:…` في `sessionStorage`) مرئيان لكليهما.
+- تربط صفحات Astro بالتطبيق بروابط عادية (`/app/login`، `/app/dashboard`). فيحمل المتصفح Blazor تحميلا كاملا
   مرة واحدة.
 
 **اختره عندما** يكون الموقع العام والتطبيق تجربتين مختلفتين يمكنهما مشاركة الترويسة والتذييل والنسق.
@@ -38,7 +40,7 @@ https://api.example.com/             ModularBlazor.Host (catalog, identity, tena
 ```
 
 - يدفع ثمن تنزيل بيئة .NET عند أول جزيرة في الزيارة؛ ويبقى كل ما عداها في الصفحة ثابتا.
-- يعيد استخدام مكونات C# وعملاء الواجهة البرمجية (`AddApiClients`) الموجودة لديك.
+- يعيد استخدام مكونات C# وعملاء الواجهة البرمجية المولدة (`ContentClient` و`TenancyClient` وغيرها) الموجودة لديك.
 - مضيف الجزر مشروع Blazor منفصل؛ راجع [جزر Blazor](/ar/guides/blazor-islands/).
 
 **اختره عندما** تكون أداة واحدة في صفحة عامة معقدة إلى حد تكون فيه إعادة كتابتها بـ JS أسوأ من تنزيل بيئة

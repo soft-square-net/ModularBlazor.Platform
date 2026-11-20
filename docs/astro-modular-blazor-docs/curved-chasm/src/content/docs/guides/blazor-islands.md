@@ -21,8 +21,9 @@ boot options against the .NET version in `Directory.Build.props` (net10.0) when 
 
 ## Why a separate host
 
-The client's `Program.cs` adds `App` to `#app` and loads the startup modules before the first render. On an Astro
-page there is no `#app`, and there is no reason to download the layouts and the login module for a widget. A
+The client's `Program.cs` (`ModularBlazor.BlzWebClient`) adds `App` to `#app`, fetches the client manifest and loads
+the startup modules before the first render. On an Astro
+page there is no `#app`, and there is no reason to download the layouts and the module catalog for a widget. A
 separate host stays small and starts fast.
 
 ## 1. The islands host
@@ -37,23 +38,34 @@ separate host stays small and starts fast.
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ModularBlazor.Infrastructure\ModularBlazor.Infrastructure.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Authentication" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <!-- A generated API client from a module repo, here the Content client (or its package). -->
+    <ProjectReference Include="..\..\..\..\..\ModularBlazor.Module.Content\src\WebApi.Modules.Content.Client\WebApi.Modules.Content.Client.csproj" />
   </ItemGroup>
 </Project>
 ```
 
 ```csharp title="src/apps/blazor/ModularBlazor.Islands/Program.cs"
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-using soft.square.net.ModularBlazor.Infrastructure.Auth;
+using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
 // Each island gets a name that Astro pages use. Parameters are passed as JSON from the page.
-builder.RootComponents.RegisterForJavaScript<TodoSummary>(identifier: "todo-summary");
+builder.RootComponents.RegisterForJavaScript<LatestPosts>(identifier: "latest-posts");
 builder.RootComponents.RegisterForJavaScript<LeagueTable>(identifier: "league-table");
 
-// The same typed API clients the client uses (ApiBaseUrl from appsettings.json).
-builder.Services.AddApiClients(builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5100");
+// The same OIDC settings as the client ("Oidc" in wwwroot/appsettings.json), so the islands see the user the client
+// signed in (same origin, same tab). Islands never start a sign-in themselves: they link to /app/login.
+builder.Services.AddOidcAuthentication(o => builder.Configuration.Bind("Oidc", o.ProviderOptions));
+
+// The gateway ("WebApi:BaseUrl"), like the client's AddWebApiClient: "WebApi" with the token, "WebApi.Public" without.
+var gateway = new Uri(builder.Configuration["WebApi:BaseUrl"] ?? "http://localhost:5080/");
+builder.Services.AddHttpClient("WebApi", c => c.BaseAddress = gateway)
+    .AddHttpMessageHandler(sp => sp.GetRequiredService<AuthorizationMessageHandler>()
+        .ConfigureHandler(authorizedUrls: [gateway.ToString()]));
+builder.Services.AddHttpClient("WebApi.Public", c => c.BaseAddress = gateway);
 
 await builder.Build().RunAsync();
 ```
@@ -61,19 +73,25 @@ await builder.Build().RunAsync();
 Island components are ordinary Razor components. Keep them self-contained: take their input as parameters,
 render links rather than navigating, and do not depend on a layout.
 
-```razor title="TodoSummary.razor"
-@inject IApiClient Api
+```razor title="LatestPosts.razor"
+@inject IHttpClientFactory Http
 
 <section class="mud-card">
   <h3 class="mud-card__title">@Title</h3>
-  @if (_open is null) { <p>Loading…</p> }
-  else { <p>@_open open tasks · <a href="/app/todo">Open the app</a></p> }
+  @if (_count is null) { <p>Loading…</p> }
+  else { <p>@_count posts on your desk · <a href="/app/">Open the app</a></p> }
 </section>
 
 @code {
-  [Parameter] public string Title { get; set; } = "My tasks";
-  private int? _open;
-  protected override async Task OnInitializedAsync() => _open = await Api.CountOpenTodosAsync(); // your API call
+  [Parameter] public string Title { get; set; } = "My desk";
+  private int? _count;
+
+  protected override async Task OnInitializedAsync()
+  {
+    var content = new ContentClient(Http.CreateClient("WebApi")); // signed-in user's token
+    try { _count = (await content.ListPostsAsync(PostView.Desk)).Count; }
+    catch (AccessTokenNotAvailableException) { _count = 0; }   // not signed in: render the fallback text
+  }
 }
 ```
 
@@ -214,22 +232,23 @@ import BlazorIsland from '../../components/BlazorIsland.astro';
 ## Runtime modules
 
 The islands host only knows components it was compiled with. Components that live in a **runtime module**
-(`Module.ToDo`, `Module.Reports`) cannot be registered directly, because `RegisterForJavaScript` needs the type
-before the host is built. Two ways forward:
+(the Dashboard and Reports samples, or any module installed by an admin) cannot be registered directly, because
+`RegisterForJavaScript` needs the type before the host is built. Two ways forward:
 
 - **Reference the module project** from the islands host. Simple, but the island ships with the host and no
   longer follows the module's own release.
 - **A generic `ModuleIsland` component.** Register one component (`"module-island"`) that takes a module id and
   a component type name, downloads the module and renders the type with `DynamicComponent`. That needs the module
-  loader, which is in `ModularBlazor.Client/Services` today (`ModuleManager.EnsureLoadedAsync`); it would first
-  have to move into a shared library, together with the package readers and the asset store.
+  loader, which is in `ModularBlazor.BlzWebClient/Services` today (`ModuleManager`, the package readers, the asset
+  store); it would first have to move into a shared library.
 
 Start with the first option and move to the second only when several modules need islands.
 
 ## Checklist
 
 - [ ] The islands host is published to `/islands/` on the **same origin** as the Astro site.
-- [ ] Its `appsettings.json` sets `ApiBaseUrl`, and the API's `Cors:Origins` lists the site origin.
+- [ ] Its `appsettings.json` has the same `Oidc` and `WebApi:BaseUrl` as the client, and `Cors:AllowedOrigins` of the
+      pools lists the site origin.
 - [ ] Every island renders a useful fallback in its slot.
 - [ ] Islands render links instead of navigating, and pass data as parameters.
 - [ ] MudTail styles the island: it uses the same CSS classes as the rest of the page.

@@ -114,7 +114,7 @@ the session's own schema the tenant's. Provisioning creates the user, grants `CR
   written):
 
 ```powershell
-./src/WebApi/scripts/Add-Migration.ps1 -Project src/WebApi/Modules/Custom/Inventory/WebApi.Modules.Inventory.Infrastructure -Name <Name>
+./src/WebApi/scripts/Add-Migration.ps1 -Project ../ModularBlazor.Samples/samples/Inventory/src/WebApi.Modules.Inventory.Infrastructure -Name <Name>
 ```
 
 - **Packages stay small:** module references to host-shipped projects carry `ExcludeAssets="runtime;native"`, so the
@@ -160,9 +160,9 @@ report lists the tenants an admin should look at, and the admin suspends a tenan
 
 ## Adding tenant data to a module
 
-`Modules/Custom/Inventory` is the sample.
+The Inventory sample (`ModularBlazor.Samples`, `samples/Inventory`) is the example.
 
-1. Name the entry project `*.Infrastructure` (or import `WebApi.Data/SharedData.props`).
+1. Name the entry project `*.Infrastructure` with the Module SDK (or set `ModuleUsesData=true` on a single project).
 2. Derive from `TenantDbContext`: set `Schema`, configure in `ConfigureModel`.
 3. Call `services.AddTenantDbContext<T>()`. That also registers `IRepository<T>` and `IReadRepository<T>`.
 4. Add an `IDesignTimeDbContextFactory` that returns

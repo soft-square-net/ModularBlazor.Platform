@@ -5,8 +5,10 @@ sidebar:
   order: 1
 ---
 
-The API (`ModularBlazor.Host`) is a **modular monolith**: every module (Auth, Catalog, Multitenancy, Media, Todo, …)
-lives in one solution with its own Domain, Application and Infrastructure projects. This section describes how that
+The API (`src/WebApi/WebApi` in `ModularBlazor.Platform`) is a **modular monolith**: one image that runs every module
+(identity, tenancy, client modules, content, shifts, …) in-process, each with its own Domain, Application and
+Infrastructure projects. Core modules ship with it; the others are built in their own repositories and uploaded while
+it runs. This section describes how that
 API is deployed, scaled and extended:
 
 - **One codebase, two ways to deploy it.** Run the same image as identical replicas (Scenario A), or split modules
@@ -33,24 +35,23 @@ Edge load balancer + YARP gateway        TLS, JWT, rate limit, tenant resolution
    OpenTelemetry: traces, metrics, logs (tenant + correlation ids) across everything
 ```
 
-## Where it lives in the repository
+## Where it lives
 
 | Path | What |
 | --- | --- |
-| `src/api/ModularBlazor.Host` | The production API host and its built-in modules (`HostModules`) |
-| `src/WebApi/WebApi` | Runtime module prototype: one image that runs as any pool |
+| `src/WebApi/WebApi` | The API host: one image that runs as any pool |
 | `src/WebApi/WebApi.Contracts` | `IRuntimeModule`, `ModuleManifest`, and the tenancy and security contracts modules see |
 | `src/WebApi/WebApi.Data` | Host-shipped data layer: `TenantDbContext`, the tenant store, four EF Core providers |
 | `src/WebApi/WebApi.SharedKernel` | Host-shipped domain base types and repository interfaces (no EF) |
-| `src/WebApi/Identity/WebApi.Identity.Server` | OpenIddict identity service (on branch `claude/identity-service-da759e`, not merged yet) |
-| `src/WebApi/Modules/Core/` | **Core modules** (`Identity`, `Tenancy`): built with every WebApi release and enabled by default |
-| `src/WebApi/Modules/Custom/` | **Custom modules**: built on their own and uploaded while the app runs |
-| `src/WebApi/Modules/Custom/WebApi.Modules.Greeting` | Sample custom module, uploaded as a package |
-| `src/WebApi/Modules/Custom/Inventory` | Sample layered custom module (Domain, Application, Infrastructure) |
-| `src/Aspire/Hybird` | Aspire lab: gateway, three pools, RabbitMQ, Redis, PostgreSQL |
+| `src/WebApi/Identity/WebApi.Identity.Server` | OpenIddict identity service (port 5090 in the lab) |
+| `src/WebApi/Modules/Core/` | **Core modules** (`identity`, `tenancy`, `client-modules`): built with every WebApi release and enabled by default |
+| `src/ModularBlazor.Module.Sdk` | The Module SDK that custom modules build with, published with the contract packages |
+| `src/Aspire/Hybird` | Aspire lab: gateway, four pools, identity service, RabbitMQ, Redis, PostgreSQL |
+| `ModularBlazor.Samples` (repo) | Sample custom modules: Greeting, Inventory (layered), Pulse, and the client modules Dashboard and Reports |
+| `ModularBlazor.Module.*` (repos) | **Custom modules**: Content, Shifts, Storage, Elsa; built on their own and uploaded while the app runs |
 
-`src/WebApi/Modules/Directory.Build.props` holds the shared settings for layered modules; `Core/` and `Custom/` each
-add their own `Directory.Build.props` on top. Both kinds are ordinary runtime modules: they differ only in how they
+`src/WebApi/Modules/Directory.Build.props` holds the settings of the core modules; custom modules get the same rules
+from the Module SDK (see [Repositories and packages](/backend/repositories/)). Both kinds are ordinary runtime modules: they differ only in how they
 arrive (with the release, or by an admin upload). See [Core and custom modules](/backend/runtime-modules/#core-and-custom-modules).
 
 ## Read in this order

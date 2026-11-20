@@ -137,26 +137,24 @@ public sealed record ModuleManifest(string Id, string Name, string Version, stri
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
+  <!-- WebApi.Contracts, Carter and ASP.NET Core, compiled against and never shipped (version in global.json). -->
+  <Sdk Name="soft.square.net.ModularBlazor.Module.Sdk" />
   <PropertyGroup>
-    <!-- Copies private dependencies to the output and writes the .deps.json the loader uses. -->
+    <!-- A single-project module: copies private dependencies and writes the .deps.json the loader uses. -->
     <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
   <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    <!-- Shared with the host: compile against them, never ship them. -->
-    <PackageReference Include="Carter" Version="10.0.0" ExcludeAssets="runtime" />
-    <ProjectReference Include="..\..\..\WebApi.Contracts\WebApi.Contracts.csproj" Private="false" ExcludeAssets="runtime" />
     <!-- Private dependency: loads into the module's own load context. -->
     <PackageReference Include="Humanizer.Core" Version="2.14.1" />
   </ItemGroup>
 </Project>
 ```
 
-تعيش الوحدات المخصصة في `src/WebApi/Modules/Custom/<Module>/`؛ والعقود في `src/WebApi/WebApi.Contracts/`، ولهذا يصعد
-المرجع ثلاثة مجلدات. ويطبق `Modules/Custom/Directory.Build.props` على كل وحدة مخصصة. أما الوحدات ذات الطبقات
-(`<Name>.Domain` و`.Application` و`.Infrastructure`، مثل `Custom/Inventory`) فتأخذ مراجعها من
-`Modules/Directory.Build.props` بحسب لاحقة اسم المشروع، فتبقى ملفات مشاريعها شبه فارغة. وتعيش الوحدات الأساسية في
-`Modules/Core/` وتشحن مع إصدار WebApi بدلا من ذلك؛ انظر [وحدات أثناء التشغيل](/ar/backend/runtime-modules/).
+تعيش الوحدات المخصصة في مستودعاتها الخاصة، وتأخذ عقود المنصة من NuGet عبر Module SDK
+([المستودعات والحزم](/ar/backend/repositories/)). أما الوحدات ذات الطبقات (`<Name>.Domain` و`.Application`
+و`.Infrastructure`، مثل وحدة Inventory النموذجية) فتأخذ مراجعها بحسب لاحقة اسم المشروع، فتبقى ملفات مشاريعها شبه
+فارغة. وتعيش الوحدات الأساسية في `src/WebApi/Modules/Core/` في المنصة وتشحن مع إصدار WebApi بدلا من ذلك؛ انظر
+[وحدات أثناء التشغيل](/ar/backend/runtime-modules/).
 
 | صيغة الحزمة | المحتوى |
 | --- | --- |
@@ -171,11 +169,13 @@ public sealed record ModuleManifest(string Id, string Name, string Version, stri
 **نسخة واحدة:**
 
 ```bash
-dotnet build src/WebApi/Modules/Custom/WebApi.Modules.Greeting
+# in ModularBlazor.Samples
+dotnet build samples/Greeting/src/WebApi.Modules.Greeting
+# in ModularBlazor.Platform
 dotnet run --project src/WebApi/WebApi --launch-profile http
 ```
 
-اضغط محتويات `src/WebApi/Modules/Custom/WebApi.Modules.Greeting/bin/Debug/net10.0` باسم `greeting.zip`، ثم:
+اضغط محتويات `samples/Greeting/src/WebApi.Modules.Greeting/bin/Debug/net10.0` باسم `greeting.zip`، ثم:
 
 ```bash
 curl -F "package=@greeting.zip" http://localhost:5298/api/admin/modules

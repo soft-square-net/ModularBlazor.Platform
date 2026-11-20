@@ -6,7 +6,7 @@ sidebar:
 ---
 
 :::note[Status]
-The Elsa runtime module exists (`src/WebApi/Modules/Custom/Elsa`, module `elsa` 0.1.0) and runs in the Hybird lab's `workflow` pool. It hosts the Elsa engine, API and tenant adapters, but **no workflow definitions yet**: the newsroom timers run in a hosted polling service. See [Current implementation](#current-implementation).
+The Elsa runtime module exists (repository `ModularBlazor.Module.Elsa`, module `elsa` 0.1.0) and runs in the Hybird lab's `workflow` pool. It hosts the Elsa engine, API and tenant adapters, but **no workflow definitions yet**: the newsroom timers run in a hosted polling service. See [Current implementation](#current-implementation).
 :::
 
 ## Recommendation
@@ -64,8 +64,8 @@ There are two architectures in the repository; do not conflate them.
 
 | Area | State |
 | --- | --- |
-| New `src/WebApi` runtime host | Elsa 3.9 runs as the custom runtime module `elsa` (`WebApi.Modules.Elsa.Infrastructure`, a single project). |
-| Older `src/api/ModularBlazor.Host` | Elsa is embedded as `ElsaHostModule`, with Finbuckle tenancy and the older permission adapter. Treat it as reference only. |
+| `src/WebApi` runtime host (`ModularBlazor.Platform`) | Elsa 3.9 runs as the custom runtime module `elsa` (`WebApi.Modules.Elsa.Infrastructure`, a single project). |
+| Old `src/api/ModularBlazor.Host` (obsolete `ModularBlazor` repo only) | Elsa is embedded as `ElsaHostModule`, with Finbuckle tenancy and the older permission adapter. Treat it as reference only. |
 
 ### What the `elsa` module does
 
@@ -97,7 +97,7 @@ dotnet user-secrets set "Parameters:elsa-client-secret" "<dev-secret>" --project
 | Typed `HttpClient` held by a singleton hosted service | `HttpClient` handlers are never rotated, so DNS changes are missed | Use `IHttpClientFactory.CreateClient` per cycle |
 | Elsa's file-system distributed lock with 2 replicas | Locks are not shared across processes | Configure a Redis or PostgreSQL distributed lock provider |
 
-Relevant code: `src/WebApi/Modules/Custom/Elsa/WebApi.Modules.Elsa.Infrastructure/ElsaModule.cs`, `NewsroomAutomationService.cs`, `src/WebApi/WebApi/Modularity/ModuleRuntime.cs` (secret injection), `src/Aspire/Hybird/AppHost.cs` (workflow pool).
+Relevant code: `src/WebApi.Modules.Elsa.Infrastructure/ElsaModule.cs` and `NewsroomAutomationService.cs` in `ModularBlazor.Module.Elsa`; `src/WebApi/WebApi/Modularity/ModuleRuntime.cs` (secret injection) and `src/Aspire/Hybird/AppHost.cs` (workflow pool) in `ModularBlazor.Platform`.
 
 ## Tenant propagation and data isolation
 

@@ -53,9 +53,9 @@ sidebar:
 | --- | --- |
 | `/`, `/news/…`, `/_astro/…` | Astro build |
 | `/app/…` | Blazor client (SPA fallback to `/app/index.html`) |
-| `/app/modules/…` | module files, no fallback |
 | `/islands/…` | islands host (optional) |
-| `http://localhost:5100/api/…` | ModularBlazor.Host |
+| `http://localhost:5080/api/…` | WebApi gateway (module files: `api/client-modules/files/…`) |
+| `http://localhost:5090/connect/…` | identity service (OpenID Connect) |
 
 ## Keeping backend modules separable
 

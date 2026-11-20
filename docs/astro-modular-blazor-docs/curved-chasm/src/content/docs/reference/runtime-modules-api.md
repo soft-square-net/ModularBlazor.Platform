@@ -164,27 +164,24 @@ A full walkthrough, from an empty folder to a module running in a pool: [Create 
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
+  <!-- WebApi.Contracts, Carter and ASP.NET Core, compiled against and never shipped (version in global.json). -->
+  <Sdk Name="soft.square.net.ModularBlazor.Module.Sdk" />
   <PropertyGroup>
-    <!-- Copies private dependencies to the output and writes the .deps.json the loader uses. -->
+    <!-- A single-project module: copies private dependencies and writes the .deps.json the loader uses. -->
     <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
   <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    <!-- Shared with the host: compile against them, never ship them. -->
-    <PackageReference Include="Carter" Version="10.0.0" ExcludeAssets="runtime" />
-    <ProjectReference Include="..\..\..\WebApi.Contracts\WebApi.Contracts.csproj" Private="false" ExcludeAssets="runtime" />
     <!-- Private dependency: loads into the module's own load context. -->
     <PackageReference Include="Humanizer.Core" Version="2.14.1" />
   </ItemGroup>
 </Project>
 ```
 
-Custom modules live in `src/WebApi/Modules/Custom/<Module>/`; the contracts are in `src/WebApi/WebApi.Contracts/`, which
-is why the reference goes up three folders. `Modules/Custom/Directory.Build.props` applies to every custom module.
-Layered modules (`<Name>.Domain`, `.Application`, `.Infrastructure`, like `Custom/Inventory`) get their references
-from `Modules/Directory.Build.props` by project-name suffix, so their project files stay almost empty. Core modules
-live in `Modules/Core/` and ship with the WebApi release instead; see
-[Core and custom modules](/backend/runtime-modules/#core-and-custom-modules).
+Custom modules live in their own repositories and get the platform's contracts from NuGet through the Module SDK
+([Repositories and packages](/backend/repositories/)). Layered modules (`<Name>.Domain`, `.Application`,
+`.Infrastructure`, like the Inventory sample) get their references by project-name suffix, so their project files stay
+almost empty. Core modules live in `src/WebApi/Modules/Core/` of the platform and ship with the WebApi release instead;
+see [Core and custom modules](/backend/runtime-modules/#core-and-custom-modules).
 
 | Package form | Contents |
 | --- | --- |
@@ -200,11 +197,13 @@ was built against.
 **Single instance:**
 
 ```bash
-dotnet build src/WebApi/Modules/Custom/WebApi.Modules.Greeting
+# in ModularBlazor.Samples
+dotnet build samples/Greeting/src/WebApi.Modules.Greeting
+# in ModularBlazor.Platform
 dotnet run --project src/WebApi/WebApi --launch-profile http
 ```
 
-Zip the contents of `src/WebApi/Modules/Custom/WebApi.Modules.Greeting/bin/Debug/net10.0` as `greeting.zip`, then:
+Zip the contents of `samples/Greeting/src/WebApi.Modules.Greeting/bin/Debug/net10.0` as `greeting.zip`, then:
 
 ```bash
 curl -F "package=@greeting.zip" http://localhost:5298/api/admin/modules

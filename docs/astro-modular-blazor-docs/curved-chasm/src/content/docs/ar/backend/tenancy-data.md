@@ -106,7 +106,7 @@ request ─► host middleware (Tenancy/): X-Tenant header, then host name (X-Fo
   وجود عدة مجموعات في مشروع واحد (اللقطة التي يحدثها، ومكان كتابة أول لقطة):
 
 ```powershell
-./src/WebApi/scripts/Add-Migration.ps1 -Project src/WebApi/Modules/Custom/Inventory/WebApi.Modules.Inventory.Infrastructure -Name <Name>
+./src/WebApi/scripts/Add-Migration.ps1 -Project ../ModularBlazor.Samples/samples/Inventory/src/WebApi.Modules.Inventory.Infrastructure -Name <Name>
 ```
 
 - **تبقى الحزم صغيرة:** مراجع الوحدات إلى المشاريع التي يشحنها المضيف تحمل `ExcludeAssets="runtime;native"`، فلا تنسخ مكتبات
@@ -122,9 +122,9 @@ request ─► host middleware (Tenancy/): X-Tenant header, then host name (X-Fo
 
 ## إضافة بيانات مستأجرين إلى وحدة
 
-الوحدة النموذجية هي `Modules/Custom/Inventory`.
+المثال هو وحدة Inventory النموذجية (`ModularBlazor.Samples`، ‏`samples/Inventory`).
 
-1. سم مشروع الدخول `*.Infrastructure` (أو استورد `WebApi.Data/SharedData.props`).
+1. سم مشروع الدخول `*.Infrastructure` مع Module SDK (أو اضبط `ModuleUsesData=true` في مشروع مفرد).
 2. اشتق من `TenantDbContext`: اضبط `Schema`، واضبط النموذج في `ConfigureModel`.
 3. استدع `services.AddTenantDbContext<T>()`. وهذا يسجل أيضا `IRepository<T>` و`IReadRepository<T>`.
 4. أضف `IDesignTimeDbContextFactory` يعيد
