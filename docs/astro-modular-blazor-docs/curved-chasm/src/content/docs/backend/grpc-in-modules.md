@@ -132,6 +132,9 @@ workaround. It was uploaded through the Blazor client's Host modules page.
 - gRPC-Web at `http://localhost:5080/api/sales`: **24 of 24** runs OK (unary, streaming and `WhoAmI`), path base
   `/api/sales`.
 - Native gRPC to 5080: `HTTP_1_1_REQUIRED`, as expected on an HTTP/1.1 endpoint.
+- Removed through the admin API (unload, then uninstall). The catalog entry and package folder are gone, the route
+  answers like any unknown path (401 from the fallback policy), and `GET /api/admin/modules/unloading` was empty
+  when checked a few minutes later: the copy that served the calls was collected.
 - Side finding: the admin API lists the module (`desiredState: Active`, `loaded: true`), but the Host modules table
   in the Blazor client doesn't show it. The difference from the other rows is `packageHash: null`.
 
@@ -243,8 +246,6 @@ var client = new Greeter.GreeterClient(channel);
 - The real Blazor client with `Grpc.Net.Client.Web` (a hand-made `fetch` probe stood in for it).
 - The Hybird lab's own gateway and multi-replica pools. They weren't running during the spike; a local YARP of the
   same image stood in for the gateway, and the Module.Content playground (one replica) for a running dev setup.
-- Unload on the playground: its module list doesn't show the module, and the admin API needs an identity-service
-  token.
 - Client streaming and bidirectional streaming. They aren't possible over gRPC-Web, and native gRPC was only tested
   with unary and server streaming.
 - gRPC reflection, health checks, compression, deadlines across a swap.
