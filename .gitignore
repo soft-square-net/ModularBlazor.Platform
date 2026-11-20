@@ -6,6 +6,12 @@ artifacts/
 
 /modules/client/Layouts.Admin/node-app/node_modules
 *.json
+# ...except the settings and npm manifests a fresh clone needs to build and run (no secrets in them: use user-secrets).
+!/src/WebApi/WebApi/appsettings.json
+!/src/WebApi/WebApi/appsettings.Development.json
+!/src/apps/blazor/ModularBlazor.BlzWebClient/wwwroot/appsettings.json
+!/modules/client/Layouts.Default/node-app/package.json
+!/src/apps/blazor/ModularBlazor.BlzWebClient/node-app/package.json
 /modules/client/Layouts.Admin/node-app/package-lock.json
 /modules/client/Layouts.Admin/node-app/yarn.lock
 
