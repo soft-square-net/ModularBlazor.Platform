@@ -14,11 +14,11 @@
   The saved file is the module's API contract. Commit it; clients (NSwag, openapi-typescript) are generated from it.
 
 .EXAMPLE
-  ./src/WebApi/scripts/Export-ModuleOpenApi.ps1 -Project src/WebApi/Modules/Custom/Content/WebApi.Modules.Content.Infrastructure -ModuleId content
+  ./src/WebApi/scripts/Export-ModuleOpenApi.ps1 -Project ../ModularBlazor.Module.Content/src/WebApi.Modules.Content.Infrastructure -ModuleId content
 
 .EXAMPLE
   # CI: fail when the endpoints changed but the committed document was not re-exported.
-  ./src/WebApi/scripts/Export-ModuleOpenApi.ps1 -Project src/WebApi/Modules/Custom/Content/WebApi.Modules.Content.Infrastructure -ModuleId content -Check
+  ./src/WebApi/scripts/Export-ModuleOpenApi.ps1 -Project ../ModularBlazor.Module.Content/src/WebApi.Modules.Content.Infrastructure -ModuleId content -Check
 
 .EXAMPLE
   # The host's own document (module admin, /api/pool) instead of a module's: src/WebApi/openapi/webapi.json.

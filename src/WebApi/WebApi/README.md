@@ -9,8 +9,8 @@ from an uploaded `.dll`, `.zip` (build output) or `.nupkg`. No restart needed fo
 | `WebApi.Contracts` | `IRuntimeModule` + `ModuleManifest`. Referenced by the host, so it is always shared. |
 | `greeting` | Sample module, in [ModularBlazor.Samples](https://github.com/soft-square-net/ModularBlazor.Samples/tree/main/samples/Greeting). Zip its `bin/<Configuration>/net10.0` and upload it. |
 | `Modules/Core/WebApi.Modules.Core.*` | Core modules: ship with every release and are seeded as `Active` on first start. See [Core modules](#core-modules). |
-| `WebApi.Modules.Pulse` | Sample for [module hosted services and pipelines](#module-hosted-services-pipelines-and-hotunload): a `BackgroundService` and a private pipeline. |
-| `Modules/Custom/Shifts`, `Modules/Custom/Content` | Newsroom modules (uploaded like any custom module). See [Newsroom modules](#newsroom-modules-shifts-and-content). |
+| `pulse` | Sample, in [ModularBlazor.Samples](https://github.com/soft-square-net/ModularBlazor.Samples/tree/main/samples/Pulse), for [module hosted services and pipelines](#module-hosted-services-pipelines-and-hotunload): a `BackgroundService` and a private pipeline. |
+| `shifts`, `content` | Newsroom modules, in [ModularBlazor.Module.Shifts](https://github.com/soft-square-net/ModularBlazor.Module.Shifts) and [ModularBlazor.Module.Content](https://github.com/soft-square-net/ModularBlazor.Module.Content) (uploaded like any custom module). See [Newsroom modules](#newsroom-modules-shifts-and-content). |
 
 ## Lifecycle
 
@@ -153,7 +153,7 @@ request ─► host middleware (Tenancy/): X-Tenant header, then host name (X-Fo
 - **No Finbuckle:** the in-house layer is small, and Finbuckle's startup-registered stores, per-tenant options and shared-database focus fit this runtime poorly. Modules only see `ITenantContext`, so it could be swapped in later.
 - **Without a tenant store** (a single local instance, no `ConnectionStrings:TenantStore`), the directory reads `Tenancy:Tenants` from the host configuration and the tenancy write endpoints return 503.
 
-**Adding tenant data to a module:** see `Modules/Custom/Inventory` (the sample).
+**Adding tenant data to a module:** see the Inventory sample ([ModularBlazor.Samples](https://github.com/soft-square-net/ModularBlazor.Samples/tree/main/samples/Inventory)).
 1. Import `SharedData.props`, or name the project `*.Infrastructure` (see below).
 2. Derive from `TenantDbContext` (set `Schema`, configure in `ConfigureModel`).
 3. Call `services.AddTenantDbContext<T>()`. That also registers `IRepository<T>` and `IReadRepository<T>`.
@@ -161,7 +161,7 @@ request ─► host middleware (Tenancy/): X-Tenant header, then host name (X-Fo
 5. Add migrations, one set per engine, with the script (see below):
 
 ```powershell
-./src/WebApi/scripts/Add-Migration.ps1 -Project src/WebApi/Modules/Custom/Inventory/WebApi.Modules.Inventory.Infrastructure -Name <Name>
+./src/WebApi/scripts/Add-Migration.ps1 -Project <ModularBlazor.Samples>/samples/Inventory/src/WebApi.Modules.Inventory.Infrastructure -Name <Name>
 ```
 
 ## Database engines and per-engine migrations
@@ -302,7 +302,7 @@ honestly.
 ## Module hosted services, pipelines and HotUnload
 
 Three runtime capabilities for modules that host more than Carter endpoints (the planned Elsa workflow module in the
-`workflow` pool is the driver). Sample: `Modules/Custom/WebApi.Modules.Pulse`.
+`workflow` pool is the driver). Sample: Pulse, in [ModularBlazor.Samples](https://github.com/soft-square-net/ModularBlazor.Samples/tree/main/samples/Pulse).
 
 ### Hosted services (`Modularity/ModuleHostedServices.cs`)
 
@@ -493,8 +493,8 @@ content: article workflow ─► IAccessScopes.HasPermissionAsync(permission, [p
 
 | Module | Projects | Schema | Routes (`/api/...`) |
 |---|---|---|---|
-| `shifts` 0.1.0 | `Modules/Custom/Shifts/WebApi.Modules.Shifts.{Domain,Application,Infrastructure}` | `shifts` | `sections`, `sections/{id}/settings`, `shifts`, `shifts/{id}/publish`, `shifts/{id}/check-out`, `shifts/{id}/members/{user}/check-out`, `mine`, `overdue` |
-| `content` 0.1.0 (starter) | `Modules/Custom/Content/WebApi.Modules.Content.{Domain,Application,Infrastructure}` | `content` | `presses`, `categories`, `articles` (`?view=Mine\|Queue\|Review\|Desk`), `articles/{id}` and `/submit`, `/accept`, `/assign`, `/approve`, `/return`, `/transfer`, `/schedule`, `/publish`, `articles/publish-due` |
+| `shifts` 0.1.0 | [ModularBlazor.Module.Shifts](https://github.com/soft-square-net/ModularBlazor.Module.Shifts): `src/WebApi.Modules.Shifts.{Domain,Application,Infrastructure}` | `shifts` | `sections`, `sections/{id}/settings`, `shifts`, `shifts/{id}/publish`, `shifts/{id}/check-out`, `shifts/{id}/members/{user}/check-out`, `mine`, `overdue` |
+| `content` 0.1.0 (starter) | [ModularBlazor.Module.Content](https://github.com/soft-square-net/ModularBlazor.Module.Content): `src/WebApi.Modules.Content.{Domain,Application,Infrastructure}` | `content` | `presses`, `categories`, `articles` (`?view=Mine\|Queue\|Review\|Desk`), `articles/{id}` and `/submit`, `/accept`, `/assign`, `/approve`, `/return`, `/transfer`, `/schedule`, `/publish`, `articles/publish-due` |
 
 - **Rota roles:**
 
@@ -559,7 +559,7 @@ dotnet build samples/Greeting/src/WebApi.Modules.Greeting
 Zip the *contents* of its `bin/Debug/net10.0`, run the host
 (`dotnet run --project src/WebApi/WebApi --launch-profile http`), then use `WebApi.http`.
 
-Pulse (hosted services and pipeline) works the same way: build `src/WebApi/Modules/Custom/WebApi.Modules.Pulse`, zip
+Pulse (hosted services and pipeline) works the same way: build `samples/Pulse/src/WebApi.Modules.Pulse` in ModularBlazor.Samples, zip
 its output, then install and activate it as `pulse`. For the HotUnload case, build with
 `-p:PulseHotUnload=false -p:PulseVersion=1.0.1`. Don't use `-p:Version`: it is a global property and re-versions
 `WebApi.Contracts` too.
