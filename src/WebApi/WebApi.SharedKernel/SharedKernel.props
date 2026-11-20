@@ -16,9 +16,11 @@
     <HostSharedPrivate Condition="'$(EfDesignAssets)' == 'all'">true</HostSharedPrivate>
   </PropertyGroup>
 
+  <Import Project="$(MSBuildThisFileDirectory)../../../build/HostSharedPackages.props" Condition="'$(_HostSharedPackagesImported)' != 'true'" />
+
   <ItemGroup>
     <ProjectReference Include="$(MSBuildThisFileDirectory)WebApi.SharedKernel.csproj" Private="$(HostSharedPrivate)" ExcludeAssets="$(HostSharedExclude)" />
-    <PackageReference Include="Ardalis.Specification" Version="9.3.1" ExcludeAssets="$(HostSharedExclude)" />
+    <PackageReference Include="@(HostSharedKernelPackage)" ExcludeAssets="$(HostSharedExclude)" />
   </ItemGroup>
 
 </Project>

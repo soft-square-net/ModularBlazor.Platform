@@ -32,6 +32,8 @@
 
   <ItemGroup>
     <None Include="Sdk/*.props;Sdk/*.targets" Pack="true" PackagePath="Sdk/" />
+    <!-- The host-shipped third-party packages: one list with the in-repo modules. -->
+    <None Include="../../build/HostSharedPackages.props" Pack="true" PackagePath="Sdk/" Visible="false" />
     <None Include="$(_PlatformProps)" Pack="true" PackagePath="Sdk/Platform.props" Visible="false" />
   </ItemGroup>
 
