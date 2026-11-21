@@ -42,6 +42,24 @@ public sealed class ActiveModuleService
 
   public IReadOnlyCollection<string> ActiveModuleIds => _active.ToArray();
 
+  // Modules kept active besides the page's own: those whose dialogs are open (counted: one dialog may open another).
+  private readonly Dictionary<string, int> _held = new(StringComparer.OrdinalIgnoreCase);
+
+  /// <summary>Keeps a module's styles and scripts on the page until <see cref="ReleaseAsync"/> (e.g. while its dialog is open).</summary>
+  public Task HoldAsync(string id)
+  {
+    _held[id] = _held.GetValueOrDefault(id) + 1;
+    return SyncAsync();
+  }
+
+  public Task ReleaseAsync(string id)
+  {
+    if (!_held.TryGetValue(id, out var count)) return Task.CompletedTask;
+    if (count <= 1) _held.Remove(id);
+    else _held[id] = count - 1;
+    return SyncAsync();
+  }
+
   /// <summary>Called by the router before it resolves a URL: make the page's modules the active ones.</summary>
   public Task NavigateAsync(ModuleDescriptor? module)
   {
@@ -84,6 +102,7 @@ public sealed class ActiveModuleService
 
     foreach (var d in _modules.Catalog.Where(d => d.LoadOnStartup)) Add(d.Id);
     if (CurrentModuleId is { } current) Add(current);
+    foreach (var held in _held.Keys) Add(held);
     return ordered;
   }
 
