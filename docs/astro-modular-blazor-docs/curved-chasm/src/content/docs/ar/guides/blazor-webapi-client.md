@@ -166,6 +166,9 @@ sequenceDiagram
 `ModuleManager` و`ActiveModuleService` وخدمات المصادقة **scoped**، لأن `AuthenticationStateProvider` في OIDC كذلك.
 ولـ WebAssembly نطاق واحد للتطبيق كله، و`host.Services` في `Program.cs` هو ذلك النطاق، فتبقى ما بقيت الصفحة.
 
+لا تشير وحدة إلى أخرى أبدا. ومع ذلك تستطيع وحدة أن تفتح نافذة حوار توفرها وحدة أخرى، بمعرفها، وتنتظر نتيجتها: انظر
+[نوافذ الحوار بين وحدات العميل](/ar/guides/module-dialogs/).
+
 ## إدارة وحدات العميل
 
 تدير الصفحة `/client-modules` (القائمة **Client modules**، للدور `platform-admin`) الكتالوج عبر العميل المولد
@@ -200,6 +203,14 @@ sequenceDiagram
 جذر محتوى WebApi)، تتشاركها نسخ المجموعة. ولوضعه في مكان آخر على مضيف واحد، اضبط تجاوز المضيف
 `Modules__Settings__client-modules__ClientModules__Path`. وتستعمله ساحات تجربة الوحدات لتبقي كتالوجها خارج نسخة
 المنصة، التي يستعملها مختبر Hybird أيضا. ويحد الرفع بـ `ClientModules:MaxPackageMegabytes` (‏50).
+
+ويرفض التثبيت (409) ما دامت وحدة مذكورة في `Dependencies` غير مثبتة، ويظهر الرفع تحذيرا بذلك.
+
+**وحدات العميل المحلية (في Development فقط).** يسمي `ClientModules:Local:{id}=<path>` مخرجات بناء وحدة عميل: ملف `.dll`
+أو `.nupkg` أو `.zip`، أو مجلدا تكوّن تجميعاته وحدة واحدة. اضبطه عبر تجاوز المضيف
+`Modules__Settings__client-modules__ClientModules__Local__{id}`. وعند البدء يثبت الكتالوج كل وحدة تغيرت ملفاتها
+ويفعّلها، والتبعيات أولا. ويكون مصدرها `local`، ويستبدل الإصدار نفسه. وتستعمله ساحات تجربة الوحدات، فتحمل واجهتها دون
+رفع. ويتجاهل خارج Development.
 
 ## صفحات MudTail
 

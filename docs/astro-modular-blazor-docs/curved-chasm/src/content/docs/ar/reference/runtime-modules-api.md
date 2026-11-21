@@ -98,6 +98,7 @@ sidebar:
 | `OpenApi:Enabled` | `false` (مفعل في بيئة التطوير) | يخدم مستندات OpenAPI وScalar خارج بيئة التطوير |
 | `Modules:CorePath` | `CoreModules` | مجلد حزم الوحدات الأساسية المشحونة مع الإصدار |
 | `Modules:Settings:{id}:{key}` | لا شيء | تجاوز المضيف لإعداد وحدة، مثل `Modules__Settings__client-modules__ClientModules__Path=/data/client-modules`. يتقدم على إعدادات الفهرس (القيم الافتراضية في البيان وقيم المسؤول) في هذه النسخة، ولا يكتب أبدا في `modules.json` |
+| `Access:DevGrants:N` | لا شيء | لبيئة التطوير فقط: `{Tenant, Email, Permissions[], Scope}` (النطاق افتراضيا `tenant`، و`module.*` لكل صلاحيات الوحدة). عندما يستدعي هذا الحساب الواجهة في ذلك المستأجر، تكتب المنح الناقصة بالمصدر `dev`. تستخدمه بيئات التجربة لأن معرفات الحسابات المزروعة عشوائية |
 | `Modules:Local:{id}` | لا شيء | لبيئة التطوير فقط: مجلد مخرجات بناء وحدة، يثبت عند بدء التشغيل كأنه رفع إذا تغيرت ملفاته (نشطا أول مرة). تستخدمه بيئات التجربة (playground) في مستودعات الوحدات، ويتجاهل مع تحذير في البيئات الأخرى |
 | `Auth:Authority` | لا شيء | خدمة الهوية (اكتشاف OIDC وJWKS). ودونها يطبق `Authentication:Schemes:Bearer` (`dotnet user-jwts`) |
 | `Auth:Audience` | `modular-webapi` | جمهور الرمز المتوقع |

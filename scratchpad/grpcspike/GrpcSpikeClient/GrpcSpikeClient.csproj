@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Spike client: calls the grpcdemo module over gRPC-Web (HTTP/1.1) or native gRPC (HTTP/2, h2c). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>GrpcSpikeClient</AssemblyName>
+    <RootNamespace>GrpcSpikeClient</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.30.2" />
+    <PackageReference Include="Grpc.Net.Client" Version="2.71.0" />
+    <PackageReference Include="Grpc.Net.Client.Web" Version="2.71.0" />
+    <PackageReference Include="Grpc.Tools" Version="2.71.0" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <Protobuf Include="../WebApi.Modules.GrpcDemo/Protos/greeter.proto" GrpcServices="Client" />
+  </ItemGroup>
+</Project>

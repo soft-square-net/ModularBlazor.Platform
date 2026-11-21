@@ -42,6 +42,13 @@ internal static class ModulePipelines
         };
         foreach (var (name, type) in host.ConstraintMap) options.ConstraintMap[name] = type;
 
+        // The module's own Configure<RouteOptions> actions (AddGrpc registers its "grpcunimplemented" constraint this
+        // way). Options.Create below replaces the options pipeline, so without this they would never run.
+        foreach (var configure in services
+                     .Where(d => d.ServiceType == typeof(IConfigureOptions<RouteOptions>) && !d.IsKeyedService)
+                     .Select(d => d.ImplementationInstance).OfType<IConfigureOptions<RouteOptions>>())
+            configure.Configure(options);
+
         if (EndpointDataSources is null || MatcherFactory is null || DfaMatcherFactory is null || MatcherLifetime is null)
         {
             // Pipelines still work; routing inside them would pin the module and leak into the host's route table.

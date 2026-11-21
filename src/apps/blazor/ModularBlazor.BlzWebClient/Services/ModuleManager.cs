@@ -80,6 +80,7 @@ public sealed class ModuleManager : IModuleNavigation
   private readonly Dictionary<string, Task> _inflight = new(StringComparer.OrdinalIgnoreCase);
   private readonly Dictionary<Assembly, ModuleDescriptor> _owners = new();
   private readonly Dictionary<string, Type> _layouts = new(StringComparer.OrdinalIgnoreCase);
+  private readonly Dictionary<string, (Type Type, ClientDialogAttribute Info)> _dialogs = new(StringComparer.OrdinalIgnoreCase);
   private readonly SemaphoreSlim _refreshLock = new(1, 1);
 
   private string? _etag;            // of the last manifest applied, for If-None-Match
@@ -208,6 +209,12 @@ public sealed class ModuleManager : IModuleNavigation
     if (i >= 0) path = path[..i];
     return path.Trim('/');
   }
+
+  // ---------------------------------------------------------------- dialogs
+
+  /// <summary>The component a loaded module registered for a dialog id ([ClientDialog]), or null.</summary>
+  public (Type Type, ClientDialogAttribute Info)? ResolveDialog(string dialogId)
+      => _dialogs.TryGetValue(dialogId, out var dialog) ? dialog : null;
 
   // ---------------------------------------------------------------- layouts
 
@@ -479,6 +486,7 @@ public sealed class ModuleManager : IModuleNavigation
       {
         _owners[assembly] = d;
         RegisterLayouts(assembly);
+        RegisterDialogs(assembly, d);
         RouterAssemblies.Add(assembly); // the Router picks routable pages up on its next refresh
       }
 
@@ -513,6 +521,9 @@ public sealed class ModuleManager : IModuleNavigation
     {
       RouterAssemblies.Remove(assembly);
       _owners.Remove(assembly);
+
+      foreach (var key in _dialogs.Where(kv => kv.Value.Type.Assembly == assembly).Select(kv => kv.Key).ToList())
+        _dialogs.Remove(key);
 
       foreach (var key in _layouts.Where(kv => kv.Value.Assembly == assembly).Select(kv => kv.Key).ToList())
         _layouts.Remove(key);
@@ -626,19 +637,44 @@ public sealed class ModuleManager : IModuleNavigation
     return reader.GetString(reader.GetAssemblyDefinition().Name);
   }
 
-  private void RegisterLayouts(Assembly assembly)
+  private static Type[] TypesOf(Assembly assembly)
   {
-    Type[] types;
     try
     {
-      types = assembly.GetTypes();
+      return assembly.GetTypes();
     }
     catch (ReflectionTypeLoadException ex)
     {
-      types = ex.Types.Where(t => t is not null).Select(t => t!).ToArray();
+      return ex.Types.Where(t => t is not null).Select(t => t!).ToArray();
     }
+  }
 
-    foreach (var type in types)
+  /// <summary>
+  /// The module's [ClientDialog] components. A module may only register ids under its own id ("{module id}/{name}"),
+  /// so one module cannot take over another's dialogs.
+  /// </summary>
+  private void RegisterDialogs(Assembly assembly, ModuleDescriptor owner)
+  {
+    foreach (var type in TypesOf(assembly))
+    {
+      if (type.GetCustomAttribute<ClientDialogAttribute>() is not { } info) continue;
+      if (!typeof(IComponent).IsAssignableFrom(type) || type.IsAbstract)
+      {
+        Console.WriteLine($"[module {owner.Id}] dialog '{info.Id}' skipped: {type.FullName} is not a component.");
+        continue;
+      }
+      if (!string.Equals(DialogIds.ModuleOf(info.Id), owner.Id, StringComparison.OrdinalIgnoreCase))
+      {
+        Console.WriteLine($"[module {owner.Id}] dialog '{info.Id}' skipped: a dialog id must be \"{owner.Id}/<name>\".");
+        continue;
+      }
+      _dialogs[info.Id] = (type, info);
+    }
+  }
+
+  private void RegisterLayouts(Assembly assembly)
+  {
+    foreach (var type in TypesOf(assembly))
     {
       var key = type.GetCustomAttribute<LayoutKeyAttribute>()?.Key;
       if (key is not null && typeof(LayoutComponentBase).IsAssignableFrom(type))

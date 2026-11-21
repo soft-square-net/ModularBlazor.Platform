@@ -40,6 +40,9 @@ builder.Services.AddSingleton<IModulePackageReader, NuPkgPackageReader>();
 builder.Services.AddScoped<ModuleManager>();
 builder.Services.AddScoped<ActiveModuleService>();
 builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.IModuleNavigation>(sp => sp.GetRequiredService<ModuleManager>());
+// Dialogs one module opens in another by id (IModuleDialogs), shown by Components/ModuleDialogHost in App.razor.
+builder.Services.AddScoped<ModuleDialogService>();
+builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.IModuleDialogs>(sp => sp.GetRequiredService<ModuleDialogService>());
 
 var host = builder.Build();
 

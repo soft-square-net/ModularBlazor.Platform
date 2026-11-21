@@ -175,6 +175,9 @@ private assemblies (like `Module.Tenants` and its generated client).
 `AuthenticationStateProvider` is scoped. WebAssembly has one scope for the whole app, and `host.Services` in
 `Program.cs` is that scope, so they still live as long as the page.
 
+Modules never reference each other. One module can still open a dialog another provides, by id, and await its
+result: see [Dialogs between client modules](/guides/module-dialogs/).
+
 ## Client module management
 
 `/client-modules` (menu **Client modules**, `platform-admin`) manages the catalog with the generated
@@ -212,6 +215,15 @@ The catalog is `client-modules.json` and the files under `ClientModules:Path` (d
 relative to the WebApi's content root), shared by the replicas of the pool. To put it somewhere else on one host, set
 the host override `Modules__Settings__client-modules__ClientModules__Path`. Module playgrounds use it to keep their
 catalog out of the platform checkout, which the Hybird lab uses as well. Uploads are limited to `ClientModules:MaxPackageMegabytes` (50).
+
+An install is refused (409) while a module in its `Dependencies` is not installed, and the upload shows a warning
+about it.
+
+**Local client modules (Development only).** `ClientModules:Local:{id}=<path>` names a client module's build output:
+a `.dll`, `.nupkg` or `.zip`, or a folder whose assemblies form one module. Set it through the host override
+`Modules__Settings__client-modules__ClientModules__Local__{id}`. On start, the catalog installs each one whose files
+changed and activates it, dependencies first. The source is `local`, and the same version is replaced. Module
+playgrounds use it, so their UI loads without an upload. Outside Development the setting is ignored.
 
 ## MudTail pages
 

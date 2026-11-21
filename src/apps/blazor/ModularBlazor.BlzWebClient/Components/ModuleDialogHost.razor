@@ -1,0 +1,73 @@
+@implements IDisposable
+@inject ModuleDialogService Dialogs
+
+@*
+  Renders the dialogs opened through IModuleDialogs, in MudTail's dialog shell (the mud-dialog-* classes of the active
+  layout's theme), on top of whatever page and layout is showing. Rendered once, in App.razor, outside the Router, so a
+  dialog does not depend on the page's layout. The host draws the frame (overlay, title, close button); the module's
+  component draws the body and its buttons and closes itself through the cascading IDialogReference.
+*@
+
+@foreach (var dialog in Dialogs.Open)
+{
+  var top = ReferenceEquals(dialog, Dialogs.Open[^1]);
+  <div @key="dialog.Key" class="mud-dialog-container open module-dialog" data-dialog-id="@dialog.Id"
+       style="@(top ? null : "pointer-events:none")" @onkeydown="e => OnKeyDown(e, dialog)">
+    <div class="mud-dialog-overlay" @onclick="() => OnOverlayClick(dialog)"></div>
+    <div class="mud-dialog" style="max-width:@dialog.Options.MaxWidth" role="dialog" aria-modal="true"
+         aria-labelledby="@($"dlg-{dialog.Key:n}")" tabindex="-1" @ref="_frames[dialog.Key]">
+      <div class="mud-dialog-title">
+        <span id="@($"dlg-{dialog.Key:n}")">@dialog.Options.Title</span>
+        <button type="button" class="module-dialog-close" aria-label="Close" @onclick="dialog.Cancel">✕</button>
+      </div>
+      <CascadingValue Value="(IDialogReference)dialog" IsFixed="true">
+        <ErrorBoundary>
+          <ChildContent>
+            <DynamicComponent Type="dialog.Component" />
+          </ChildContent>
+          <ErrorContent Context="error">
+            <div class="mud-dialog-content" role="alert">
+              This dialog failed: @error.Message
+            </div>
+            <div class="mud-dialog-actions">
+              <button type="button" class="mud-button-root mud-button-text mud-button-medium" @onclick="dialog.Cancel">Close</button>
+            </div>
+          </ErrorContent>
+        </ErrorBoundary>
+      </CascadingValue>
+    </div>
+  </div>
+}
+
+@code {
+  private readonly Dictionary<Guid, ElementReference> _frames = new();
+  private Guid? _focused;
+
+  protected override void OnInitialized() => Dialogs.Changed += OnChanged;
+
+  private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+  protected override async Task OnAfterRenderAsync(bool firstRender)
+  {
+    foreach (var closed in _frames.Keys.Where(k => Dialogs.Open.All(d => d.Key != k)).ToList()) _frames.Remove(closed);
+
+    // Move the focus into a dialog when it opens, so Escape and Tab work in it.
+    if (Dialogs.Open.Count > 0 && Dialogs.Open[^1].Key is var top && top != _focused && _frames.TryGetValue(top, out var frame))
+    {
+      _focused = top;
+      try { await frame.FocusAsync(); } catch (InvalidOperationException) { }
+    }
+  }
+
+  private static void OnKeyDown(KeyboardEventArgs e, ModuleDialogService.OpenDialog dialog)
+  {
+    if (e.Key == "Escape" && dialog.Options.CloseOnEscape != false) dialog.Cancel();
+  }
+
+  private static void OnOverlayClick(ModuleDialogService.OpenDialog dialog)
+  {
+    if (dialog.Options.CloseOnOverlayClick != false) dialog.Cancel();
+  }
+
+  public void Dispose() => Dialogs.Changed -= OnChanged;
+}

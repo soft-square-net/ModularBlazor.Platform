@@ -236,7 +236,7 @@ Modules/<Name>/
   - Repositories read and write the current tenant's database.
   - `Add`, `Update` and `Delete` save immediately (Ardalis semantics).
 - **Specifications:** reads go through `Specification<T>` / `Specification<T, TResult>`. Lists project to DTOs with `Select` and use `AsNoTracking`.
-- **No MediatR:** application services instead. Mediator handler and pipeline caches are keyed by module types and would need the same unload work.
+- **No MediatR:** application services instead. MediatR's reflection-built handler and pipeline caches are static and keyed by module types, so they would keep modules from unloading. A module may ship a source-generated mediator (Mediator, `Mediator.SourceGenerator`) privately and register it in its own container: the handler table is code in the module's assembly, so it unloads with the module (see the docs, "Create a module", "A source-generated mediator inside the module").
 - **Versions:** Ardalis.Specification(.EntityFrameworkCore) 9.3.1 targets EF Core 9 and runs on the host's EF Core 10; this was verified in the lab.
 
 ## How each problem is solved

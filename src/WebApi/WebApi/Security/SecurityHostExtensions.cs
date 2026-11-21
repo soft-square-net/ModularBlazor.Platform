@@ -80,6 +80,9 @@ public static class SecurityHostExtensions
     {
         app.UseAuthentication();
         app.UseTenancy();
+        // Development only: Access:DevGrants (grants a dev setup needs, by email), before permissions are checked.
+        if (app.ApplicationServices.GetRequiredService<IHostEnvironment>().IsDevelopment())
+            app.UseMiddleware<DevGrantSeeder>();
         app.UseAuthorization();
         return app;
     }
