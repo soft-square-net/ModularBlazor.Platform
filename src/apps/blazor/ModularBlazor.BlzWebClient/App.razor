@@ -21,6 +21,9 @@
       </ModuleLayoutHost>
     </NotFound>
   </Router>
+
+  @* Dialogs opened through IModuleDialogs, above any page and layout. *@
+  <ModuleDialogHost />
 @code {
 
   // Pages that never need a module download or a signed-in user (this app's own pages; host-modules checks the role itself).
