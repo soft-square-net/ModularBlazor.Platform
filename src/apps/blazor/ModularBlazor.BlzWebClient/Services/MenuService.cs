@@ -15,19 +15,30 @@ namespace soft.square.net.ModularBlazor.BlzWebClient.Services;
 /// <item>A child is shown in its parent's zone; a parent that is not there (its module is not in the catalog) puts the
 /// child at the top of its own zone. A group with nothing in it and no link of its own is left out.</item>
 /// <item>Order: Order, then the title in the current language.</item>
+/// <item>On top: the administrators' changes (<see cref="MenuCustomizations"/>), and the menus admin page in the
+/// secondary menu for those who may use it.</item>
 /// </list>
 /// </summary>
 public sealed class MenuService : IMenuService, IDisposable
 {
+  /// <summary>The menus admin page (Pages/Menus.razor).</summary>
+  public const string AdminPage = "menus";
+
   private readonly ModuleManager _modules;
+  private readonly MenuCustomizations _customizations;
   private Dictionary<string, IReadOnlyList<MenuNode>>? _zones; // built on first use after a change
   private string? _culture;                                    // ...in this UI culture (the titles' order depends on it)
 
-  public MenuService(ModuleManager modules)
+  public MenuService(ModuleManager modules, MenuCustomizations customizations)
   {
     _modules = modules;
+    _customizations = customizations;
     _modules.Changed += OnCatalogChanged;
+    _customizations.Changed += OnCatalogChanged;
   }
+
+  /// <summary>The modules' and the app's own entries, before the administrators' changes (for the admin page).</summary>
+  public IReadOnlyList<MenuItem> ModuleItems() => Items(withCustomizations: false);
 
   public event Action? Changed;
 
@@ -44,10 +55,14 @@ public sealed class MenuService : IMenuService, IDisposable
     Changed?.Invoke();
   }
 
-  public void Dispose() => _modules.Changed -= OnCatalogChanged;
+  public void Dispose()
+  {
+    _modules.Changed -= OnCatalogChanged;
+    _customizations.Changed -= OnCatalogChanged;
+  }
 
-  /// <summary>Every entry the catalog brings, ids unique (the first one wins).</summary>
-  private List<MenuItem> Items()
+  /// <summary>Every entry the catalog brings, ids unique (the first one wins), then the administrators' changes.</summary>
+  private List<MenuItem> Items(bool withCustomizations = true)
   {
     var items = new List<MenuItem>();
     foreach (var module in _modules.Catalog.Where(d => !d.Hidden))
@@ -59,7 +74,13 @@ public sealed class MenuService : IMenuService, IDisposable
     }
     items.AddRange(_modules.HostNav.Select(n =>
         new MenuItem($"host:{n.Href}", MenuItemKinds.Link, MenuZones.Secondary, n.Title, n.Href, Order: n.Order, Titles: n.Titles)));
-    return items.DistinctBy(i => i.Id, StringComparer.OrdinalIgnoreCase).ToList();
+    if (_customizations.CanManage)
+    {
+      var page = ModuleManager.HostNavItem("Menus", AdminPage, 912);
+      items.Add(new MenuItem($"host:{AdminPage}", MenuItemKinds.Link, MenuZones.Secondary, page.Title, page.Href, Order: page.Order, Titles: page.Titles));
+    }
+    var unique = items.DistinctBy(i => i.Id, StringComparer.OrdinalIgnoreCase).ToList();
+    return withCustomizations ? MenuCustomizations.Apply(unique, _customizations.Current) : unique;
   }
 
   /// <summary>The zones' trees. Pure: public for tests.</summary>

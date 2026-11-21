@@ -83,6 +83,15 @@ example.
   is not there, at the top of its own zone; a group with nothing in it and no `Href` is hidden. A module without menu
   attributes keeps its `NavTitle` entry, as a link in `main`. Layouts show a zone with
   `<MenuZone Zone="@MenuZones.Main" />` or build their own from `IMenuService.Zone(...)`.
+
+  Administrators change the menus on the client's **Menus** page (`/menus`), kept by the WebApi's `menus` core module
+  (`/api/menus`): hide, rename (per language), move to another menu or group and reorder any entry by its id, and add
+  links and groups of their own, to pages of the app or to external `http(s)` addresses (opened in a new tab), for
+  everyone, signed-in users or visitors only. There are two layers: the platform's (every tenant; platform admins,
+  without a tenant) and each tenant's on top of it (the tenant's `menus.manage` permission, or a platform admin naming
+  the tenant). The module never reads the modules' entries: it stores changes by id and the client applies them, so an
+  entry whose module leaves the catalog simply has nothing to change. Added entries are known as `@platform:{id}` and
+  `@tenant:{id}`; a save sends the version it read (409 when someone saved meanwhile).
 * **Layout module:** a `LayoutComponentBase` with `@attribute [LayoutKey("my-layout")]`. Any module can ship one; a
   module's pages choose it with `Layout` in `[ClientModule]`, or a page can pick with `@attribute [UseLayout("my-layout")]`.
   Layout precedence: page `@layout` > `[UseLayout]` > the module's `Layout` > `default`.

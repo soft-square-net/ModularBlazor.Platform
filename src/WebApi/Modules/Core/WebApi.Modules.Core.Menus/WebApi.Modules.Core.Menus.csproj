@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Core module "menus": what administrators change in the client's menus, per platform and per tenant (hide, rename,
+    move, reorder a module's entries; add links and groups, external ones too). The modules' own entries come from the
+    client-modules manifest; the client applies these changes on top. Shared setup in ../Directory.Build.props.
+  -->
+
+</Project>
