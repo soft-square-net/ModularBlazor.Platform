@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+option csharp_namespace = "GrpcDemo.Protos";
+
+package grpcdemo;
+
+service Greeter {
+  // Unary.
+  rpc SayHello (HelloRequest) returns (HelloReply);
+  // Server streaming: `count` replies, `interval_ms` apart.
+  rpc Countdown (CountdownRequest) returns (stream CountdownReply);
+  // Who the module sees: user, tenant, permission check through IAccessScopes.
+  rpc WhoAmI (WhoAmIRequest) returns (WhoAmIReply);
+}
+
+message HelloRequest { string name = 1; }
+message HelloReply { string message = 1; string module_version = 2; }
+
+message CountdownRequest { int32 count = 1; int32 interval_ms = 2; }
+message CountdownReply { int32 value = 1; }
+
+message WhoAmIRequest { string permission = 1; }
+message WhoAmIReply {
+  bool authenticated = 1;
+  string user = 2;
+  string tenant = 3;
+  string resolved_by = 4;
+  bool has_permission = 5;
+  string path_base = 6;
+  string protocol = 7;
+}
