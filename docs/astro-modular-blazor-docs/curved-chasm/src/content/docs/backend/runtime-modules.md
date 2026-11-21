@@ -87,8 +87,11 @@ ModularBlazor.Module.<Name>/src/
   read and write the current tenant's database; `Add`, `Update` and `Delete` save immediately.
 - **Specifications:** reads go through `Specification<T>` / `Specification<T, TResult>`; lists project to DTOs with
   `Select` and use `AsNoTracking`.
-- **No MediatR:** application services instead. Mediator handler and pipeline caches are keyed by module types and
-  would need the same unload work.
+- **No MediatR:** application services instead. MediatR's reflection-built handler and pipeline caches are static
+  and keyed by module types, so they would keep modules from unloading. A module may ship a **source-generated**
+  mediator ([Mediator](https://github.com/martinothamar/Mediator)) privately: its handler table is code in the
+  module's own assembly and it is registered in the module's container, so it unloads with the module
+  ([conditions](/backend/create-a-module/#a-source-generated-mediator-inside-the-module)).
 - Ardalis.Specification 9.3.1 targets EF Core 9 and runs on the host's EF Core 10; verified in the lab.
 
 Tenant data, migrations and the four database engines: [Tenancy and tenant data](/backend/tenancy-data/).
