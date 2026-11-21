@@ -11,7 +11,7 @@
   <Import Project="../../build/Platform.Packaging.props" />
 
   <PropertyGroup>
-    <Description>ModularBlazor: MSBuild SDK for modules developed outside the platform repo. Server modules (Domain, Application, Infrastructure layers or a single project) and Blazor client modules compile against the platform's contract packages and ship none of them.</Description>
+    <Description>ModularBlazor: MSBuild SDK for modules developed outside the platform repo. Server modules (Domain, Application, Infrastructure layers, the Clean Architecture Core, UseCases, Infrastructure, Web layers, or a single project) and Blazor client modules compile against the platform's contract packages and ship none of them.</Description>
     <PackageType>MSBuildSdk</PackageType>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <IncludeSymbols>false</IncludeSymbols>

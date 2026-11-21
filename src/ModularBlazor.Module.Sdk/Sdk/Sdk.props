@@ -13,12 +13,20 @@
     to use another one).
 
     What a project gets, by kind (ModuleLayer, from the project name unless set):
-      *.Domain          WebApi.SharedKernel
-      *.Application     WebApi.SharedKernel, WebApi.Contracts, ASP.NET Core
-      *.Infrastructure  WebApi.Data (EF Core, SharedKernel), WebApi.Contracts, Carter, ASP.NET Core; the entry assembly
+      *.Domain, *.Core  Domain: WebApi.SharedKernel
+      *.Application,    Application: WebApi.SharedKernel, WebApi.Contracts, ASP.NET Core
+        *.UseCases
+      *.Infrastructure  WebApi.Data (EF Core, SharedKernel), WebApi.Contracts, Carter, ASP.NET Core; loadable on its own
+                        (EnableDynamicLoading): the entry assembly of a Domain/Application/Infrastructure module, and
+                        what dotnet-ef needs to add migrations to it
       Module            any other server project: a single-project module (WebApi.Contracts, Carter, ASP.NET Core;
                         set ModuleUsesData=true for WebApi.Data); set EnableDynamicLoading=true on the entry project
+        *.Web           a Module too: the entry assembly of a Clean Architecture module (Core, UseCases,
+                        Infrastructure, Web). EnableDynamicLoading and ModuleUsesData default to true (its
+                        Infrastructure layer's EF Core and WebApi.Data stay compile-only); set ModuleUsesData=false
+                        for a module without data
       Client            a Razor project: ModularBlazor.Abstractions, browser platform, wwwroot embedded in the assembly
+    A ModuleLayer, EnableDynamicLoading or ModuleUsesData set in the project file wins over the name.
     All of these are provided by the host at runtime: they are compiled against and never copied into the module's
     output, so the module's build output (or package) holds only its own assemblies and its private dependencies.
 
@@ -36,8 +44,9 @@
 
     <!-- The entry assembly of a layered module: copies private dependencies into the output, writes the .deps.json the
          module loader resolves with, and a runtimeconfig.json for dotnet-ef. Set here, before the .NET SDK targets
-         read it; a single-project module sets it itself. -->
+         read it; a single-project module sets it itself. A project file that sets it comes later and wins. -->
     <EnableDynamicLoading Condition="'$(EnableDynamicLoading)' == '' And $(MSBuildProjectName.EndsWith('.Infrastructure'))">true</EnableDynamicLoading>
+    <EnableDynamicLoading Condition="'$(EnableDynamicLoading)' == '' And $(MSBuildProjectName.EndsWith('.Web')) And '$(UsingMicrosoftNETSdkRazor)' != 'true'">true</EnableDynamicLoading>
   </PropertyGroup>
 
 </Project>

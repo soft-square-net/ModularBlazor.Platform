@@ -134,6 +134,18 @@ The SDK recognises each layer by its **project-name suffix**, so the names matte
 | `.Application` | The above plus `WebApi.Contracts` and `Microsoft.AspNetCore.App` | Contracts |
 | `.Infrastructure` | `WebApi.Data` (EF Core, `TenantDbContext`), Carter, `EnableDynamicLoading` (writes the `.deps.json` the loader needs) | Data, EF Core, Carter, Ardalis |
 
+The [Ardalis Clean Architecture](https://github.com/ardalis/CleanArchitecture) names are recognised too, for a module
+made from the `ModuleTemplate.CleanArchitecture` template:
+
+| Layer | Treated as |
+| --- | --- |
+| `.Core` | `.Domain` |
+| `.UseCases` | `.Application` |
+| `.Infrastructure` | `.Infrastructure` (still loadable on its own, for `dotnet ef`) |
+| `.Web` | the entry assembly (holds the `IRuntimeModule`): Contracts, Carter, `EnableDynamicLoading`, and `WebApi.Data` compile-only (`ModuleUsesData`; set it to `false` in a module without data) |
+
+A `ModuleLayer`, `EnableDynamicLoading` or `ModuleUsesData` set in a project file wins over its name.
+
 Host-shipped assemblies are compiled against but excluded from the output, so the package holds only your three
 assemblies and your private dependencies. **Do not** add your own `PackageReference` to EF Core, Carter or
 Ardalis.Specification: the host's copies are used at runtime whatever version you compile against.
@@ -1207,7 +1219,7 @@ Core modules can be deactivated, unloaded and configured, but not uninstalled or
 
 - [ ] Id and route prefix chosen; lowercase; unique among installed modules.
 - [ ] Its own repository with `global.json` (Module SDK version), `NuGet.Config` and a CI workflow that reads `PACKAGES_TOKEN`.
-- [ ] Project names end in `.Domain`, `.Application`, `.Infrastructure`; no reference to platform source.
+- [ ] Project names end in `.Domain`, `.Application`, `.Infrastructure` (or, Clean Architecture, `.Core`, `.UseCases`, `.Infrastructure`, `.Web`); no reference to platform source.
 - [ ] Exactly one public `IRuntimeModule` with a parameterless constructor, in the Infrastructure project.
 - [ ] Every `RequirePermission` name is declared in `Manifest.Permissions`.
 - [ ] Every tenant entity implements `ITenantOwned`; the `DbContext` derives from `TenantDbContext` with its own `Schema`.

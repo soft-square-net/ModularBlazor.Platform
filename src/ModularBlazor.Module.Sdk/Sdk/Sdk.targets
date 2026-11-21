@@ -10,7 +10,13 @@
     <ModuleLayer Condition="'$(ModuleLayer)' == '' And $(MSBuildProjectName.EndsWith('.Domain'))">Domain</ModuleLayer>
     <ModuleLayer Condition="'$(ModuleLayer)' == '' And $(MSBuildProjectName.EndsWith('.Application'))">Application</ModuleLayer>
     <ModuleLayer Condition="'$(ModuleLayer)' == '' And $(MSBuildProjectName.EndsWith('.Infrastructure'))">Infrastructure</ModuleLayer>
+    <!-- Clean Architecture names (Core, UseCases, Infrastructure, Web): the same kinds. -->
+    <ModuleLayer Condition="'$(ModuleLayer)' == '' And $(MSBuildProjectName.EndsWith('.Core'))">Domain</ModuleLayer>
+    <ModuleLayer Condition="'$(ModuleLayer)' == '' And $(MSBuildProjectName.EndsWith('.UseCases'))">Application</ModuleLayer>
     <ModuleLayer Condition="'$(ModuleLayer)' == ''">Module</ModuleLayer>
+    <!-- The entry assembly of a Clean Architecture module compiles against its Infrastructure layer's data packages:
+         reference them itself, compile-only, or they flow in from that project and get copied into the output. -->
+    <ModuleUsesData Condition="'$(ModuleUsesData)' == '' And '$(ModuleLayer)' == 'Module' And $(MSBuildProjectName.EndsWith('.Web'))">true</ModuleUsesData>
     <_ModuleUsesData Condition="'$(ModuleLayer)' == 'Infrastructure' Or ('$(ModuleLayer)' == 'Module' And '$(ModuleUsesData)' == 'true')">true</_ModuleUsesData>
   </PropertyGroup>
 
