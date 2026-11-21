@@ -60,8 +60,9 @@ entry, the default route prefix (`/api/notes`), the database schema and the `Mod
 A module lives in a repository of its own, next to the platform's, and builds against the platform's NuGet packages
 through the **Module SDK**. [Repositories and packages](/backend/repositories/) explains the packages, the feed token and
 the CI workflow; this step only creates the files. Copy `global.json`, `NuGet.Config`, `Directory.Build.props` and
-`.github/workflows/build.yml` from `ModularBlazor.Module.Content`. The `dotnet new` template
-(`ModularBlazor.ModuleTemplate`) is still a scaffold. Then:
+`.github/workflows/build.yml` from `ModularBlazor.Module.Content`. Or skip the manual steps: the
+[Clean Architecture module template](/backend/module-template-clean-architecture/) (`dotnet new platform-module-ca`)
+generates all of it, with an example feature. By hand:
 
 ```bash
 mkdir ModularBlazor.Module.Notes && cd ModularBlazor.Module.Notes
@@ -231,7 +232,8 @@ public sealed class NoteService(IReadRepository<Note> reader, IRepository<Note> 
 - `IAccessScopes` (host-provided, scoped) gives the caller's `UserId` (the token's `sub`) and answers permission
   questions for the current tenant.
 - No MediatR, no custom `IAuthorizationRequirement`, no named policies: the host would cache their types and the
-  module could never unload. Why, and what to use instead: [Data access and use cases](#data-access-and-use-cases).
+  module could never unload. Why, and what to use instead (including a source-generated mediator the module ships
+  itself): [Data access and use cases](#data-access-and-use-cases).
 
 ## 5. Infrastructure: the module, its database and its endpoints
 
@@ -885,7 +887,9 @@ that others depend on answers 409. **Disable** instead takes it out of every use
 
 Every module follows the same shape: a thin Carter endpoint calls one application-service method; the method checks
 rights, loads an aggregate through a repository, calls a domain method and saves. Reads go through Ardalis
-specifications. There is no mediator.
+specifications. The platform needs no mediator; a module may add a source-generated one of its own, with one handler
+per use case in place of the service method (see
+[Use cases](#use-cases-application-services-or-a-module-private-source-generated-mediator)).
 
 ```mermaid
 flowchart LR
@@ -1009,15 +1013,16 @@ Rules:
 - **It stays unloadable.** Neither the dispatcher nor the context caches anything in statics or uses `dynamic`;
   handler lookups are cached only by the module's container, which is disposed when the module unloads.
 
-### Use cases: application services, not MediatR
+### Use cases: application services, or a module-private source-generated mediator
 
-Use cases are methods on application services registered in the module's container (`AddScoped<NoteService>()`).
-**Do not add MediatR**:
+Use cases are methods on application services registered in the module's container (`AddScoped<NoteService>()`),
+or one handler per use case dispatched by a **source-generated mediator that the module ships privately** (see
+[below](#a-source-generated-mediator-inside-the-module)). **Do not add MediatR**:
 
-- **It breaks unloading.** MediatR caches request handlers in static, process-wide dictionaries keyed by request type.
-  If the host shipped it, those caches would hold every module's types forever, so modules could not unload or be
-  upgraded in place. If each module shipped its own copy, you would have one mediator per module, which removes the
-  point of having one.
+- **It breaks unloading.** MediatR finds handlers by reflection and caches them in static, process-wide dictionaries
+  keyed by request type. If the host shipped it, those caches would hold every module's types forever, so modules
+  could not unload or be upgraded in place.
+- **Licence.** MediatR 13 and later needs a paid commercial licence above a certain company size.
 - **It adds nothing here.** Each thing teams usually adopt it for is already covered:
 
 | Reason teams use MediatR | What this architecture uses |
@@ -1027,13 +1032,36 @@ Use cases are methods on application services registered in the module's contain
 | Authorization pipeline | `RequirePermission` on routes; `IAccessScopes` for resource-level checks |
 | Notifications (`INotification`) inside a module | [Domain events](#reactions-inside-the-module-domain-events), handled in the same save |
 | Decoupling between modules | Modules talk over HTTP or the broker, never in-process |
-| One handler per use case | One service method per use case, or plain handler classes in the module's container |
+| One handler per use case | One service method per use case, plain handler classes in the module's container, or a module-private source-generated mediator |
 
-- **Licence.** MediatR 13 and later needs a paid commercial licence above a certain company size.
+When a service grows large, split it by use-case group (such as `PostAuthoringService`, `PostReviewService` and
+`PostDeskService`), or move to one small handler class per use case.
 
-When a service grows large (the Content module's `PostService` is near that point), split it by use-case group,
-such as `PostAuthoringService`, `PostReviewService` and `PostDeskService`, or move to one small handler class per use
-case registered in the module's container. Neither needs a mediator.
+#### A source-generated mediator inside the module
+
+A module may use [Mediator](https://github.com/martinothamar/Mediator) (MIT, `Mediator.Abstractions` and
+`Mediator.SourceGenerator`), for example to follow the Ardalis Clean Architecture layout of one command or query and
+one handler per use case. It is safe for unloading where MediatR is not, under these conditions:
+
+- **The module ships it, the host does not.** Reference it as an ordinary (private) package, so it is copied into the
+  module's output and loads in the module's own load context. If the host ever shipped Mediator, modules would bind
+  to the host's copy instead: check the host's assemblies before relying on this.
+- **Source-generated only.** The generator writes the handler table into the module's entry assembly at compile time:
+  no reflection scan, no static caches outside the module. Put `Mediator.SourceGenerator` (`PrivateAssets="all"`) on
+  the entry project, and list the assemblies that hold handlers in `options.Assemblies`.
+- **Registered in the module's container** (`services.AddMediator(...)` in `ConfigureServices`), with
+  `ServiceLifetime.Scoped`, so handlers get the request's tenant `DbContext` and access scopes, and everything is
+  disposed when the module unloads.
+- **Inside the module only.** Each module has its own mediator; modules still talk over HTTP or the broker. Domain
+  events still go through the platform's dispatcher, not through the mediator.
+- **Pipeline behaviours are module code.** Do not inject `ILogger<T>` of a module type into them (the host's logger
+  factory caches by type); take `ILoggerFactory` and create a logger by name.
+- **Prove it unloads.** After the module has served requests through its handlers, unload it and check that
+  `GET /api/admin/modules/unloading` comes back empty.
+
+The Content module's Clean Architecture layout (Core, UseCases, Infrastructure, Web) is the working example: handlers
+in `UseCases`, `MediatorConfig` in `Web`, verified with the unload check above. Endpoint filters remain the place for
+HTTP-level concerns (problem details, concurrency conflicts) either way.
 
 ### Cross-cutting concerns: endpoint filters
 
