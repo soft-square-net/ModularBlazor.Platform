@@ -166,6 +166,9 @@ sequenceDiagram
 `ModuleManager` و`ActiveModuleService` وخدمات المصادقة **scoped**، لأن `AuthenticationStateProvider` في OIDC كذلك.
 ولـ WebAssembly نطاق واحد للتطبيق كله، و`host.Services` في `Program.cs` هو ذلك النطاق، فتبقى ما بقيت الصفحة.
 
+لا تشير وحدة إلى أخرى أبدا. ومع ذلك تستطيع وحدة أن تفتح نافذة حوار توفرها وحدة أخرى، بمعرفها، وتنتظر نتيجتها: انظر
+[نوافذ الحوار بين وحدات العميل](/ar/guides/module-dialogs/).
+
 ## إدارة وحدات العميل
 
 تدير الصفحة `/client-modules` (القائمة **Client modules**، للدور `platform-admin`) الكتالوج عبر العميل المولد

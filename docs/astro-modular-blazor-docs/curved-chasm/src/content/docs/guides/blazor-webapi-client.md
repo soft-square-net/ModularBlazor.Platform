@@ -175,6 +175,9 @@ private assemblies (like `Module.Tenants` and its generated client).
 `AuthenticationStateProvider` is scoped. WebAssembly has one scope for the whole app, and `host.Services` in
 `Program.cs` is that scope, so they still live as long as the page.
 
+Modules never reference each other. One module can still open a dialog another provides, by id, and await its
+result: see [Dialogs between client modules](/guides/module-dialogs/).
+
 ## Client module management
 
 `/client-modules` (menu **Client modules**, `platform-admin`) manages the catalog with the generated
