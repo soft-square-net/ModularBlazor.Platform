@@ -1,11 +1,12 @@
 @page "/module-error"
+@inject IStringLocalizer<App> L
 
-<PageTitle>Module failed to load</PageTitle>
+<PageTitle>@L["Module failed to load"]</PageTitle>
 
-<h1>Module failed to load</h1>
-<p>The module <strong>@Module</strong> could not be loaded.</p>
+<h1>@L["Module failed to load"]</h1>
+<p>@((MarkupString)L["The module <strong>{0}</strong> could not be loaded.", System.Net.WebUtility.HtmlEncode(Module ?? "")].Value)</p>
 <p class="error-text">@Message</p>
-<p><a href="">Back to home</a></p>
+<p><a href="">@L["Back to home"]</a></p>
 
 @code {
     [Parameter, SupplyParameterFromQuery] public string? Module { get; set; }

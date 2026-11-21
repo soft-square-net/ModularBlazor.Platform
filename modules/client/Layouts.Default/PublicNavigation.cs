@@ -10,7 +10,7 @@ public sealed record NavLinkItem(string Title, string Href);
 /// <summary>
 /// Turns the flat module menu into mega-nav sections by URL: an item whose href is "sports/football" goes into
 /// the panel of the item whose href is "sports". Items without such a parent stay at the top level.
-/// Order follows <see cref="ModuleNavItem.Order"/>, then the title.
+/// Order follows <see cref="ModuleNavItem.Order"/>, then the title. Titles are in the current language.
 /// </summary>
 public static class PublicNavigation
 {
@@ -19,7 +19,7 @@ public static class PublicNavigation
     var ordered = items
       .Select(i => (Item: i, Href: Normalize(i.Href)))
       .OrderBy(x => x.Item.Order)
-      .ThenBy(x => x.Item.Title, StringComparer.CurrentCultureIgnoreCase)
+      .ThenBy(x => x.Item.LocalTitle, StringComparer.CurrentCultureIgnoreCase)
       .ToList();
 
     var topHrefs = ordered
@@ -38,14 +38,14 @@ public static class PublicNavigation
       if (parent is not null && topHrefs.Contains(parent))
       {
         if (!byHref.TryGetValue(parent, out var children)) byHref[parent] = children = [];
-        children.Add(new NavLinkItem(item.Title, href));
+        children.Add(new NavLinkItem(item.LocalTitle, href));
         continue;
       }
 
       if (byHref.ContainsKey(href)) continue; // the same section listed twice
       var list = new List<NavLinkItem>();
       byHref[href] = list;
-      sections.Add((item.Title, href, list));
+      sections.Add((item.LocalTitle, href, list));
     }
 
     return sections.Select(s => new NavSection(s.Title, s.Href, s.Children)).ToList();

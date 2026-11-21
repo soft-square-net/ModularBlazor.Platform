@@ -14,6 +14,8 @@ artifacts/
 !**/Properties/launchSettings.json
 !/modules/client/Layouts.Default/node-app/package.json
 !/src/apps/blazor/ModularBlazor.BlzWebClient/node-app/package.json
+# Translations (i18n/{culture}.json, embedded in each assembly): source files, never secrets.
+!**/i18n/*.json
 /modules/client/Layouts.Admin/node-app/package-lock.json
 /modules/client/Layouts.Admin/node-app/yarn.lock
 

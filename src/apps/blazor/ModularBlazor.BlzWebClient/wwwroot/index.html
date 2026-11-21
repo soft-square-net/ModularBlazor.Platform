@@ -1,23 +1,54 @@
 <!DOCTYPE html>
-<html lang="en">
+<!-- Arabic is the default language: the page starts right to left; the script below switches to the user's saved
+     choice before anything renders, and LocaleService (Services/LocaleService.cs) keeps it in step afterwards. -->
+<html lang="ar" dir="rtl">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Modular Blazor</title>
     <base href="/" />
     <link rel="icon" href="data:," />
+    <script>
+        // appLocale: the saved language ("mb.culture") and <html lang dir>. Used by LocaleService through JS interop.
+        (function () {
+            var key = 'mb.culture';
+            var rtl = /^(ar|he|fa|ur|ps|sd|ug|yi|dv|ckb)(-|$)/i;
+            function get() { try { return localStorage.getItem(key); } catch (e) { return null; } }
+            function apply(culture, dir, persist) {
+                var root = document.documentElement;
+                root.lang = culture;
+                root.dir = dir || (rtl.test(culture) ? 'rtl' : 'ltr');
+                if (persist) { try { localStorage.setItem(key, culture); } catch (e) { /* storage blocked */ } }
+            }
+            window.appLocale = { get: get, apply: apply };
+            var saved = get();
+            if (saved) apply(saved, null, false);
+        })();
+    </script>
     <link rel="stylesheet" href="css/app.css" />
     <script src="moduleHost.js"></script>
     <script src="moduleCache.js"></script>
 </head>
 <body>
-    <div id="app"><div class="boot">Loading core modules…</div></div>
+    <div id="app"><div class="boot" data-boot-text>جارٍ تحميل الوحدات الأساسية…</div></div>
+    <script>
+        if (!/^ar(-|$)/i.test(document.documentElement.lang)) {
+            var boot = document.querySelector('[data-boot-text]');
+            if (boot) boot.textContent = 'Loading core modules…';
+        }
+    </script>
 
     <div id="blazor-error-ui">
-        An unhandled error has occurred.
-        <a href="." class="reload">Reload</a>
+        <span data-error-text>حدث خطأ غير متوقع.</span>
+        <a href="." class="reload" data-reload-text>إعادة التحميل</a>
         <span class="dismiss">✕</span>
     </div>
+    <script>
+        if (!/^ar(-|$)/i.test(document.documentElement.lang)) {
+            document.querySelector('[data-error-text]').textContent = 'An unhandled error has occurred.';
+            document.querySelector('[data-reload-text]').textContent = 'Reload';
+        }
+    </script>
 
     <!-- OpenID Connect (Authorization Code + PKCE) against the OpenIddict identity service. -->
     <script src="_content/Microsoft.AspNetCore.Components.WebAssembly.Authentication/AuthenticationService.js"></script>

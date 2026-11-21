@@ -1,0 +1,27 @@
+@namespace soft.square.net.ModularBlazor.Abstractions.Localization
+@using Microsoft.AspNetCore.Components.Web
+@inject ILocaleService Locale
+
+@*
+  The language switcher every layout can show: one button per language the app offers, in that language's own name
+  ("العربية", "English"). Hidden when only one language is offered. Styled by the host (.locale-switcher).
+*@
+@if (Locale.Available.Count > 1)
+{
+  <div class="locale-switcher @Class" role="group" aria-label="@Label">
+    @foreach (var language in Locale.Available)
+    {
+      var l = language;
+      var current = l.Culture.Equals(Locale.Culture, StringComparison.OrdinalIgnoreCase);
+      <button type="button" lang="@l.Culture" dir="@l.Direction" aria-pressed="@(current ? "true" : "false")"
+              @onclick="() => Locale.SetCultureAsync(l.Culture)">@l.NativeName</button>
+    }
+  </div>
+}
+
+@code {
+  [Parameter] public string? Class { get; set; }
+
+  /// <summary>The group's accessible name: "Language" in both languages, so it is found whatever is selected.</summary>
+  private string Label => Locale.IsRightToLeft ? "اللغة / Language" : "Language / اللغة";
+}

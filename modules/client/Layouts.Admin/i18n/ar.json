@@ -1,0 +1,8 @@
+{
+  "$comment": "Layouts.Admin. Common words (Members, Tenants, Sign out) come from ModularBlazor.Abstractions.",
+  "Administration": "الإدارة",
+  "Overview": "نظرة عامة",
+  "Client modules": "وحدات الواجهة",
+  "Host modules": "وحدات الخادم",
+  "← Back to the app": "→ العودة إلى التطبيق"
+}

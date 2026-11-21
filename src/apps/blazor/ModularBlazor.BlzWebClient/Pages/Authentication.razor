@@ -1,6 +1,7 @@
 @page "/authentication/{action}"
 @attribute [UseLayout("none")]
 @using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@inject IStringLocalizer<App> L
 
 @*
   The OpenID Connect round trips: login (redirect to the identity service), login-callback (code -> tokens),
@@ -10,22 +11,22 @@
 <div class="blz-auth">
   <div class="mud-paper mud-elevation-4 blz-auth-card">
     <RemoteAuthenticatorView Action="@Action">
-      <LoggingIn><Status Text="Redirecting to the identity service…" /></LoggingIn>
-      <CompletingLoggingIn><Status Text="Completing sign-in…" /></CompletingLoggingIn>
+      <LoggingIn><Status Text="@L["Redirecting to the identity service…"]" /></LoggingIn>
+      <CompletingLoggingIn><Status Text="@L["Completing sign-in…"]" /></CompletingLoggingIn>
       <LogInFailed Context="error">
-        <h1 class="mud-typography mud-typography-h6">Sign-in failed</h1>
+        <h1 class="mud-typography mud-typography-h6">@L["Sign-in failed"]</h1>
         <p class="mud-typography mud-typography-body2 blz-error" role="alert">@error</p>
-        <a href="login" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium blz-block">Try again</a>
+        <a href="login" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium blz-block">@L["Try again"]</a>
       </LogInFailed>
-      <LogOut><Status Text="Signing out…" /></LogOut>
-      <CompletingLogOut><Status Text="Completing sign-out…" /></CompletingLogOut>
+      <LogOut><Status Text="@L["Signing out…"]" /></LogOut>
+      <CompletingLogOut><Status Text="@L["Completing sign-out…"]" /></CompletingLogOut>
       <LogOutFailed Context="error">
-        <h1 class="mud-typography mud-typography-h6">Sign-out failed</h1>
+        <h1 class="mud-typography mud-typography-h6">@L["Sign-out failed"]</h1>
         <p class="mud-typography mud-typography-body2 blz-error" role="alert">@error</p>
       </LogOutFailed>
       <LogOutSucceeded>
-        <h1 class="mud-typography mud-typography-h6">You are signed out</h1>
-        <a href="login" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium blz-block">Sign in again</a>
+        <h1 class="mud-typography mud-typography-h6">@L["You are signed out"]</h1>
+        <a href="login" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium blz-block">@L["Sign in again"]</a>
       </LogOutSucceeded>
     </RemoteAuthenticatorView>
   </div>

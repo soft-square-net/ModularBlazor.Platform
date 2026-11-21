@@ -1,11 +1,12 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Localization;
 using soft.square.net.WebApi.Identity.Server.Data;
 
 namespace soft.square.net.WebApi.Identity.Server.Pages.Account;
 
-public sealed class LoginModel(SignInManager<ApplicationUser> signIn) : PageModel
+public sealed class LoginModel(SignInManager<ApplicationUser> signIn, IStringLocalizer<Program> texts) : PageModel
 {
     [BindProperty(SupportsGet = true)] public string? ReturnUrl { get; set; }
     [BindProperty] public string Email { get; set; } = "";
@@ -23,10 +24,10 @@ public sealed class LoginModel(SignInManager<ApplicationUser> signIn) : PageMode
 
         // TODO(MFA): the second-factor step (authenticator app / WebAuthn) and enrolment UI come later; a tenant with
         // RequireMfa already refuses tokens to accounts that did not sign in with MFA.
-        Error = result.IsLockedOut ? "The account is locked. Try again in a few minutes."
-              : result.RequiresTwoFactor ? "This account uses two-factor sign-in, which this page does not support yet."
-              : result.IsNotAllowed ? "This account may not sign in yet (email not confirmed?)."
-              : "Invalid email or password.";
+        Error = result.IsLockedOut ? texts["The account is locked. Try again in a few minutes."]
+              : result.RequiresTwoFactor ? texts["This account uses two-factor sign-in, which this page does not support yet."]
+              : result.IsNotAllowed ? texts["This account may not sign in yet (email not confirmed?)."]
+              : texts["Invalid email or password."];
         return Page();
     }
 }

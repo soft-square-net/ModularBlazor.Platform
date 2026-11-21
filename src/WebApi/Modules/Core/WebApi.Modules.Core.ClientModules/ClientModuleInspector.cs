@@ -199,7 +199,7 @@ internal static partial class ClientModuleInspector
                  ?? (primary.Info.Name.StartsWith(AssemblyPrefix, StringComparison.Ordinal) ? primary.Info.Name[AssemblyPrefix.Length..] : primary.Info.Name);
         RequireId(id);
 
-        var detected = Detect(attribute, primary.Info.Routes);
+        var detected = Detect(attribute, primary.Info.Routes, primary.Info.Texts);
         if (settingsJson is not null) detected = Overlay(detected, settingsJson);
         if (detected.LoadStrategy == ClientModuleLoadStrategy.Startup && detected.RequiresAuth)
             warnings.Add("Startup module that requires sign-in: it is only loaded after sign-in. Set RequiresAuth = false for layouts and themes.");
@@ -217,7 +217,8 @@ internal static partial class ClientModuleInspector
 
     // ---------------------------------------------------------------- settings
 
-    private static ClientModuleSettings Detect(IReadOnlyDictionary<string, object?> a, IReadOnlyList<string> routes)
+    private static ClientModuleSettings Detect(IReadOnlyDictionary<string, object?> a, IReadOnlyList<string> routes,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> texts)
     {
         string[] Strings(string name) => a.GetValueOrDefault(name) as string[] ?? [];
         var prefixes = Strings("RoutePrefixes");
@@ -225,7 +226,7 @@ internal static partial class ClientModuleInspector
             prefixes = routes.Select(FirstSegment).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
         var nav = a.GetValueOrDefault("NavTitle") is string title && a.GetValueOrDefault("NavHref") is string href
-            ? new[] { new ClientModuleNavItem(title, href, a.GetValueOrDefault("NavOrder") as int? ?? 100) }
+            ? new[] { new ClientModuleNavItem(title, href, a.GetValueOrDefault("NavOrder") as int? ?? 100, Translations(title, texts)) }
             : [];
 
         return new ClientModuleSettings
@@ -270,10 +271,57 @@ internal static partial class ClientModuleInspector
         return segment.Length == 0 || segment.StartsWith('{') ? null : segment;
     }
 
+    // ---------------------------------------------------------------- translations
+
+    /// <summary>The menu title in every language the module translates it into (culture → text).</summary>
+    private static Dictionary<string, string>? Translations(string title, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> texts)
+    {
+        var titles = texts
+            .Where(t => t.Value.TryGetValue(title, out var text) && !string.IsNullOrWhiteSpace(text))
+            .ToDictionary(t => t.Key, t => t.Value[title], StringComparer.OrdinalIgnoreCase);
+        return titles.Count == 0 ? null : titles;
+    }
+
+    /// <summary>
+    /// The module's embedded translations (resources "…i18n.{culture}.json", see Share.All's EmbeddedJsonStringLocalizerFactory),
+    /// read as data: culture → flat key/text map. A file that is not a JSON object of strings is skipped.
+    /// </summary>
+    private static Dictionary<string, IReadOnlyDictionary<string, string>> ReadTexts(PEReader pe, MetadataReader md)
+    {
+        var texts = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
+        if (pe.PEHeaders.CorHeader is not { } cor || cor.ResourcesDirectory.Size == 0) return texts;
+        var block = pe.GetSectionData(cor.ResourcesDirectory.RelativeVirtualAddress);
+        foreach (var handle in md.ManifestResources)
+        {
+            var resource = md.GetManifestResource(handle);
+            if (!resource.Implementation.IsNil) continue; // linked or in another assembly
+            if (TranslationResource().Match(md.GetString(resource.Name)) is not { Success: true } match) continue;
+            try
+            {
+                var reader = block.GetReader((int)resource.Offset, block.Length - (int)resource.Offset);
+                var bytes = reader.ReadBytes(reader.ReadInt32());
+                using var document = JsonDocument.Parse(bytes, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+                if (document.RootElement.ValueKind != JsonValueKind.Object) continue;
+                texts[match.Groups["culture"].Value] = document.RootElement.EnumerateObject()
+                    .Where(p => p.Value.ValueKind == JsonValueKind.String && !p.Name.StartsWith('$'))
+                    .ToDictionary(p => p.Name, p => p.Value.GetString()!, StringComparer.Ordinal);
+            }
+            catch (Exception e) when (e is JsonException or BadImageFormatException or ArgumentOutOfRangeException)
+            {
+                // A broken file only costs the translated menu title; the module itself still installs.
+            }
+        }
+        return texts;
+    }
+
+    [GeneratedRegex(@"(?:^|[./\\])i18n[./\\](?<culture>[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*)\.json$", RegexOptions.IgnoreCase)]
+    private static partial Regex TranslationResource();
+
     // ---------------------------------------------------------------- metadata
 
     private sealed record AssemblyInfo(string Name, string Version, IReadOnlyDictionary<string, object?>? Attribute,
-        IReadOnlyList<string> Routes, IReadOnlyList<string> Layouts, IReadOnlyList<string> References);
+        IReadOnlyList<string> Routes, IReadOnlyList<string> Layouts, IReadOnlyList<string> References,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> Texts);
 
     private static AssemblyInfo ReadAssembly(PackageFile file)
     {
@@ -312,7 +360,8 @@ internal static partial class ClientModuleInspector
 
             var references = md.AssemblyReferences.Select(r => md.GetString(md.GetAssemblyReference(r).Name)).ToList();
             var version = NormalizeVersion(informational) ?? assembly.Version.ToString(3);
-            return new AssemblyInfo(md.GetString(assembly.Name), version, client, routes.Distinct().Order().ToList(), layouts.Distinct().ToList(), references);
+            return new AssemblyInfo(md.GetString(assembly.Name), version, client, routes.Distinct().Order().ToList(), layouts.Distinct().ToList(), references,
+                ReadTexts(pe, md));
         }
         catch (BadImageFormatException)
         {

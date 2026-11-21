@@ -20,7 +20,8 @@ public enum ClientModuleLoadStrategy
     Preload
 }
 
-public sealed record ClientModuleNavItem(string Title, string Href, int Order = 100);
+/// <summary>A menu entry. <see cref="Titles"/>: the title in other languages (culture → text), from the module's i18n files.</summary>
+public sealed record ClientModuleNavItem(string Title, string Href, int Order = 100, IReadOnlyDictionary<string, string>? Titles = null);
 
 /// <summary>What an admin decides about a client module. Kept across versions: a new version keeps the module's settings.</summary>
 public sealed record ClientModuleSettings

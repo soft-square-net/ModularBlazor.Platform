@@ -4,6 +4,9 @@ using soft.square.net.ModularBlazor.BlzWebClient;
 using soft.square.net.ModularBlazor.BlzWebClient.Auth;
 using soft.square.net.ModularBlazor.BlzWebClient.Services;
 using soft.square.net.ModularBlazor.Abstractions.MudTail;
+using Microsoft.Extensions.Localization;
+using soft.square.net.ModularBlazor.Abstractions.Localization;
+using soft.square.net.Share.All.Localization;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
@@ -29,6 +32,16 @@ builder.Services.AddScoped<HostModulesApi>();
 
 // MudTail's runtime, shared through the Layouts.Default module (tables, toasts, behaviours on this app's pages).
 builder.Services.AddScoped<MudTailRuntime>();
+
+// Languages (Arabic by default, see wwwroot/appsettings.json "Localization"). Texts: IStringLocalizer<T>, read from the
+// i18n/{culture}.json files embedded in each assembly, with the shared words of ModularBlazor.Abstractions behind them.
+// Every HttpClient sends the language, so the WebApi answers in it too.
+builder.Services.AddSingleton<IStringLocalizerFactory>(new EmbeddedJsonStringLocalizerFactory(typeof(ILocaleService).Assembly));
+builder.Services.AddTransient(typeof(IStringLocalizer<>), typeof(StringLocalizer<>));
+builder.Services.AddScoped<LocaleService>();
+builder.Services.AddScoped<ILocaleService>(sp => sp.GetRequiredService<LocaleService>());
+builder.Services.AddTransient<AcceptLanguageHandler>();
+builder.Services.ConfigureHttpClientDefaults(client => client.AddHttpMessageHandler<AcceptLanguageHandler>());
 
 // Modules. ModuleManager and ActiveModuleService follow the user's session (AuthenticationStateProvider is scoped),
 // so they are scoped too; WebAssembly has one scope for the whole app, so they still live as long as the page.
@@ -57,5 +70,8 @@ await modules.LoadStartupModulesAsync();
 
 // ...and the startup modules' styles/scripts go live (they stay active for the whole session).
 await host.Services.GetRequiredService<ActiveModuleService>().SyncAsync();
+
+// The language, before the first render: the saved choice or the default (MudTail is active by now, so it follows).
+await host.Services.GetRequiredService<LocaleService>().InitializeAsync();
 
 await host.RunAsync();

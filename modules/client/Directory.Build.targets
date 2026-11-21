@@ -3,5 +3,6 @@
   <!-- wwwroot is embedded in the module assembly (EmbedModuleAssets). The target lives in the Module SDK, so modules
        built in this repo and outside it embed their assets the same way. -->
   <Import Project="$(MSBuildThisFileDirectory)../../src/ModularBlazor.Module.Sdk/Sdk/ModuleAssets.targets" />
+  <Import Project="$(MSBuildThisFileDirectory)../../src/ModularBlazor.Module.Sdk/Sdk/ModuleTranslations.targets" />
 
 </Project>

@@ -783,6 +783,15 @@
             "type": "integer",
             "format": "int32",
             "default": 100
+          },
+          "titles": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         }
       },

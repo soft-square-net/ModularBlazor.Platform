@@ -52,5 +52,7 @@
   </ItemGroup>
 
   <Import Project="$(MSBuildThisFileDirectory)ModuleAssets.targets" Condition="'$(ModuleLayer)' == 'Client'" />
+  <!-- Every layer: i18n/{culture}.json translations (texts of pages, messages of use cases). -->
+  <Import Project="$(MSBuildThisFileDirectory)ModuleTranslations.targets" />
 
 </Project>

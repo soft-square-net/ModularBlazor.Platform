@@ -22,6 +22,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\WebApi.Contracts\WebApi.Contracts.csproj" />
+    <!-- Embedded JSON translations (IStringLocalizerFactory), the same ones the Blazor clients use. -->
+    <ProjectReference Include="..\..\Share.All\Share.All.csproj" />
     <!-- Shared data layer (EF Core, Npgsql, TenantDbContext, tenant store): host-shipped, so modules share its types. -->
     <ProjectReference Include="..\WebApi.Data\WebApi.Data.csproj" />
   </ItemGroup>

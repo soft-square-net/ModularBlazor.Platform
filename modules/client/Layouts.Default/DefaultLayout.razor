@@ -4,28 +4,31 @@
 @inject IModuleNavigation Navigation
 @inject ICurrentUserService Users
 @inject IAuthenticationService Auth
+@inject IStringLocalizer<DefaultLayout> L
 
 <div class="shell-default">
   <aside class="shell-sidebar">
     <a class="brand" href="">Modular Blazor</a>
 
     <nav>
-      <NavLink href="" Match="NavLinkMatch.All">Home</NavLink>
+      <NavLink href="" Match="NavLinkMatch.All">@L["Home"]</NavLink>
       @foreach (var item in Navigation.Items)
       {
-        <NavLink href="@item.Href">@item.Title</NavLink>
+        <NavLink href="@item.Href">@item.LocalTitle</NavLink>
       }
     </nav>
+
+    <LocaleSwitcher Class="shell-locale" />
 
     <div class="shell-user">
       @if (_user is not null)
       {
         <div>@_user.Name <small>(@string.Join(", ", _user.Roles))</small></div>
-        <a href="login" @onclick="SignOutAsync" @onclick:preventDefault>Sign out</a>
+        <a href="login" @onclick="SignOutAsync" @onclick:preventDefault>@L["Sign out"]</a>
       }
       else
       {
-        <a href="login">Sign in</a>
+        <a href="login">@L["Sign in"]</a>
       }
     </div>
   </aside>

@@ -11,8 +11,24 @@ public enum ModuleKind
     NuPkg
 }
 
-/// <summary>A menu entry contributed by a module. Href is relative to the app base.</summary>
-public sealed record ModuleNavItem( string Title, string Href, int Order = 100);
+/// <summary>
+/// A menu entry contributed by a module. Href is relative to the app base. <see cref="Titles"/> holds the title in other
+/// languages (culture → text, read from the module's i18n files when it is uploaded); <see cref="Title"/> is the English one.
+/// </summary>
+public sealed record ModuleNavItem(string Title, string Href, int Order = 100, IReadOnlyDictionary<string, string>? Titles = null)
+{
+    /// <summary>The title in the current UI culture (ar-EG, then ar), else <see cref="Title"/>.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string LocalTitle => TitleIn(System.Globalization.CultureInfo.CurrentUICulture);
+
+    public string TitleIn(System.Globalization.CultureInfo culture)
+    {
+        if (Titles is { Count: > 0 })
+            for (var c = culture; !string.IsNullOrEmpty(c.Name); c = c.Parent)
+                if (Titles.TryGetValue(c.Name, out var title) && !string.IsNullOrWhiteSpace(title)) return title;
+        return Title;
+    }
+}
 
 /// <summary>Metadata the host needs to know about a module before its code is downloaded.</summary>
 public sealed class ModuleDescriptor

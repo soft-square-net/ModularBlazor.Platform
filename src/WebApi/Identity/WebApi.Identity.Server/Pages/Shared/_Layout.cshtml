@@ -1,16 +1,33 @@
 <!doctype html>
-<html lang="en">
+@{
+    var culture = System.Globalization.CultureInfo.CurrentUICulture;
+    var rtl = culture.TextInfo.IsRightToLeft;
+    // The language links keep the page and its query (ReturnUrl), with ?culture= replaced.
+    string LinkTo(string c)
+    {
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(Context.Request.QueryString.Value)
+            .Where(p => !p.Key.Equals("culture", StringComparison.OrdinalIgnoreCase) && !p.Key.Equals("ui-culture", StringComparison.OrdinalIgnoreCase))
+            .Select(p => new KeyValuePair<string, string?>(p.Key, p.Value.ToString()))
+            .Append(new KeyValuePair<string, string?>("culture", c));
+        return Context.Request.Path + Microsoft.AspNetCore.Http.QueryString.Create(query).ToUriComponent();
+    }
+}
+<html lang="@culture.Name" dir="@(rtl ? "rtl" : "ltr")">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>@(ViewData["Title"] ?? "Sign in") · Modular Identity</title>
+    <title>@(ViewData["Title"] ?? L["Sign in"]) · @L["Modular Identity"]</title>
     @* MudTail's stylesheet (src/MudTail/dist/mudtail.css, copied by the build when it exists): the same tokens and
        components as the Blazor clients, so signing in looks like the app that sent you here. *@
     <link rel="stylesheet" href="~/css/mudtail.css" asp-append-version="true" />
     <style>
         body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px; box-sizing: border-box;
                background: var(--mud-palette-background); color: var(--mud-palette-text-primary);
-               font-family: var(--mud-typography-default-family, system-ui, sans-serif); }
+               font-family: var(--mud-typography-default-family, system-ui, sans-serif), "Noto Sans Arabic", "Segoe UI", Tahoma, sans-serif; }
+        .id-locale { display: flex; justify-content: center; gap: 4px; margin-top: 20px; }
+        .id-locale a { padding: 2px 10px; border-radius: 999px; font-size: .8125rem; text-decoration: none; color: var(--mud-palette-text-secondary); }
+        .id-locale a[aria-current] { color: var(--mud-palette-primary); font-weight: 600; }
+        [dir="rtl"] input[type="email"], [dir="rtl"] code { direction: ltr; }
         .id-card { width: 100%; max-width: 420px; padding: 32px 28px; border-radius: 12px; box-sizing: border-box; }
         .id-head { text-align: center; margin-bottom: 20px; }
         .id-head h1 { margin: 12px 0 4px; }
@@ -33,10 +50,14 @@
 <main class="mud-paper mud-elevation-4 id-card">
     <div class="id-head">
         <span class="id-logo" aria-hidden="true">MB</span>
-        <h1 class="mud-typography mud-typography-h5">@(ViewData["Title"] ?? "Sign in")</h1>
-        <p class="mud-typography mud-typography-body2">Modular Identity</p>
+        <h1 class="mud-typography mud-typography-h5">@(ViewData["Title"] ?? L["Sign in"])</h1>
+        <p class="mud-typography mud-typography-body2">@L["Modular Identity"]</p>
     </div>
     @RenderBody()
+    <nav class="id-locale" aria-label="@L["Language"]">
+        <a href="@LinkTo("ar")" lang="ar" aria-current="@(culture.TwoLetterISOLanguageName == "ar" ? "true" : null)">العربية</a>
+        <a href="@LinkTo("en")" lang="en" aria-current="@(culture.TwoLetterISOLanguageName == "en" ? "true" : null)">English</a>
+    </nav>
 </main>
 </body>
 </html>

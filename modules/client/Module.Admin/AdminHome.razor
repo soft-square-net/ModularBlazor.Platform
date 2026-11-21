@@ -1,20 +1,23 @@
 @page "/admin"
 @inject ICurrentUserService Users
+@inject IStringLocalizer<AdminHome> L
 
 @*
   The administration overview: who is signed in, and the admin areas. Members is this module's own page; the others
   belong to the host (client and host modules) or to Module.Tenants, and use the default layout.
 *@
 
-<PageTitle>Administration</PageTitle>
+<PageTitle>@L["Administration"]</PageTitle>
 
 <div class="mud-container adm-page">
   <header class="adm-header">
-    <h1 class="mud-typography mud-typography-h4">Administration</h1>
+    <h1 class="mud-typography mud-typography-h4">@L["Administration"]</h1>
     @if (_user is not null)
     {
       <p class="mud-typography mud-typography-body1 adm-muted">
-        Signed in as <strong>@_user.Name</strong> (@string.Join(", ", _user.Roles))@(_user.Tenant is null ? ", platform account" : $", tenant {_user.Tenant}").
+        @((MarkupString)(_user.Tenant is null
+            ? L["Signed in as <strong>{0}</strong> ({1}), platform account.", System.Net.WebUtility.HtmlEncode(_user.Name), System.Net.WebUtility.HtmlEncode(string.Join(", ", _user.Roles))].Value
+            : L["Signed in as <strong>{0}</strong> ({1}), tenant {2}.", System.Net.WebUtility.HtmlEncode(_user.Name), System.Net.WebUtility.HtmlEncode(string.Join(", ", _user.Roles)), System.Net.WebUtility.HtmlEncode(_user.Tenant)].Value))
       </p>
     }
   </header>
@@ -33,12 +36,12 @@
 @code {
   private sealed record Area(string Title, string Href, string Text);
 
-  private static readonly Area[] Areas =
+  private Area[] Areas =>
   [
-    new("Members", "admin/members", "The members of a tenant on the identity service: invite, suspend, activate, remove."),
-    new("Tenants", "tenants", "Organisations on the platform and their subscription periods."),
-    new("Client modules", "client-modules", "The modules of this app: upload, install, settings, versions."),
-    new("Host modules", "host-modules", "The WebApi's own modules, per pool: install, activate, deactivate."),
+    new(L["Members"], "admin/members", L["The members of a tenant on the identity service: invite, suspend, activate, remove."]),
+    new(L["Tenants"], "tenants", L["Organisations on the platform and their subscription periods."]),
+    new(L["Client modules"], "client-modules", L["The modules of this app: upload, install, settings, versions."]),
+    new(L["Host modules"], "host-modules", L["The WebApi's own modules, per pool: install, activate, deactivate."]),
   ];
 
   private UserInfo? _user;

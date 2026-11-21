@@ -3,6 +3,7 @@
 @inject ModuleManager Modules
 @inject ICurrentUserService CurrentUsers
 @inject NavigationManager Nav
+@inject IStringLocalizer<App> L
 
 @if (_redirecting)
 {
@@ -11,9 +12,9 @@
 else if (_forbidden)
 {
     <LayoutView Layout="_layout">
-        <PageTitle>Access denied</PageTitle>
-        <h1>Access denied</h1>
-        <p>Your account does not have access to this module.</p>
+        <PageTitle>@L["Access denied"]</PageTitle>
+        <h1>@L["Access denied"]</h1>
+        <p>@L["Your account does not have access to this module."]</p>
     </LayoutView>
 }
 else if (_ready)

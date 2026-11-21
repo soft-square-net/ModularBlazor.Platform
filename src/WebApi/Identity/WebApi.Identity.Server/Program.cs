@@ -115,6 +115,7 @@ builder.Services.AddOpenIddict()
 builder.Services.AddScoped<TokenIssuer>();
 builder.Services.AddScoped<TenantAuthorizations>();
 builder.Services.AddMembershipAdmin();
+builder.Services.AddIdentityLocalization(builder.Configuration);
 builder.Services.AddRazorPages();
 builder.Services.AddHealthChecks();
 
@@ -138,6 +139,7 @@ await IdentitySeeder.InitializeAsync(app.Services);
 
 app.UseStatusCodePages();
 app.UseStaticFiles(); // wwwroot/css/mudtail.css for the sign-in pages
+app.UseIdentityLocalization(); // ar by default; ?culture=, the app's ui_locales, then the cookie
 app.UseRouting();
 app.UseCors();
 app.UseAuthentication();

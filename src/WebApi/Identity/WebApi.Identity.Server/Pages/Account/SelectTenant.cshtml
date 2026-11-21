@@ -1,7 +1,7 @@
 @page
 @model SelectTenantModel
-@{ ViewData["Title"] = "Choose a tenant"; }
-<p class="mud-typography mud-typography-body2 id-muted">Your account belongs to several organisations. A sign-in is for one of them; you can switch later without signing in again.</p>
+@{ ViewData["Title"] = L["Choose a tenant"].Value; }
+<p class="mud-typography mud-typography-body2 id-muted">@L["Your account belongs to several organisations. A sign-in is for one of them; you can switch later without signing in again."]</p>
 <form method="post" class="id-stack">
     <input type="hidden" asp-for="ReturnUrl" />
     @foreach (var tenant in Model.Tenants)

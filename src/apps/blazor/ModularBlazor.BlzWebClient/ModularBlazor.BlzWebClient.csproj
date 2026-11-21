@@ -19,6 +19,8 @@
     <RunAOTCompilation>false</RunAOTCompilation>
     <AssemblyName>$(SoftSquarePrefix).ModularBlazor.BlzWebClient</AssemblyName>
     <RootNamespace>$(SoftSquarePrefix).ModularBlazor.BlzWebClient</RootNamespace>
+    <!-- Arabic is the default language: load every culture's formats (dates, numbers), not only the browser's. -->
+    <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
   </PropertyGroup>
 
   <ItemGroup>
@@ -35,6 +37,12 @@
     <ProjectReference Include="..\..\..\WebApi\WebApi.Client\WebApi.Client.csproj" />
     <!-- Typed client of the client-modules core module (/api/client-modules: upload, install, settings, versions). -->
     <ProjectReference Include="..\..\..\WebApi\Modules\Core.Clients\WebApi.Modules.Core.ClientModules.Client\WebApi.Modules.Core.ClientModules.Client.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Translations: i18n/{culture}.json, read by IStringLocalizer<T> (Share.All EmbeddedJsonStringLocalizerFactory). -->
+    <Content Remove="i18n/**" />
+    <EmbeddedResource Include="i18n/*.json" />
   </ItemGroup>
 
   <!-- ================================================================ node-app (wwwroot/js/app.js) -->
