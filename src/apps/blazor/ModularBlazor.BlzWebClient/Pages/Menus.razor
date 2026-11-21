@@ -1,0 +1,396 @@
+@page "/menus"
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using soft.square.net.ModularBlazor.Abstractions.Auth
+@using soft.square.net.Share.All
+@using soft.square.net.WebApi.Modules.Core.Menus.Client
+@using Problem = soft.square.net.WebApi.Modules.Core.Menus.Client.ProblemDetails
+@inject IHttpClientFactory HttpClients
+@inject ICurrentUserService Users
+@inject MenuService MenuBuilder
+@inject MenuCustomizations Customizations
+@inject MudTailRuntime MudTail
+@inject IStringLocalizer<App> L
+
+@*
+  The menus admin page, through the gateway: the WebApi's menus core module (/api/menus/admin,
+  WebApi.Modules.Core.Menus.Client). One layer at a time: a tenant's (tenant admins with menus.manage; platform admins
+  name the tenant) on top of the platform's (platform admins, no tenant). The modules' entries are listed as this
+  browser has them; each can be hidden, renamed, moved and reordered, and links and groups can be added (pages of the
+  app or external addresses). Saving replaces the whole layer; the menus of this browser follow at once.
+*@
+
+<PageTitle>@L["Menus"]</PageTitle>
+
+<div class="mud-container blz-page">
+  <header class="blz-page-header">
+    <div>
+      <h1 class="mud-typography mud-typography-h4">@L["Menus"]</h1>
+      <p class="mud-typography mud-typography-body1">
+        @L["The modules bring their own menu entries. Here you hide, rename, move and reorder them, and add links and groups of your own, for the whole platform or for one tenant."]
+      </p>
+    </div>
+    <div class="blz-page-actions">
+      <button type="button" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" @onclick="LoadAsync" disabled="@_busy">@L["Reload"]</button>
+      <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="SaveAsync" disabled="@(_busy || _view is null)">@L["Save"]</button>
+    </div>
+  </header>
+
+  @if (_platformAdmin)
+  {
+    <section class="mud-paper mud-elevation-1 blz-card">
+      <div class="blz-install">
+        <div class="mud-input-control">
+          <label class="mud-input-label">@L["Tenant (empty: the platform's menus, for every tenant)"]</label>
+          <div class="mud-input-wrapper"><input class="mud-input-slot" @bind="_tenant" placeholder="acme" /></div>
+        </div>
+        <button type="button" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" @onclick="LoadAsync" disabled="@_busy">@L["Open"]</button>
+      </div>
+    </section>
+  }
+
+  @if (_error is not null)
+  {
+    <p class="mud-typography mud-typography-body2 blz-error" role="alert">@_error</p>
+  }
+
+  @if (_view is { } view)
+  {
+    <div class="blz-facts">
+      <span class="blz-chip">@L["Menus of"] <strong>@(view.Scope == "platform" ? L["the platform"].Value : view.Scope)</strong></span>
+      <span class="blz-chip">@L["Version"] <strong>@(view.Customization.Version ?? 0)</strong></span>
+      @if (view.Customization.UpdatedBy is { } by)
+      {
+        <span class="blz-chip">@L["Changed by {0}", by]</span>
+      }
+      @if (view.Inherited is { } inherited)
+      {
+        <span class="blz-chip">@L["On top of the platform's changes: {0} entries, {1} added", inherited.Overrides?.Count ?? 0, inherited.Items?.Count ?? 0]</span>
+      }
+    </div>
+
+    <section class="mud-paper mud-elevation-1 blz-card">
+      <h2 class="mud-typography mud-typography-h6">@L["Entries"]</h2>
+      <p class="mud-typography mud-typography-body2 blz-muted">@L["Empty fields keep what the entry has. A hidden group hides what is in it."]</p>
+      <div class="blz-scroll">
+        <table class="blz-versions blz-menu-table">
+          <thead>
+            <tr>
+              <th>@L["Entry"]</th><th>@L["Hidden"]</th><th>@L["Menu"]</th><th>@L["In group"]</th><th>@L["Order"]</th>
+              <th>@L["Title (English)"]</th><th>@L["Title (Arabic)"]</th>
+            </tr>
+          </thead>
+          <tbody>
+            @foreach (var entry in _entries)
+            {
+              var d = Draft(entry.Id);
+              <tr class="@(d.Hidden ? "blz-muted" : null)">
+                <td>
+                  <strong>@entry.LocalTitle</strong>
+                  <div class="blz-muted"><code>@entry.Id</code> · @L[entry.IsGroup ? "group" : "link"] · @(entry.Parent ?? entry.Zone)@(entry.Href is { } h ? $" · {h}" : "")</div>
+                </td>
+                <td><input type="checkbox" @bind="d.Hidden" aria-label="@L["Hidden"]" /></td>
+                <td>@ZoneSelect(() => d.Zone, v => d.Zone = v, keep: true)</td>
+                <td>@ParentSelect(() => d.Parent, v => d.Parent = v, entry.Id, keep: true)</td>
+                <td><input class="mud-input-slot blz-narrow" type="number" @bind="d.Order" placeholder="@entry.Order" /></td>
+                <td><input class="mud-input-slot" @bind="d.Title" placeholder="@entry.Title" /></td>
+                <td><input class="mud-input-slot" dir="rtl" lang="ar" @bind="d.TitleAr" placeholder="@entry.TitleIn(new("ar"))" /></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="mud-paper mud-elevation-1 blz-card">
+      <h2 class="mud-typography mud-typography-h6">@L["Added links and groups"]</h2>
+      <p class="mud-typography mud-typography-body2 blz-muted">
+        @((MarkupString)L["A link goes to a page of the app (<code>contents/new</code>) or to an address outside it (<code>https://…</code>, opened in a new tab). The menu knows an added entry as <code>{0}:id</code>.", Layer].Value)
+      </p>
+      @foreach (var item in _items)
+      {
+        var i = item;
+        <div class="blz-grid blz-menu-item">
+          <div class="mud-input-control">
+            <label class="mud-input-label">@L["Id"]</label>
+            <div class="mud-input-wrapper"><input class="mud-input-slot" @bind="i.Id" placeholder="help" /></div>
+          </div>
+          <div class="mud-input-control">
+            <label class="mud-input-label">@L["Kind"]</label>
+            <div class="mud-input-wrapper mud-input-wrapper--select">
+              <select class="mud-input-slot" @bind="i.Kind">
+                <option value="link">@L["link"]</option>
+                <option value="group">@L["group"]</option>
+              </select>
+            </div>
+          </div>
+          <div class="mud-input-control">
+            <label class="mud-input-label">@L["Title (English)"]</label>
+            <div class="mud-input-wrapper"><input class="mud-input-slot" @bind="i.Title" /></div>
+          </div>
+          <div class="mud-input-control">
+            <label class="mud-input-label">@L["Title (Arabic)"]</label>
+            <div class="mud-input-wrapper"><input class="mud-input-slot" dir="rtl" lang="ar" @bind="i.TitleAr" /></div>
+          </div>
+          <div class="mud-input-control blz-wide">
+            <label class="mud-input-label">@L[i.Kind == "group" ? "Address (optional)" : "Address"]</label>
+            <div class="mud-input-wrapper"><input class="mud-input-slot" dir="ltr" @bind="i.Href" placeholder="https://example.com/help" /></div>
+          </div>
+          <div class="mud-input-control">
+            <label class="mud-input-label">@L["Menu"]</label>
+            @ZoneSelect(() => i.Zone, v => i.Zone = v ?? MenuZones.Main, keep: false)
+          </div>
+          <div class="mud-input-control">
+            <label class="mud-input-label">@L["In group"]</label>
+            @ParentSelect(() => i.Parent, v => i.Parent = v, $"{Layer}:{i.Id}", keep: false)
+          </div>
+          <div class="mud-input-control">
+            <label class="mud-input-label">@L["Order"]</label>
+            <div class="mud-input-wrapper"><input class="mud-input-slot" type="number" @bind="i.Order" /></div>
+          </div>
+          <div class="mud-input-control">
+            <label class="mud-input-label">@L["Shown to"]</label>
+            <div class="mud-input-wrapper mud-input-wrapper--select">
+              <select class="mud-input-slot" @bind="i.Audience">
+                <option value="everyone">@L["Everyone"]</option>
+                <option value="signed-in">@L["Signed-in users"]</option>
+                <option value="anonymous">@L["Visitors who are not signed in"]</option>
+              </select>
+            </div>
+          </div>
+          <div class="blz-row-actions">
+            <button type="button" class="mud-button-root mud-button-text mud-button-error mud-button-small" @onclick="() => _items.Remove(i)">@L["Remove"]</button>
+          </div>
+        </div>
+      }
+      <div class="blz-row-actions">
+        <button type="button" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" @onclick="AddItem">@L["Add a link or group"]</button>
+      </div>
+    </section>
+  }
+</div>
+
+@code {
+  /// <summary>The change to one entry, as form fields (empty: keep).</summary>
+  private sealed class EntryDraft
+  {
+    public bool Hidden { get; set; }
+    public string? Zone { get; set; }
+    public string? Parent { get; set; }  // null: keep; "": top of its menu; otherwise a group's id
+    public int? Order { get; set; }
+    public string? Title { get; set; }
+    public string? TitleAr { get; set; }
+    public string? Icon { get; set; }    // kept as it was (no field yet)
+    public IDictionary<string, string>? OtherTitles { get; set; } // translations other than Arabic, kept
+
+    public bool IsEmpty => !Hidden && Zone is null && Parent is null && Order is null && string.IsNullOrWhiteSpace(Title)
+                           && string.IsNullOrWhiteSpace(TitleAr) && Icon is null;
+  }
+
+  private sealed class ItemDraft
+  {
+    public string Id { get; set; } = "";
+    public string Kind { get; set; } = "link";
+    public string Zone { get; set; } = MenuZones.Main;
+    public string? Title { get; set; }
+    public string? TitleAr { get; set; }
+    public string? Href { get; set; }
+    public string? Parent { get; set; }
+    public string? Icon { get; set; }
+    public int Order { get; set; } = 100;
+    public string Audience { get; set; } = "everyone";
+    public IDictionary<string, string>? OtherTitles { get; set; }
+  }
+
+  private const string Keep = "~";
+
+  private bool _platformAdmin;
+  private string? _tenant;
+  private bool _busy;
+  private string? _error;
+  private MenuAdminView? _view;
+  private List<MenuItem> _entries = [];
+  private readonly Dictionary<string, EntryDraft> _drafts = new(StringComparer.OrdinalIgnoreCase);
+  private List<ItemDraft> _items = [];
+
+  /// <summary>The prefix of this layer's added entries.</summary>
+  private string Layer => _view?.Scope == "platform" ? "@platform" : "@tenant";
+
+  protected override async Task OnInitializedAsync()
+  {
+    var user = await Users.GetUserInfoAsync();
+    _platformAdmin = user?.Roles?.Contains(ModuleManager.PlatformAdminRole) == true;
+    await LoadAsync();
+  }
+
+  private EntryDraft Draft(string id) =>
+      _drafts.TryGetValue(id, out var draft) ? draft : _drafts[id] = new EntryDraft();
+
+  private MenusClient Api()
+  {
+    var http = HttpClients.CreateClient(soft.square.net.ModularBlazor.Abstractions.HttpClientNames.WebApi);
+    if (_platformAdmin && !string.IsNullOrWhiteSpace(_tenant))
+      http.DefaultRequestHeaders.Add("X-Tenant", _tenant.Trim());
+    return new MenusClient(http);
+  }
+
+  private Task LoadAsync() => RunAsync(async () => Show(await Api().GetLayerAsync()));
+
+  private Task SaveAsync() => RunAsync(async () =>
+  {
+    var save = new SaveMenuCustomization
+    {
+      Version = _view!.Customization.Version ?? 0,
+      Overrides = _drafts.Where(d => !d.Value.IsEmpty).Select(d => new MenuOverride
+      {
+        Id = d.Key,
+        Hidden = d.Value.Hidden ? true : null,
+        Zone = d.Value.Zone,
+        Parent = d.Value.Parent,
+        Order = d.Value.Order,
+        Title = Blank(d.Value.Title),
+        Titles = Titles(d.Value.TitleAr, d.Value.OtherTitles),
+        Icon = d.Value.Icon
+      }).ToList(),
+      Items = _items.Select(i => new MenuCustomItem
+      {
+        Id = i.Id.Trim(),
+        Kind = i.Kind,
+        Zone = i.Zone,
+        Title = Blank(i.Title) ?? Blank(i.TitleAr) ?? i.Id,
+        Titles = Titles(i.TitleAr, i.OtherTitles),
+        Href = Blank(i.Href),
+        Parent = Blank(i.Parent),
+        Icon = i.Icon,
+        Order = i.Order,
+        Audience = i.Audience
+      }).ToList()
+    };
+    Show(await Api().SaveAsync(save));
+    await Customizations.RefreshAsync(force: true); // this browser's menus follow (when it is this caller's layer)
+    await MudTail.ToastAsync(L["The menus are saved."], "success");
+  });
+
+  private void Show(MenuAdminView view)
+  {
+    _view = view;
+    _drafts.Clear();
+    foreach (var o in view.Customization.Overrides ?? [])
+      _drafts[o.Id] = new EntryDraft
+      {
+        Hidden = o.Hidden == true,
+        Zone = o.Zone,
+        Parent = o.Parent,
+        Order = o.Order,
+        Title = o.Title,
+        TitleAr = Arabic(o.Titles),
+        Icon = o.Icon,
+        OtherTitles = o.Titles?.Where(t => t.Key != "ar").ToDictionary(t => t.Key, t => t.Value)
+      };
+    _items = (view.Customization.Items ?? []).Select(i => new ItemDraft
+    {
+      Id = i.Id,
+      Kind = i.Kind,
+      Zone = i.Zone,
+      Title = i.Title,
+      TitleAr = Arabic(i.Titles),
+      Href = i.Href,
+      // Stored full ("@tenant:news"); the form shows this layer's groups by their full id too.
+      Parent = i.Parent,
+      Icon = i.Icon,
+      Order = i.Order ?? 100,
+      Audience = i.Audience ?? "everyone",
+      OtherTitles = i.Titles?.Where(t => t.Key != "ar").ToDictionary(t => t.Key, t => t.Value)
+    }).ToList();
+
+    // The entries this browser has (the modules' and the app's own), the platform's added ones under a tenant's
+    // layer, then those of entries changed here that this browser does not have (another tenant's modules).
+    var inherited = (view.Inherited?.Items ?? []).Select(i => new MenuItem(
+        $"@platform:{i.Id}", i.Kind, i.Zone, i.Title, i.Href, i.Parent, i.Icon, i.Order ?? 100,
+        i.Titles is { Count: > 0 } t ? new Dictionary<string, string>(t) : null));
+    var known = MenuBuilder.ModuleItems().Concat(inherited).ToList();
+    var unknown = (view.Customization.Overrides ?? []).Where(o => known.All(k => !k.Id.Equals(o.Id, StringComparison.OrdinalIgnoreCase)))
+        .Select(o => new MenuItem(o.Id, MenuItemKinds.Link, o.Zone ?? "?", o.Title ?? o.Id));
+    _entries = known.Concat(unknown).OrderBy(e => e.Zone).ThenBy(e => e.Parent ?? e.Id).ThenBy(e => e.Order).ToList();
+  }
+
+  private void AddItem() => _items.Add(new ItemDraft { Id = $"link-{_items.Count + 1}" });
+
+  /// <summary>Groups an entry can go in: the modules', the platform's added ones, and this layer's (not the entry itself).</summary>
+  private IEnumerable<(string Id, string Title)> Groups(string except) =>
+      _entries.Where(e => e.IsGroup).Select(e => (e.Id, e.LocalTitle))
+          .Concat(_items.Where(i => i.Kind == "group" && !string.IsNullOrWhiteSpace(i.Id))
+              .Select(i => ($"{Layer}:{i.Id.Trim()}", Blank(i.TitleAr) ?? Blank(i.Title) ?? i.Id)))
+          .Where(g => !g.Item1.Equals(except, StringComparison.OrdinalIgnoreCase))
+          .DistinctBy(g => g.Item1);
+
+  private RenderFragment ZoneSelect(Func<string?> get, Action<string?> set, bool keep) => @<div class="mud-input-wrapper mud-input-wrapper--select">
+    <select class="mud-input-slot" value="@(get() ?? (keep ? Keep : MenuZones.Main))"
+            @onchange="e => set(e.Value as string is Keep ? null : e.Value as string)">
+      @if (keep)
+      {
+        <option value="@Keep">@L["(as it is)"]</option>
+      }
+      <option value="@MenuZones.Main">@L["Main menu"]</option>
+      <option value="@MenuZones.Secondary">@L["Secondary menu"]</option>
+      <option value="@MenuZones.User">@L["User menu"]</option>
+    </select>
+  </div>;
+
+  private RenderFragment ParentSelect(Func<string?> get, Action<string?> set, string self, bool keep) => @<div class="mud-input-wrapper mud-input-wrapper--select">
+    <select class="mud-input-slot" value="@(get() ?? (keep ? Keep : ""))"
+            @onchange="e => set(e.Value as string is Keep ? null : e.Value as string)">
+      @if (keep)
+      {
+        <option value="@Keep">@L["(as it is)"]</option>
+      }
+      <option value="">@L["(top of the menu)"]</option>
+      @foreach (var group in Groups(self))
+      {
+        <option value="@group.Id">@group.Title</option>
+      }
+    </select>
+  </div>;
+
+  private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+  private static string? Arabic(IDictionary<string, string>? titles) => titles is not null && titles.TryGetValue("ar", out var ar) ? ar : null;
+
+  private static IDictionary<string, string>? Titles(string? arabic, IDictionary<string, string>? others)
+  {
+    var titles = new Dictionary<string, string>(others ?? new Dictionary<string, string>());
+    if (Blank(arabic) is { } ar) titles["ar"] = ar;
+    return titles.Count == 0 ? null : titles;
+  }
+
+  private async Task RunAsync(Func<Task> call)
+  {
+    _busy = true;
+    _error = null;
+    StateHasChanged();
+    try
+    {
+      await call();
+    }
+    catch (AccessTokenNotAvailableException ex)
+    {
+      ex.Redirect();
+      return;
+    }
+    catch (Exception ex)
+    {
+      _error = ex switch
+      {
+        MenusApiException<Problem> problem => $"{problem.StatusCode}: {problem.Result.Detail ?? problem.Result.Title ?? L["request failed"]}",
+        MenusApiException { StatusCode: 403 } => L["403: your account may not change these menus (menus.manage in the tenant, or platform.modules.manage)."],
+        MenusApiException { StatusCode: 404 } => L["404: the WebApi has no menus module."],
+        MenusApiException api => $"{api.StatusCode}: {api.Message}",
+        _ => ex.Message
+      };
+    }
+    finally
+    {
+      _busy = false;
+    }
+    StateHasChanged();
+  }
+}

@@ -132,6 +132,13 @@ small { color: var(--muted); }
 .blz-versions th, .blz-versions td { text-align: start; padding: 8px; border-bottom: 1px solid var(--mud-palette-lines-default, var(--border)); }
 .blz-versions th { font-size: .8125rem; color: var(--mud-palette-text-secondary, var(--muted)); }
 
+/* menus admin page */
+.blz-scroll { overflow-x: auto; }
+.blz-menu-table td { vertical-align: top; }
+.blz-menu-table .mud-input-slot { min-inline-size: 8rem; }
+.blz-menu-table .blz-narrow { min-inline-size: 0; inline-size: 5rem; }
+.blz-menu-item { padding-block: 12px; border-bottom: 1px solid var(--mud-palette-lines-default, var(--border)); }
+
 /* sign-in and authentication pages (no layout: a centred MudTail card) */
 .blz-auth {
   min-height: 100vh; display: grid; place-items: center; padding: 16px;

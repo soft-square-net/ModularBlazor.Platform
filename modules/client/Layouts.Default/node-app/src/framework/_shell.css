@@ -69,6 +69,44 @@
   color: var(--mud-palette-primary-contrast);
 }
 
+/* The menus the modules fill (<MenuZone>): nested lists, a group's title over its links. */
+.shell-default .menu-zone ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.shell-default .menu-zone ul ul {
+  padding-inline-start: 0.75rem;
+}
+
+.shell-default .menu-zone a {
+  display: block;
+}
+
+.shell-default .menu-zone span.menu-group-title {
+  display: block;
+  padding-block: 0.75rem 0.25rem;
+  padding-inline: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--mud-palette-text-disabled);
+}
+
+.shell-default nav.shell-secondary {
+  flex: none;
+  border-block-start: 1px solid var(--mud-palette-lines-default);
+  padding-block-start: 0.5rem;
+}
+
+.shell-default nav.shell-user-menu {
+  flex: none;
+  margin-block: 0.5rem;
+}
+
 .shell-default .shell-user {
   font-size: 0.85rem;
   color: var(--mud-palette-text-secondary);

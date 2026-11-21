@@ -1,0 +1,83 @@
+@namespace soft.square.net.ModularBlazor.Abstractions.Menus
+@using Microsoft.AspNetCore.Components.Routing
+@using soft.square.net.Share.All
+@implements IDisposable
+@inject IMenuService Menus
+
+@*
+  One menu (zone) as nested lists: <MenuZone Zone="main" />. Links are NavLinks (class "active" on the current page),
+  external links open in a new tab, a group is a heading (or a link, when it has an Href) over its own list.
+  Styled by the layout: .menu-zone, .menu-zone--{zone}, .menu-group, .menu-group-title, .menu-link.
+  ItemTemplate replaces how one entry is drawn (it gets the MenuNode; draw its Children yourself).
+*@
+@{ var nodes = Menus.Zone(Zone); }
+@if (nodes.Count > 0)
+{
+  @if (Landmark)
+  {
+    <nav class="menu-zone menu-zone--@Zone @Class" aria-label="@(Label ?? Zone)">
+      @List(nodes)
+    </nav>
+  }
+  else
+  {
+    <div class="menu-zone menu-zone--@Zone @Class">@List(nodes)</div>
+  }
+}
+
+@code {
+  /// <summary>main, secondary, user (see MenuZones), or a zone a module names.</summary>
+  [Parameter, EditorRequired] public string Zone { get; set; } = MenuZones.Main;
+
+  [Parameter] public string? Class { get; set; }
+
+  /// <summary>The nav's accessible name. Default: the zone.</summary>
+  [Parameter] public string? Label { get; set; }
+
+  [Parameter] public RenderFragment<MenuNode>? ItemTemplate { get; set; }
+
+  /// <summary>False: a plain div, for a zone placed inside the layout's own nav. Default true: a nav landmark.</summary>
+  [Parameter] public bool Landmark { get; set; } = true;
+
+  protected override void OnInitialized() => Menus.Changed += OnChanged;
+
+  private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+  public void Dispose() => Menus.Changed -= OnChanged;
+
+  private RenderFragment List(IReadOnlyList<MenuNode> nodes) => @<ul>
+    @foreach (var node in nodes)
+    {
+      <li @key="node.Item.Id" class="@(node.Item.IsGroup ? "menu-group" : "menu-item")">
+        @if (ItemTemplate is not null)
+        {
+          @ItemTemplate(node)
+        }
+        else
+        {
+          @Entry(node.Item)
+          @if (node.HasChildren)
+          {
+            @List(node.Children)
+          }
+        }
+      </li>
+    }
+  </ul>;
+
+  private RenderFragment Entry(MenuItem item) => @<text>
+    @if (string.IsNullOrEmpty(item.Href))
+    {
+      <span class="menu-group-title" data-icon="@item.Icon">@item.LocalTitle</span>
+    }
+    else if (item.External)
+    {
+      <a class="menu-link @(item.IsGroup ? "menu-group-title" : null)" href="@item.Href" target="_blank" rel="noopener noreferrer" data-icon="@item.Icon">@item.LocalTitle</a>
+    }
+    else
+    {
+      <NavLink class="@(item.IsGroup ? "menu-link menu-group-title" : "menu-link")" href="@item.Href" data-icon="@item.Icon"
+               Match="@(item.Href is "" or "/" ? NavLinkMatch.All : NavLinkMatch.Prefix)">@item.LocalTitle</NavLink>
+    }
+  </text>;
+}

@@ -1568,6 +1568,10 @@ namespace soft.square.net.WebApi.Modules.Core.ClientModules.Client
         [System.ComponentModel.DataAnnotations.Required]
         public System.Collections.Generic.IReadOnlyList<ClientModuleNavItem> Nav { get; set; } = new System.Collections.Generic.List<ClientModuleNavItem>();
 
+        [System.Text.Json.Serialization.JsonPropertyName("menu")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.IReadOnlyList<ClientModuleMenuItem> Menu { get; set; } = new System.Collections.Generic.List<ClientModuleMenuItem>();
+
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
         [System.Text.Json.Serialization.JsonExtensionData]
@@ -1643,6 +1647,55 @@ namespace soft.square.net.WebApi.Modules.Core.ClientModules.Client
         [System.Text.Json.Serialization.JsonPropertyName("modules")]
         [System.ComponentModel.DataAnnotations.Required]
         public System.Collections.Generic.IReadOnlyList<ClientModuleDescriptor> Modules { get; set; } = new System.Collections.Generic.List<ClientModuleDescriptor>();
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ClientModuleMenuItem
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("id")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Id { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("kind")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Kind { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("zone")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Zone { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("title")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Title { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("href")]
+        public string? Href { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("parent")]
+        public string? Parent { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("icon")]
+        public string? Icon { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("order")]
+        public int? Order { get; set; } = 100;
+
+        [System.Text.Json.Serialization.JsonPropertyName("titles")]
+        public System.Collections.Generic.IDictionary<string, string>? Titles { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("external")]
+        public bool? External { get; set; } = false;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -1842,6 +1895,9 @@ namespace soft.square.net.WebApi.Modules.Core.ClientModules.Client
         [System.Text.Json.Serialization.JsonPropertyName("layouts")]
         public System.Collections.Generic.IReadOnlyList<string>? Layouts { get; set; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("menu")]
+        public System.Collections.Generic.IReadOnlyList<ClientModuleMenuItem>? Menu { get; set; } = default!;
+
         [System.Text.Json.Serialization.JsonPropertyName("warnings")]
         public System.Collections.Generic.IReadOnlyList<string>? Warnings { get; set; } = default!;
 
@@ -1898,6 +1954,9 @@ namespace soft.square.net.WebApi.Modules.Core.ClientModules.Client
 
         [System.Text.Json.Serialization.JsonPropertyName("layouts")]
         public System.Collections.Generic.IReadOnlyList<string>? Layouts { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("menu")]
+        public System.Collections.Generic.IReadOnlyList<ClientModuleMenuItem>? Menu { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 

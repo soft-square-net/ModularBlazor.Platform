@@ -37,6 +37,8 @@
     <ProjectReference Include="..\..\..\WebApi\WebApi.Client\WebApi.Client.csproj" />
     <!-- Typed client of the client-modules core module (/api/client-modules: upload, install, settings, versions). -->
     <ProjectReference Include="..\..\..\WebApi\Modules\Core.Clients\WebApi.Modules.Core.ClientModules.Client\WebApi.Modules.Core.ClientModules.Client.csproj" />
+    <!-- Typed client of the menus core module (/api/menus: administrators' changes to the menus). -->
+    <ProjectReference Include="..\..\..\WebApi\Modules\Core.Clients\WebApi.Modules.Core.Menus.Client\WebApi.Modules.Core.Menus.Client.csproj" />
   </ItemGroup>
 
   <ItemGroup>

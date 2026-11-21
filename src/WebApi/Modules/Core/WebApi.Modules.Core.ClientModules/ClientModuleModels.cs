@@ -23,6 +23,30 @@ public enum ClientModuleLoadStrategy
 /// <summary>A menu entry. <see cref="Titles"/>: the title in other languages (culture → text), from the module's i18n files.</summary>
 public sealed record ClientModuleNavItem(string Title, string Href, int Order = 100, IReadOnlyDictionary<string, string>? Titles = null);
 
+/// <summary>
+/// A menu group or link the module declares ([assembly: MenuGroup] / [assembly: MenuLink]), read when it is uploaded.
+/// It is part of the module's code, so it is kept per version (the active version's are in the manifest), not in the
+/// admin's settings.
+/// </summary>
+/// <param name="Id">"{moduleId}:{localId}".</param>
+/// <param name="Kind">"group" or "link".</param>
+/// <param name="Zone">"main", "secondary", "user", or another zone a layout shows.</param>
+/// <param name="Href">Relative to the app base: a page of the module. Null: a group that only holds links.</param>
+/// <param name="Parent">The id of the group it is in (this module's or another's); null: the zone's top level.</param>
+/// <param name="Titles">The title in other languages (culture → text), from the module's i18n files.</param>
+/// <param name="External">An absolute http(s) link. Modules cannot declare one; kept for links an admin adds.</param>
+public sealed record ClientModuleMenuItem(
+    string Id,
+    string Kind,
+    string Zone,
+    string Title,
+    string? Href = null,
+    string? Parent = null,
+    string? Icon = null,
+    int Order = 100,
+    IReadOnlyDictionary<string, string>? Titles = null,
+    bool External = false);
+
 /// <summary>What an admin decides about a client module. Kept across versions: a new version keeps the module's settings.</summary>
 public sealed record ClientModuleSettings
 {
@@ -88,6 +112,9 @@ public sealed record ClientModuleVersion
 
     /// <summary>Layout keys ([LayoutKey]) the module provides.</summary>
     public IReadOnlyList<string> Layouts { get; init; } = [];
+
+    /// <summary>The menu groups and links the module declares ([assembly: MenuGroup] / [MenuLink]).</summary>
+    public IReadOnlyList<ClientModuleMenuItem> Menu { get; init; } = [];
 }
 
 /// <summary>A client module in the catalog.</summary>
@@ -137,7 +164,8 @@ public sealed record ClientModuleDescriptor(
     IReadOnlyList<string> Dependencies,
     IReadOnlyList<string> Styles,
     IReadOnlyList<string> Scripts,
-    IReadOnlyList<ClientModuleNavItem> Nav);
+    IReadOnlyList<ClientModuleNavItem> Nav,
+    IReadOnlyList<ClientModuleMenuItem> Menu);
 
 /// <summary>The modules the caller may use; <see cref="ETag"/> changes whenever the list does.</summary>
 public sealed record ClientModuleManifest(string ETag, IReadOnlyList<ClientModuleDescriptor> Modules);
@@ -170,6 +198,9 @@ public sealed record ClientModuleUpload
     public IReadOnlyList<ClientModuleFile> Files { get; init; } = [];
     public IReadOnlyList<string> Routes { get; init; } = [];
     public IReadOnlyList<string> Layouts { get; init; } = [];
+
+    /// <summary>The menu groups and links the module declares.</summary>
+    public IReadOnlyList<ClientModuleMenuItem> Menu { get; init; } = [];
     public IReadOnlyList<string> Warnings { get; init; } = [];
     public DateTimeOffset ExpiresAt { get; init; }
 }

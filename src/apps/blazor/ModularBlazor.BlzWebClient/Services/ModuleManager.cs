@@ -146,7 +146,7 @@ public sealed class ModuleManager : IModuleNavigation
       _catalog.Values.OrderBy(d => !d.LoadOnStartup).ThenBy(d => d.Id).ToList();
 
   /// <summary>A menu entry for one of this app's own pages, with its title in every language of the app's i18n files.</summary>
-  private static ModuleNavItem HostNavItem(string title, string href, int order)
+  internal static ModuleNavItem HostNavItem(string title, string href, int order)
   {
     var catalog = soft.square.net.Share.All.Localization.TextCatalog.Of(typeof(App).Assembly);
     var titles = catalog.Cultures
@@ -154,6 +154,9 @@ public sealed class ModuleManager : IModuleNavigation
       .ToDictionary(c => c, c => catalog.For(c)[title], StringComparer.OrdinalIgnoreCase);
     return new ModuleNavItem(title, href, order, titles);
   }
+
+  /// <summary>This app's own pages (module management) for the roles that may use them; MenuService puts them in the secondary menu.</summary>
+  public IReadOnlyList<ModuleNavItem> HostNav => _hostNav;
 
   public IReadOnlyList<ModuleNavItem> Items =>
       _catalog.Values

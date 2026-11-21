@@ -10,13 +10,13 @@
   <aside class="shell-sidebar">
     <a class="brand" href="">Modular Blazor</a>
 
-    <nav>
+    @* The three menus the modules fill (MenuLink / MenuGroup): main, secondary under it, user next to the account. *@
+    <nav class="shell-nav" aria-label="@L["Main"]">
       <NavLink href="" Match="NavLinkMatch.All">@L["Home"]</NavLink>
-      @foreach (var item in Navigation.Items)
-      {
-        <NavLink href="@item.Href">@item.LocalTitle</NavLink>
-      }
+      <MenuZone Zone="@MenuZones.Main" Landmark="false" />
     </nav>
+
+    <MenuZone Zone="@MenuZones.Secondary" Class="shell-secondary" Label="@L["More"]" />
 
     <LocaleSwitcher Class="shell-locale" />
 
@@ -24,6 +24,7 @@
       @if (_user is not null)
       {
         <div>@_user.Name <small>(@string.Join(", ", _user.Roles))</small></div>
+        <MenuZone Zone="@MenuZones.User" Class="shell-user-menu" Label="@L["Account"]" />
         <a href="login" @onclick="SignOutAsync" @onclick:preventDefault>@L["Sign out"]</a>
       }
       else

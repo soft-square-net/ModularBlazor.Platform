@@ -1,6 +1,7 @@
 {
   "$comment": "Arabic texts of Module.Admin. Keys are the English source texts; shared words come from ModularBlazor.Abstractions.",
   "Administration": "الإدارة",
+  "Members": "الأعضاء",
   "Signed in as <strong>{0}</strong> ({1}), platform account.": "مسجّل الدخول باسم <strong>{0}</strong> ({1})، حساب المنصة.",
   "Signed in as <strong>{0}</strong> ({1}), tenant {2}.": "مسجّل الدخول باسم <strong>{0}</strong> ({1})، المستأجر {2}.",
   "The members of a tenant on the identity service: invite, suspend, activate, remove.": "أعضاء المستأجر في خدمة الهوية: دعوة، إيقاف، تفعيل، إزالة.",
