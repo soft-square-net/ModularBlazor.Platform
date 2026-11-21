@@ -21,6 +21,7 @@ internal sealed class ClientModuleCatalog
     private static readonly TimeSpan UploadLifetime = TimeSpan.FromHours(1);
 
     private readonly ClientModulesOptions _options;
+    private readonly IHostEnvironment _environment;
     private readonly ILogger<ClientModuleCatalog> _log;
     private readonly string _records;
     private readonly string _files;
@@ -30,6 +31,7 @@ internal sealed class ClientModuleCatalog
     public ClientModuleCatalog(IOptions<ClientModulesOptions> options, IHostEnvironment environment, ILogger<ClientModuleCatalog> log)
     {
         _options = options.Value;
+        _environment = environment;
         _log = log;
         Root = Path.GetFullPath(_options.Path, environment.ContentRootPath);
         _records = Path.Combine(Root, "client-modules.json");
@@ -155,9 +157,9 @@ internal sealed class ClientModuleCatalog
         Directory.CreateDirectory(folder);
         foreach (var file in package.Files) await File.WriteAllBytesAsync(Path.Combine(folder, file.Name), file.Content, ct);
 
-        var upload = Describe(package, token, Path.GetFileName(fileName), user);
-        await File.WriteAllTextAsync(Path.Combine(folder, "upload.json"), JsonSerializer.Serialize(new StagedUpload(upload, package.PackageHash), Json), ct);
-        return upload;
+        var staged = new StagedUpload(Describe(package, token, Path.GetFileName(fileName)), package.PackageHash);
+        await File.WriteAllTextAsync(Path.Combine(folder, "upload.json"), JsonSerializer.Serialize(staged, Json), ct);
+        return Refresh(staged);
     }
 
     public ClientModuleUpload GetUpload(string token) => Refresh(ReadStaged(token));
@@ -178,15 +180,23 @@ internal sealed class ClientModuleCatalog
         var package = new InspectedPackage(u.Kind, u.Id, u.Version, u.Detected, files, u.Routes, u.Layouts, u.Warnings);
         if (package.PackageHash != staged.PackageHash) throw new ClientModuleException("The upload's files changed; upload the package again.", 409);
 
-        var record = await ChangeAsync(records => AddVersion(records, package, request.Settings, request.Activate, request.Replace, core: false, "upload", user), ct);
+        var record = await ChangeAsync(records =>
+        {
+            // A module whose dependencies are not installed would be listed, then fail in every browser that loads it.
+            var existing = records.FirstOrDefault(r => r.Id.Equals(package.Id, StringComparison.OrdinalIgnoreCase));
+            var missing = MissingDependencies(records, request.Settings ?? existing?.Settings ?? package.Detected);
+            if (missing.Count > 0)
+                throw new ClientModuleException(
+                    $"'{package.Id}' depends on {string.Join(", ", missing.Select(m => $"'{m}'"))}, which is not installed. Install it first, or remove it from the dependencies.", 409);
+            return AddVersion(records, package, request.Settings, request.Activate, request.Replace, core: false, "upload", user);
+        }, ct);
         Directory.Delete(folder, recursive: true);
         _log.LogInformation("Client module {Module} {Version} installed by {User}", record.Id, package.Version, user);
         return record;
     }
 
-    private ClientModuleUpload Describe(InspectedPackage package, string token, string fileName, string? user)
-    {
-        var upload = new ClientModuleUpload
+    private static ClientModuleUpload Describe(InspectedPackage package, string token, string fileName) =>
+        new()
         {
             Token = token,
             FileName = fileName,
@@ -200,16 +210,19 @@ internal sealed class ClientModuleCatalog
             Warnings = package.Warnings,
             ExpiresAt = DateTimeOffset.UtcNow + UploadLifetime
         };
-        return Refresh(new StagedUpload(upload, package.PackageHash));
-    }
 
     /// <summary>The upload compared with the catalog as it is now.</summary>
     private ClientModuleUpload Refresh(StagedUpload staged)
     {
-        var existing = List().FirstOrDefault(r => r.Id.Equals(staged.Upload.Id, StringComparison.OrdinalIgnoreCase));
+        var records = List();
+        var existing = records.FirstOrDefault(r => r.Id.Equals(staged.Upload.Id, StringComparison.OrdinalIgnoreCase));
         var version = existing?.Versions.FirstOrDefault(v => v.Version == staged.Upload.Version);
+        var missing = MissingDependencies(records, existing?.Settings ?? staged.Upload.Detected);
         return staged.Upload with
         {
+            Warnings = missing.Count == 0
+                ? staged.Upload.Warnings
+                : [.. staged.Upload.Warnings, $"Depends on {string.Join(", ", missing)}, which is not installed: install it first."],
             Current = existing?.Settings,
             CurrentVersion = existing?.ActiveVersion,
             IsCore = existing?.Core ?? false,
@@ -354,7 +367,86 @@ internal sealed class ClientModuleCatalog
         }, ct);
     }
 
+    /// <summary>
+    /// Development only: installs the client modules named in <c>ClientModules:Local:{id}</c> (a .dll, .nupkg or .zip
+    /// file, or a folder whose assemblies form one module) from a build output, like an upload, so a module repo's
+    /// playground shows its UI without uploading it. Installed again when the files change, as the active version
+    /// (same version: replaced); the admin's settings are kept. Dependencies among them are installed first.
+    /// </summary>
+    public async Task SeedLocalAsync(CancellationToken ct)
+    {
+        if (!_environment.IsDevelopment())
+        {
+            if (_options.Local.Count > 0) _log.LogWarning("ClientModules:Local is ignored outside Development.");
+            return;
+        }
+        if (_options.Local.Count == 0) return;
+
+        var packages = new List<InspectedPackage>();
+        foreach (var (id, configured) in _options.Local)
+        {
+            if (string.IsNullOrWhiteSpace(configured)) continue;
+            var path = Path.GetFullPath(configured, _environment.ContentRootPath);
+            try
+            {
+                var package = Directory.Exists(path) ? ClientModuleInspector.InspectFolder(path)
+                    : File.Exists(path) ? ClientModuleInspector.Inspect(Path.GetFileName(path), await File.ReadAllBytesAsync(path, ct))
+                    : null;
+                if (package is null)
+                {
+                    _log.LogWarning("Local client module {Module}: {Path} does not exist (build the module first).", id, path);
+                    continue;
+                }
+                if (!package.Id.Equals(id, StringComparison.OrdinalIgnoreCase))
+                    _log.LogWarning("Local client module {Module}: {Path} holds module {Actual}; installed under that id.", id, path, package.Id);
+                packages.Add(package);
+            }
+            catch (ClientModuleException e)
+            {
+                _log.LogWarning("Local client module {Module} skipped: {Reason}", id, e.Message);
+            }
+        }
+        if (packages.Count == 0) return;
+
+        // Dependencies first, so each module finds what it lists (a cycle keeps the configured order).
+        var ordered = new List<InspectedPackage>();
+        void Visit(InspectedPackage p, HashSet<string> path)
+        {
+            if (ordered.Contains(p) || !path.Add(p.Id)) return;
+            foreach (var dependency in p.Detected.Dependencies)
+                if (packages.FirstOrDefault(d => d.Id.Equals(dependency, StringComparison.OrdinalIgnoreCase)) is { } d) Visit(d, path);
+            ordered.Add(p);
+        }
+        foreach (var package in packages) Visit(package, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
+        await ChangeAsync(records =>
+        {
+            foreach (var package in ordered)
+            {
+                var existing = records.FirstOrDefault(r => r.Id.Equals(package.Id, StringComparison.OrdinalIgnoreCase));
+                if (existing is { Core: true })
+                {
+                    _log.LogWarning("Local client module {Module} not installed: a core module has that id.", package.Id);
+                    continue;
+                }
+                if (existing?.Active?.PackageHash == package.PackageHash) continue;
+
+                var record = AddVersion(records, package, settings: null, activate: true, replace: true, core: false, "local", user: null);
+                var missing = MissingDependencies(records, record.Settings);
+                if (missing.Count > 0)
+                    _log.LogWarning("Local client module {Module} depends on {Missing}, which is not installed.", record.Id, string.Join(", ", missing));
+                _log.LogInformation("Installed local client module {Module} {Version}", record.Id, record.ActiveVersion);
+            }
+            return true;
+        }, ct);
+    }
+
     // ================================================================ helpers
+
+    private static List<string> MissingDependencies(IEnumerable<ClientModuleRecord> records, ClientModuleSettings settings) =>
+        (settings.Dependencies ?? [])
+            .Where(d => !records.Any(r => r.Id.Equals(d, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
 
     private ClientModuleRecord AddVersion(List<ClientModuleRecord> records, InspectedPackage package, ClientModuleSettings? settings,
         bool activate, bool replace, bool core, string source, string? user)

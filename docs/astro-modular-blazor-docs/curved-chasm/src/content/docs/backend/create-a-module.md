@@ -552,8 +552,8 @@ It has two launch profiles, one per loop:
 
 | Profile | The WebApi gets | Use it for |
 | --- | --- | --- |
-| `dev` (default) | `Modules__Local__notes=<Infrastructure bin folder>`: in Development, the module is installed from its build output on startup and activated, and reinstalled when the files change | Daily work: change code, build, restart the `webapi` resource in the Aspire dashboard (or F5 again) |
-| `install` | Nothing: it starts without the module, as in production | Before a release: upload `out/notes.zip` on `http://localhost:5070/host-modules` and activate it, which runs the real install path |
+| `dev` (default) | The server part: `Modules__Local__notes=<Infrastructure bin folder>`. The client parts: `ClientModules:Local:{id}=<the DLL>`, a setting of the client-modules module given as a host override. In Development, every start installs what changed from the build output and activates it: the server part, then the API client, then the UI | Daily work: change code, build, restart the `webapi` resource in the Aspire dashboard (or F5 again), and reload the browser |
+| `install` | Nothing: it starts without the module, as in production | Before a release: upload `out/notes.zip` on `http://localhost:5070/host-modules` and activate it, then the two DLLs from `out/client/` on `/client-modules`, the API client first. This runs the real install path |
 
 The AppHost keeps the playground's data in the repo, and away from the platform checkout and the Hybird lab:
 
@@ -567,22 +567,40 @@ var webApi = builder.AddProject<Projects.WebApi>("webapi", launchProfileName: nu
     .WithEnvironment("Modules__Settings__client-modules__ClientModules__Path",
         Path.Combine(data, mode == "dev" ? "client-modules" : "client-modules-install"));
 if (mode == "dev")
-    webApi.WithEnvironment("Modules__Local__notes", Metadata("ModuleOutput"));
+{
+    const string ClientLocal = "Modules__Settings__client-modules__ClientModules__Local__";
+    webApi.WithEnvironment("Modules__Local__notes", Metadata("ModuleOutput"))      // the Infrastructure bin folder
+        .WithEnvironment(ClientLocal + "WebApi.Modules.Notes.Client", Metadata("ApiClientOutput"))   // its .dll
+        .WithEnvironment(ClientLocal + "Module.Notes", Metadata("UiOutput"));                         // its .dll
+}
 ```
+
+`ClientModules:Local` works in Development only. A client module installed this way is an ordinary module with the
+source `local`: the admin's settings are kept, and the same version is replaced when its files change. Among the local
+modules, dependencies are installed first.
 
 ```bash
 dotnet run --project playground --launch-profile dev
 ```
 
-Then:
+Then open `http://localhost:5070`. The menu item "Notes" is there. The client catalog stays in `playground/.data`.
 
-1. **Upload the client parts.** They load in the browser from the client-modules catalog, which has no local mode.
-   On `http://localhost:5070/client-modules`, signed in as `admin@modular.local`, upload
-   `soft.square.net.WebApi.Modules.Notes.Client.dll` first, then `soft.square.net.Module.Notes.dll`. Do this once per
-   new version of either one. The catalog stays in `playground/.data`.
-2. **Use the pages.** Sign out, and sign in again with the organisation `acme`. In Development the platform seeds the
-   dev tenants `acme` and `globex`. Give the user the module's permissions in that tenant (step 13) before testing
-   writes.
+To use the pages, sign in as a member of a tenant, with its organisation. In Development the identity service seeds
+the tenants `acme` and `globex` and their accounts: `acme-admin@modular.local`, and `editor@modular.local` in both.
+The platform admin has no tenant, so a tenant-bound API answers it with 400.
+
+Those accounts hold no module permissions, and seeded accounts get random user ids. So the playground gives them
+permissions **by email**, with the WebApi's `Access:DevGrants` (Development only):
+
+```csharp title="playground/AppHost.cs"
+webApi.WithEnvironment("Access__DevGrants__0__Tenant", "acme")
+      .WithEnvironment("Access__DevGrants__0__Email", "acme-admin@modular.local")
+      .WithEnvironment("Access__DevGrants__0__Permissions__0", "notes.*");   // every permission the module declares
+```
+
+The first time that account calls the API in that tenant, the WebApi writes the grants it is missing. They are
+ordinary grants with the source `dev`: listed by `GET /api/identity/grants` and revocable like any other. A wildcard
+covers the permissions of modules installed later as well.
 
 The playground uses the lab's ports (identity 5090, API 5080, client 5070), because the identity service registers
 the client for them. Stop the Hybird lab first. Data stays in the playground's Docker volume and in
@@ -777,6 +795,9 @@ The first request for a tenant may wait (up to 30 s) while that tenant's migrati
 2. Upload `soft.square.net.Module.Notes.dll`. The form is pre-filled from its `[assembly: ClientModule]`: change the
    roles, tenants or menu entry if needed, and install it.
 
+The order matters. The upload warns when a dependency is not installed, and the install is refused (409) until it is,
+because browsers would otherwise fail to load the module.
+
 The menu item "Notes" appears for every user whose manifest includes the module. The module is downloaded when one of
 them first opens `/notes`. The same two steps through the API:
 
@@ -790,7 +811,8 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 ## 13. Grant the permission
 
 `notes.write` is now in the permission catalog (`GET /api/identity/permissions`). Give it to a user inside one tenant.
-The caller needs `access.grants.manage` (platform admin, or that tenant's admin):
+The caller needs `access.grants.manage`: the platform admin (with `X-Tenant`), or a user granted it in that tenant.
+In a playground, `Access:DevGrants` does this for the dev accounts (step 8).
 
 ```bash
 curl -X POST -H "Authorization: Bearer $TOKEN" -H "X-Tenant: acme" -H "Content-Type: application/json" \
@@ -1241,11 +1263,11 @@ Core modules can be deactivated, unloaded and configured, but not uninstalled or
 | Works on PostgreSQL, fails on Oracle or MySQL | Engine trap from step 6 | Fix the mapping or the migration for that engine |
 | Memory still used after unload | Something pins the module (static cache, host singleton, timer) | Check `/api/admin/modules/unloading`; see [Unloading runtime modules](/backend/runtime-module-unloading/) |
 | 409 on unload or uninstall | `HotUnload = false` | Add `?deferred=true` and restart the pool |
-| The UI module's page fails to load its types | The API client module is not installed or not active | Install `WebApi.Modules.<Name>.Client` first; check the UI's `Dependencies` |
+| "The module Module.Notes could not be loaded. Unknown module 'WebApi.Modules.Notes.Client'." | The UI was installed without its API client (since `client-modules` checks dependencies, installing it that way is refused with 409) | Install `WebApi.Modules.<Name>.Client` first; in a playground, use the `dev` loop, which installs both |
 | The UI's output contains the API client's DLL or `Microsoft.*` DLLs | A reference without `Private="false"` / `PrivateAssets="all"` | Fix the reference (step 7); ship the UI's own DLL only |
 | `CS1061` on members of an API model inside a page | The page's file name equals the model's name, so the page class hides the model | Rename the page (`PostPage.razor`, not `PostDetail.razor`) |
 | The page says 400: no tenant | Signed in without a tenant (the platform admin) to a tenant-bound API | Sign in with an organisation on the client's sign-in page |
-| The page says 403 | The user lacks the module's permission in that tenant | Grant it (step 13) |
+| The page says 403 | The user lacks the module's permission in that tenant | Grant it (step 13); in a playground, add the account to `Access:DevGrants` (step 8) |
 | The playground's build stops: no `ModularBlazor.Platform` checkout | The platform isn't cloned next to the module repo | Clone it as `<workspace>/Platform`, or pass `-p:PlatformRoot=<path>/` |
 | The playground's build can't copy files (`MSB3027`) | The Hybird lab or another playground is running from the same platform checkout | Stop it first: they share the platform's build output and ports |
 | Client modules uploaded in a playground show up in the lab | The client catalog is in the platform checkout (`App_Data/client-modules`) | Set `Modules__Settings__client-modules__ClientModules__Path` in the playground (step 8) |

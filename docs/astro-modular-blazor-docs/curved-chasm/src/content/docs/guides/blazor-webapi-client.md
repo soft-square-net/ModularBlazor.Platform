@@ -213,6 +213,15 @@ relative to the WebApi's content root), shared by the replicas of the pool. To p
 the host override `Modules__Settings__client-modules__ClientModules__Path`. Module playgrounds use it to keep their
 catalog out of the platform checkout, which the Hybird lab uses as well. Uploads are limited to `ClientModules:MaxPackageMegabytes` (50).
 
+An install is refused (409) while a module in its `Dependencies` is not installed, and the upload shows a warning
+about it.
+
+**Local client modules (Development only).** `ClientModules:Local:{id}=<path>` names a client module's build output:
+a `.dll`, `.nupkg` or `.zip`, or a folder whose assemblies form one module. Set it through the host override
+`Modules__Settings__client-modules__ClientModules__Local__{id}`. On start, the catalog installs each one whose files
+changed and activates it, dependencies first. The source is `local`, and the same version is replaced. Module
+playgrounds use it, so their UI loads without an upload. Outside Development the setting is ignored.
+
 ## MudTail pages
 
 `Layouts.Default` bundles MudTail's Blazor interop into its `js/module.js`, and `moduleHost.get('Layouts.Default')`

@@ -201,6 +201,14 @@ sequenceDiagram
 `Modules__Settings__client-modules__ClientModules__Path`. وتستعمله ساحات تجربة الوحدات لتبقي كتالوجها خارج نسخة
 المنصة، التي يستعملها مختبر Hybird أيضا. ويحد الرفع بـ `ClientModules:MaxPackageMegabytes` (‏50).
 
+ويرفض التثبيت (409) ما دامت وحدة مذكورة في `Dependencies` غير مثبتة، ويظهر الرفع تحذيرا بذلك.
+
+**وحدات العميل المحلية (في Development فقط).** يسمي `ClientModules:Local:{id}=<path>` مخرجات بناء وحدة عميل: ملف `.dll`
+أو `.nupkg` أو `.zip`، أو مجلدا تكوّن تجميعاته وحدة واحدة. اضبطه عبر تجاوز المضيف
+`Modules__Settings__client-modules__ClientModules__Local__{id}`. وعند البدء يثبت الكتالوج كل وحدة تغيرت ملفاتها
+ويفعّلها، والتبعيات أولا. ويكون مصدرها `local`، ويستبدل الإصدار نفسه. وتستعمله ساحات تجربة الوحدات، فتحمل واجهتها دون
+رفع. ويتجاهل خارج Development.
+
 ## صفحات MudTail
 
 تضم `Layouts.Default` تكامل MudTail مع Blazor في ملفها `js/module.js`، ويسلمه `moduleHost.get('Layouts.Default')`.

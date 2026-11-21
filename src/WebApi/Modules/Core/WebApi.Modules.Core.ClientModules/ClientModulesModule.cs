@@ -48,6 +48,12 @@ public sealed class ClientModulesOptions
     public string SeedPath { get; set; } = "CoreClientModules";
 
     public int MaxPackageMegabytes { get; set; } = 50;
+
+    /// <summary>
+    /// Development only: module id → a build output (.dll, .nupkg, .zip, or a folder), installed on activation when its
+    /// files changed. Set it from the host: <c>Modules:Settings:client-modules:ClientModules:Local:{id}</c>.
+    /// </summary>
+    public Dictionary<string, string> Local { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
 /// <summary>Seeds the shipped client modules on activation; idempotent, runs on every replica that loads the module.</summary>
@@ -63,6 +69,15 @@ internal sealed class ClientModuleSeeder(ClientModuleCatalog catalog, ILogger<Cl
         {
             // The catalog keeps working with what it has; the admin sees the shipped modules missing.
             log.LogError(e, "Seeding the core client modules failed");
+        }
+
+        try
+        {
+            await catalog.SeedLocalAsync(ct);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            log.LogError(e, "Installing the local client modules failed");
         }
     }
 }
