@@ -1,44 +1,45 @@
 @page
 @model LoginModel
-@{ ViewData["Title"] = "Sign in"; }
+@{ ViewData["Title"] = L["Sign in"].Value; }
 <form method="post" class="id-form">
     <input type="hidden" asp-for="ReturnUrl" />
     @if (Model.Error is not null) { <p class="mud-typography mud-typography-body2 id-error" role="alert">@Model.Error</p> }
 
     <div class="mud-input-control">
-        <label class="mud-input-label" asp-for="Email">Email</label>
+        <label class="mud-input-label" asp-for="Email">@L["Email"]</label>
         <div class="mud-input-wrapper">
             <input asp-for="Email" class="mud-input-slot" type="email" autocomplete="username" placeholder="you@example.com" autofocus required />
         </div>
     </div>
 
     <div class="mud-input-control">
-        <label class="mud-input-label" asp-for="Password">Password</label>
+        <label class="mud-input-label" asp-for="Password">@L["Password"]</label>
         <div class="mud-input-wrapper" id="password-wrapper">
             <input asp-for="Password" class="mud-input-slot" type="password" autocomplete="current-password" required />
-            <button type="button" class="mud-input-adornment-end id-toggle" id="password-toggle" aria-label="Show password" aria-pressed="false">Show</button>
+            <button type="button" class="mud-input-adornment-end id-toggle" id="password-toggle" aria-label="@L["Show password"]" aria-pressed="false">@L["Show"]</button>
         </div>
     </div>
 
     <div class="id-row">
         <label class="mud-checkbox">
             <input asp-for="RememberMe" type="checkbox" />
-            <span>Keep me signed in</span>
+            <span>@L["Keep me signed in"]</span>
         </label>
     </div>
 
-    <button type="submit" class="mud-button-root mud-button-filled mud-button-primary mud-button-large id-block">Sign in</button>
+    <button type="submit" class="mud-button-root mud-button-filled mud-button-primary mud-button-large id-block">@L["Sign in"]</button>
 </form>
 <script>
     // Password reveal (MudTail's password-toggle behaviour, without loading its script bundle here).
     (() => {
+        const t = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(new { show = L["Show"].Value, hide = L["Hide"].Value, showPassword = L["Show password"].Value, hidePassword = L["Hide password"].Value }));
         const input = document.getElementById('Password'), button = document.getElementById('password-toggle');
         button.addEventListener('click', () => {
             const show = input.type === 'password';
             input.type = show ? 'text' : 'password';
-            button.textContent = show ? 'Hide' : 'Show';
+            button.textContent = show ? t.hide : t.show;
             button.setAttribute('aria-pressed', String(show));
-            button.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+            button.setAttribute('aria-label', show ? t.hidePassword : t.showPassword);
         });
     })();
 </script>

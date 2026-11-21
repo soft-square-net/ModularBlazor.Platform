@@ -2,6 +2,7 @@ using Carter;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
+using soft.square.net.WebApi.Localization;
 using soft.square.net.WebApi.Modularity;
 using soft.square.net.WebApi.OpenApi;
 using soft.square.net.WebApi.Security;
@@ -13,6 +14,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddModularOpenApi();
 builder.Services.AddCarter();
 builder.Services.AddHealthChecks();
+// Languages: each request runs in the caller's culture (Accept-Language; Arabic by default), texts from the embedded
+// i18n/{culture}.json of each assembly, runtime modules included.
+builder.Services.AddPlatformLocalization(builder.Configuration);
 // Tenancy on every replica: tenant directory (TenantStore, refreshed over the broker), ITenantContext per request,
 // tenant databases and per-tenant module initialization. Before the runtime modules, so tenants load first.
 builder.AddPlatformTenancy("broker");
@@ -44,6 +48,8 @@ if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOIN
 }
 
 var app = builder.Build();
+
+app.UsePlatformLocalization(); // first: everything after it (errors included) runs in the request's culture
 
 // After routing (endpoint metadata): CORS (preflight requests are answered here, before authentication), then
 // authenticate, resolve the tenant (header, host, token claim), then authorize (grants are per tenant).

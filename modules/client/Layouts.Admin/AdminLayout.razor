@@ -3,6 +3,7 @@
 @implements IDisposable
 @inject ICurrentUserService Users
 @inject IAuthenticationService Auth
+@inject IStringLocalizer<AdminLayout> L
 
 @*
   The administration shell (layout key "admin"): a top bar with the admin areas. Module.Admin's pages use it; the
@@ -12,21 +13,22 @@
 
 <div class="adm-shell">
   <header class="adm-topbar">
-    <a class="adm-brand" href="admin">Administration</a>
+    <a class="adm-brand" href="admin">@L["Administration"]</a>
     <nav class="adm-nav">
-      <NavLink href="admin" Match="NavLinkMatch.All">Overview</NavLink>
-      <NavLink href="admin/members">Members</NavLink>
-      <NavLink href="tenants">Tenants</NavLink>
-      <NavLink href="client-modules">Client modules</NavLink>
-      <NavLink href="host-modules">Host modules</NavLink>
+      <NavLink href="admin" Match="NavLinkMatch.All">@L["Overview"]</NavLink>
+      <NavLink href="admin/members">@L["Members"]</NavLink>
+      <NavLink href="tenants">@L["Tenants"]</NavLink>
+      <NavLink href="client-modules">@L["Client modules"]</NavLink>
+      <NavLink href="host-modules">@L["Host modules"]</NavLink>
     </nav>
     <div class="adm-user">
       @if (_user is not null)
       {
         <span>@_user.Name</span>
-        <a href="login" @onclick="SignOutAsync" @onclick:preventDefault>Sign out</a>
+        <a href="login" @onclick="SignOutAsync" @onclick:preventDefault>@L["Sign out"]</a>
       }
-      <a href="">&larr; Back to the app</a>
+      <LocaleSwitcher />
+      <a href="">@L["← Back to the app"]</a>
     </div>
   </header>
 

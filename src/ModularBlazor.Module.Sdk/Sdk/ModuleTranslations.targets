@@ -1,0 +1,20 @@
+<Project>
+
+  <!--
+    Translations: i18n/{culture}.json (ar.json, en.json, ...) are embedded as the resources "i18n/{culture}.json", where
+    IStringLocalizer<T> (Share.All EmbeddedJsonStringLocalizerFactory) finds them at runtime, in the browser and on any
+    WebApi pool, and where the client-modules upload reads the translated menu title. They are data, not web content.
+  -->
+  <ItemGroup>
+    <Content Remove="i18n/**" />
+    <None Remove="i18n/**" />
+  </ItemGroup>
+  <Target Name="EmbedModuleTranslations" BeforeTargets="AssignTargetPaths" Condition="Exists('$(MSBuildProjectDirectory)/i18n')">
+    <ItemGroup>
+      <_ModuleTranslation Include="i18n/*.json" />
+      <EmbeddedResource Remove="@(_ModuleTranslation)" />
+      <EmbeddedResource Include="@(_ModuleTranslation)" LogicalName="i18n/%(_ModuleTranslation.Filename)%(_ModuleTranslation.Extension)" />
+    </ItemGroup>
+  </Target>
+
+</Project>

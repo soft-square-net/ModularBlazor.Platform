@@ -8,6 +8,7 @@
 @inject ICurrentUserService Users
 @inject ModuleManager Modules
 @inject MudTailRuntime MudTail
+@inject IStringLocalizer<App> L
 
 @*
   Client module management through the gateway, with the OpenIddict access token: the WebApi's client-modules core
@@ -17,20 +18,19 @@
   to this browser's module list at once (the manifest is fetched again); other users get it on their next check.
 *@
 
-<PageTitle>Client modules</PageTitle>
+<PageTitle>@L["Client modules"]</PageTitle>
 
 <div class="mud-container blz-page">
   <header class="blz-page-header">
     <div>
-      <h1 class="mud-typography mud-typography-h4">Client modules</h1>
+      <h1 class="mud-typography mud-typography-h4">@L["Client modules"]</h1>
       <p class="mud-typography mud-typography-body1">
-        The modules of this app, served by the WebApi. Each user receives the ones their roles and tenant allow: startup
-        modules before the first page, lazy ones when a page needs them, preload ones in the background after sign-in.
+        @L["The modules of this app, served by the WebApi. Each user receives the ones their roles and tenant allow: startup modules before the first page, lazy ones when a page needs them, preload ones in the background after sign-in."]
       </p>
     </div>
     <div class="blz-page-actions">
       <button type="button" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" @onclick="RefreshAsync" disabled="@(_busy || !_allowed)">
-        Refresh
+        @L["Refresh"]
       </button>
     </div>
   </header>
@@ -38,19 +38,19 @@
   @if (!_allowed)
   {
     <section class="mud-paper mud-elevation-1 blz-card">
-      <h2 class="mud-typography mud-typography-h6">Access denied</h2>
-      <p class="mud-typography mud-typography-body1">Managing client modules needs the <code>@ModuleManager.PlatformAdminRole</code> role.</p>
+      <h2 class="mud-typography mud-typography-h6">@L["Access denied"]</h2>
+      <p class="mud-typography mud-typography-body1">@((MarkupString)L["Managing client modules needs the <code>{0}</code> role.", ModuleManager.PlatformAdminRole].Value)</p>
     </section>
   }
   else
   {
     <div class="blz-facts">
-      <span class="blz-chip">Modules <strong>@_modules.Count</strong></span>
-      <span class="blz-chip">Enabled <strong>@_modules.Count(m => m.Enabled != false)</strong></span>
-      <span class="blz-chip">Core <strong>@_modules.Count(m => m.Core == true)</strong></span>
+      <span class="blz-chip">@L["Modules"] <strong>@_modules.Count</strong></span>
+      <span class="blz-chip">@L["Enabled"] <strong>@_modules.Count(m => m.Enabled != false)</strong></span>
+      <span class="blz-chip">@L["Core"] <strong>@_modules.Count(m => m.Core == true)</strong></span>
       @if (Modules.Source != ModuleCatalogSource.Api)
       {
-        <span class="blz-chip blz-chip-warning">This browser could not read the manifest: @Modules.ManifestError</span>
+        <span class="blz-chip blz-chip-warning">@L["This browser could not read the manifest: {0}", Modules.ManifestError ?? ""]</span>
       }
     </div>
 
@@ -60,18 +60,17 @@
     }
 
     <section class="mud-paper mud-elevation-1 blz-card">
-      <h2 class="mud-typography mud-typography-h6">Upload a module</h2>
+      <h2 class="mud-typography mud-typography-h6">@L["Upload a module"]</h2>
       <p class="mud-typography mud-typography-body2 blz-muted">
-        A <code>.dll</code> with <code>[assembly: ClientModule]</code>, a <code>.nupkg</code>, or a <code>.zip</code> of the
-        module and its private assemblies. It is checked first (read, never run); you install it in the next step.
+        @((MarkupString)L["A <code>.dll</code> with <code>[assembly: ClientModule]</code>, a <code>.nupkg</code>, or a <code>.zip</code> of the module and its private assemblies. It is checked first (read, never run); you install it in the next step."].Value)
       </p>
       <div class="blz-install">
         <label class="mud-button-root mud-button-outlined mud-button-surface mud-button-medium blz-file">
           <InputFile OnChange="FileChosen" accept=".dll,.nupkg,.zip" />
-          <span>@(_file?.Name ?? "Choose a file…")</span>
+          <span>@(_file?.Name ?? L["Choose a file…"])</span>
         </label>
         <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="UploadAsync" disabled="@(_file is null || _busy)">
-          Check
+          @L["Check"]
         </button>
       </div>
     </section>
@@ -79,19 +78,19 @@
     @if (_draft is { } d)
     {
       <section class="mud-paper mud-elevation-2 blz-card">
-        <h2 class="mud-typography mud-typography-h6">Install @d.Id @d.Version</h2>
+        <h2 class="mud-typography mud-typography-h6">@L["Install {0} {1}", d.Id, d.Version]</h2>
         <div class="blz-facts">
-          <span class="blz-chip">Kind <strong>@d.Kind</strong></span>
+          <span class="blz-chip">@L["Kind"] <strong>@d.Kind</strong></span>
           <span class="blz-chip @(d.IsCore == true || (d.VersionExists == true && d.SamePackage != true) ? "blz-chip-warning" : "")">@DraftState(d)</span>
-          <span class="blz-chip">Pages <strong>@(d.Routes?.Count ?? 0)</strong></span>
+          <span class="blz-chip">@L["Pages"] <strong>@(d.Routes?.Count ?? 0)</strong></span>
           @if (d.Layouts is { Count: > 0 })
           {
-            <span class="blz-chip">Layouts <strong>@string.Join(", ", d.Layouts)</strong></span>
+            <span class="blz-chip">@L["Layouts"] <strong>@string.Join(", ", d.Layouts)</strong></span>
           }
         </div>
         <p class="mud-typography mud-typography-body2 blz-muted">
-          Files: @string.Join(", ", (d.Files ?? []).Select(f => $"{f.Name} ({f.Size / 1024.0:0.#} KB)"))
-          @if (d.Routes is { Count: > 0 }) { <br />@($"Pages: {string.Join(", ", d.Routes)}") }
+          @L["Files:"] @string.Join(", ", (d.Files ?? []).Select(f => $"{f.Name} ({f.Size / 1024.0:0.#} KB)"))
+          @if (d.Routes is { Count: > 0 }) { <br />@L["Pages: {0}", string.Join(", ", d.Routes)] }
         </p>
         @if (d.Warnings is { Count: > 0 })
         {
@@ -104,7 +103,7 @@
         {
           <label class="blz-check">
             <input type="checkbox" @bind="_draftApplySettings" />
-            <span>Replace the module's settings with these (otherwise its current settings are kept)</span>
+            <span>@L["Replace the module's settings with these (otherwise its current settings are kept)"]</span>
           </label>
         }
         @if (d.Current is null || _draftApplySettings)
@@ -114,35 +113,35 @@
 
         <label class="blz-check">
           <input type="checkbox" @bind="_draftActivate" />
-          <span>Make this the active version (the one users receive)</span>
+          <span>@L["Make this the active version (the one users receive)"]</span>
         </label>
         @if (d.VersionExists == true && d.SamePackage != true)
         {
           <label class="blz-check">
             <input type="checkbox" @bind="_draftReplace" />
-            <span>Replace the files of the installed version @d.Version (otherwise raise the module's version)</span>
+            <span>@L["Replace the files of the installed version {0} (otherwise raise the module's version)", d.Version]</span>
           </label>
         }
 
         <div class="blz-row-actions">
-          <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="InstallAsync" disabled="@_busy">Install</button>
-          <button type="button" class="mud-button-root mud-button-text mud-button-surface mud-button-medium" @onclick="DiscardAsync" disabled="@_busy">Discard</button>
+          <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="InstallAsync" disabled="@_busy">@L["Install"]</button>
+          <button type="button" class="mud-button-root mud-button-text mud-button-surface mud-button-medium" @onclick="DiscardAsync" disabled="@_busy">@L["Discard"]</button>
         </div>
       </section>
     }
 
     <section class="mud-paper mud-elevation-1 blz-card">
-      <MudTailDataTable @ref="_table" Columns="Columns" Actions="RowActions" OnAction="OnActionAsync" EmptyText="No client modules yet. Upload one above." />
+      <MudTailDataTable @ref="_table" Columns="Columns" Actions="RowActions" OnAction="OnActionAsync" EmptyText="@L["No client modules yet. Upload one above."]" />
     </section>
 
     @if (_editing is { } edited)
     {
       <section class="mud-paper mud-elevation-2 blz-card">
-        <h2 class="mud-typography mud-typography-h6">Settings of @edited.Id</h2>
+        <h2 class="mud-typography mud-typography-h6">@L["Settings of {0}", edited.Id]</h2>
         @SettingsFields(_editForm)
         <div class="blz-row-actions">
-          <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="SaveSettingsAsync" disabled="@_busy">Save</button>
-          <button type="button" class="mud-button-root mud-button-text mud-button-surface mud-button-medium" @onclick="() => _editing = null">Cancel</button>
+          <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="SaveSettingsAsync" disabled="@_busy">@L["Save"]</button>
+          <button type="button" class="mud-button-root mud-button-text mud-button-surface mud-button-medium" @onclick="() => _editing = null">@L["Cancel"]</button>
         </div>
       </section>
     }
@@ -150,17 +149,17 @@
     @if (_versionsOf is { } owner)
     {
       <section class="mud-paper mud-elevation-2 blz-card">
-        <h2 class="mud-typography mud-typography-h6">Versions of @owner.Id</h2>
+        <h2 class="mud-typography mud-typography-h6">@L["Versions of {0}", owner.Id]</h2>
         <table class="blz-versions">
           <thead>
-            <tr><th>Version</th><th>Kind</th><th>Source</th><th>Uploaded</th><th>Files</th><th></th></tr>
+            <tr><th>@L["Version"]</th><th>@L["Kind"]</th><th>@L["Source"]</th><th>@L["Uploaded"]</th><th>@L["Files"]</th><th></th></tr>
           </thead>
           <tbody>
             @foreach (var v in owner.Versions ?? [])
             {
               var active = v.Version == owner.ActiveVersion;
               <tr>
-                <td><strong>@v.Version</strong>@(active ? " (active)" : "")</td>
+                <td><strong>@v.Version</strong>@(active ? L[" (active)"].Value : "")</td>
                 <td>@v.Kind</td>
                 <td>@v.Source</td>
                 <td>@(v.UploadedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "-")</td>
@@ -168,8 +167,8 @@
                 <td>
                   @if (!active)
                   {
-                    <button type="button" class="mud-button-root mud-button-text mud-button-primary mud-button-small" @onclick="() => ActivateVersionAsync(owner.Id, v.Version)" disabled="@_busy">Activate</button>
-                    <button type="button" class="mud-button-root mud-button-text mud-button-error mud-button-small" @onclick="() => DeleteVersionAsync(owner.Id, v.Version)" disabled="@_busy">Delete</button>
+                    <button type="button" class="mud-button-root mud-button-text mud-button-primary mud-button-small" @onclick="() => ActivateVersionAsync(owner.Id, v.Version)" disabled="@_busy">@L["Activate"]</button>
+                    <button type="button" class="mud-button-root mud-button-text mud-button-error mud-button-small" @onclick="() => DeleteVersionAsync(owner.Id, v.Version)" disabled="@_busy">@L["Delete"]</button>
                   }
                 </td>
               </tr>
@@ -177,7 +176,7 @@
           </tbody>
         </table>
         <div class="blz-row-actions">
-          <button type="button" class="mud-button-root mud-button-text mud-button-surface mud-button-medium" @onclick="() => _versionsOf = null">Close</button>
+          <button type="button" class="mud-button-root mud-button-text mud-button-surface mud-button-medium" @onclick="() => _versionsOf = null">@L["Close"]</button>
         </div>
       </section>
     }
@@ -208,6 +207,9 @@
     /// <summary>Menu entries after the first, kept as they are (the form edits one).</summary>
     public List<ClientModuleNavItem> MoreNav { get; set; } = [];
 
+    /// <summary>The first entry as it was: its translations (Titles) are kept while its title stays the same.</summary>
+    public ClientModuleNavItem? FirstNav { get; set; }
+
     public static SettingsForm From(ClientModuleSettings? s)
     {
       var nav = s?.Nav ?? [];
@@ -229,7 +231,8 @@
         NavTitle = nav.FirstOrDefault()?.Title,
         NavHref = nav.FirstOrDefault()?.Href,
         NavOrder = nav.FirstOrDefault()?.Order ?? 100,
-        MoreNav = nav.Skip(1).ToList()
+        MoreNav = nav.Skip(1).ToList(),
+        FirstNav = nav.FirstOrDefault()
       };
     }
 
@@ -237,7 +240,11 @@
     {
       var nav = new List<ClientModuleNavItem>();
       if (!string.IsNullOrWhiteSpace(NavTitle) && !string.IsNullOrWhiteSpace(NavHref))
-        nav.Add(new ClientModuleNavItem { Title = NavTitle.Trim(), Href = NavHref.Trim(), Order = NavOrder });
+        nav.Add(new ClientModuleNavItem
+        {
+          Title = NavTitle.Trim(), Href = NavHref.Trim(), Order = NavOrder,
+          Titles = FirstNav?.Title == NavTitle.Trim() ? FirstNav.Titles : null,
+        });
       nav.AddRange(MoreNav);
       return new ClientModuleSettings
       {
@@ -263,27 +270,27 @@
     private static string? Blank(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
   }
 
-  private static readonly IReadOnlyList<object> Columns =
+  private IReadOnlyList<object> Columns =>
   [
-    new { key = "id", title = "Module" },
-    new { key = "name", title = "Name" },
-    new { key = "version", title = "Version", width = "100px" },
-    new { key = "versions", title = "Versions", type = "number", width = "100px" },
-    new { key = "strategy", title = "Loads", type = "enum", options = new[] { "Startup", "Lazy", "Preload" } },
-    new { key = "access", title = "Who gets it" },
-    new { key = "routes", title = "Routes" },
-    new { key = "enabled", title = "Enabled", type = "boolean", format = "boolean" },
-    new { key = "core", title = "Core", type = "boolean", format = "boolean" },
+    new { key = "id", title = L["Module"].Value },
+    new { key = "name", title = L["Name"].Value },
+    new { key = "version", title = L["Version"].Value, width = "100px" },
+    new { key = "versions", title = L["Versions"].Value, type = "number", width = "100px" },
+    new { key = "strategy", title = L["Loads"].Value, type = "enum", options = new[] { L["Startup"].Value, L["Lazy"].Value, L["Preload"].Value } },
+    new { key = "access", title = L["Who gets it"].Value },
+    new { key = "routes", title = L["Routes"].Value },
+    new { key = "enabled", title = L["Enabled"].Value, type = "boolean", format = "boolean" },
+    new { key = "core", title = L["Core"].Value, type = "boolean", format = "boolean" },
   ];
 
   // Not "edit"/"delete": MudTail reserves those ids for its own edit dialog.
-  private static readonly IReadOnlyList<object> RowActions =
+  private IReadOnlyList<object> RowActions =>
   [
-    new { id = "settings", label = "Settings" },
-    new { id = "versions", label = "Versions" },
-    new { id = "enable", label = "Enable" },
-    new { id = "disable", label = "Disable" },
-    new { id = "remove", label = "Delete", color = "error" },
+    new { id = "settings", label = L["Settings"].Value },
+    new { id = "versions", label = L["Versions"].Value },
+    new { id = "enable", label = L["Enable"].Value },
+    new { id = "disable", label = L["Disable"].Value },
+    new { id = "remove", label = L["Delete"].Value, color = "error" },
   ];
 
   /// <summary>The browser keeps the upload in memory; the WebApi accepts packages up to 50 MB by default.</summary>
@@ -321,77 +328,77 @@
 
   private RenderFragment SettingsFields(SettingsForm f) => @<div class="blz-grid">
     <div class="mud-input-control">
-      <label class="mud-input-label">Name</label>
+      <label class="mud-input-label">@L["Name"]</label>
       <div class="mud-input-wrapper"><input class="mud-input-slot" @bind="f.Name" /></div>
     </div>
     <div class="mud-input-control">
-      <label class="mud-input-label">Loads</label>
+      <label class="mud-input-label">@L["Loads"]</label>
       <div class="mud-input-wrapper mud-input-wrapper--select">
         <select class="mud-input-slot" @bind="f.LoadStrategy">
-          <option value="@ClientModuleLoadStrategy.Startup">Startup (before the first page)</option>
-          <option value="@ClientModuleLoadStrategy.Lazy">Lazy (when a page needs it)</option>
-          <option value="@ClientModuleLoadStrategy.Preload">Preload (in the background after sign-in)</option>
+          <option value="@ClientModuleLoadStrategy.Startup">@L["Startup (before the first page)"]</option>
+          <option value="@ClientModuleLoadStrategy.Lazy">@L["Lazy (when a page needs it)"]</option>
+          <option value="@ClientModuleLoadStrategy.Preload">@L["Preload (in the background after sign-in)"]</option>
         </select>
       </div>
     </div>
     <div class="mud-input-control">
-      <label class="mud-input-label">Layout key</label>
+      <label class="mud-input-label">@L["Layout key"]</label>
       <div class="mud-input-wrapper"><input class="mud-input-slot" @bind="f.Layout" placeholder="default" /></div>
     </div>
     <div class="mud-input-control blz-wide">
-      <label class="mud-input-label">Description</label>
+      <label class="mud-input-label">@L["Description"]</label>
       <div class="mud-input-wrapper"><input class="mud-input-slot" @bind="f.Description" /></div>
     </div>
     <div class="mud-input-control">
-      <label class="mud-input-label">Roles (any of)</label>
-      <div class="mud-input-wrapper"><input class="mud-input-slot" @bind="f.Roles" placeholder="empty: every signed-in user" /></div>
+      <label class="mud-input-label">@L["Roles (any of)"]</label>
+      <div class="mud-input-wrapper"><input class="mud-input-slot" @bind="f.Roles" placeholder="@L["empty: every signed-in user"]" /></div>
     </div>
     <div class="mud-input-control">
-      <label class="mud-input-label">Required role</label>
+      <label class="mud-input-label">@L["Required role"]</label>
       <div class="mud-input-wrapper"><input class="mud-input-slot" @bind="f.RequiredRole" /></div>
     </div>
     <div class="mud-input-control">
-      <label class="mud-input-label">Tenants</label>
-      <div class="mud-input-wrapper"><input class="mud-input-slot" @bind="f.Tenants" placeholder="empty: every tenant" /></div>
+      <label class="mud-input-label">@L["Tenants"]</label>
+      <div class="mud-input-wrapper"><input class="mud-input-slot" @bind="f.Tenants" placeholder="@L["empty: every tenant"]" /></div>
     </div>
     <div class="mud-input-control">
-      <label class="mud-input-label">Route prefixes</label>
+      <label class="mud-input-label">@L["Route prefixes"]</label>
       <div class="mud-input-wrapper"><input class="mud-input-slot" @bind="f.RoutePrefixes" placeholder="reports, reports-admin" /></div>
     </div>
     <div class="mud-input-control">
-      <label class="mud-input-label">Depends on (module ids)</label>
+      <label class="mud-input-label">@L["Depends on (module ids)"]</label>
       <div class="mud-input-wrapper"><input class="mud-input-slot" @bind="f.Dependencies" placeholder="Layouts.Default" /></div>
     </div>
     <div class="mud-input-control">
-      <label class="mud-input-label">Styles</label>
+      <label class="mud-input-label">@L["Styles"]</label>
       <div class="mud-input-wrapper"><input class="mud-input-slot" @bind="f.Styles" /></div>
     </div>
     <div class="mud-input-control">
-      <label class="mud-input-label">Scripts</label>
+      <label class="mud-input-label">@L["Scripts"]</label>
       <div class="mud-input-wrapper"><input class="mud-input-slot" @bind="f.Scripts" /></div>
     </div>
     <div class="mud-input-control">
-      <label class="mud-input-label">Menu title</label>
-      <div class="mud-input-wrapper"><input class="mud-input-slot" @bind="f.NavTitle" placeholder="no menu entry" /></div>
+      <label class="mud-input-label">@L["Menu title"]</label>
+      <div class="mud-input-wrapper"><input class="mud-input-slot" @bind="f.NavTitle" placeholder="@L["no menu entry"]" /></div>
     </div>
     <div class="mud-input-control">
-      <label class="mud-input-label">Menu link</label>
+      <label class="mud-input-label">@L["Menu link"]</label>
       <div class="mud-input-wrapper"><input class="mud-input-slot" @bind="f.NavHref" placeholder="reports" /></div>
     </div>
     <div class="mud-input-control">
-      <label class="mud-input-label">Menu order</label>
+      <label class="mud-input-label">@L["Menu order"]</label>
       <div class="mud-input-wrapper"><input type="number" class="mud-input-slot" @bind="f.NavOrder" /></div>
     </div>
-    <label class="blz-check"><input type="checkbox" @bind="f.RequiresAuth" /><span>Requires sign-in</span></label>
-    <label class="blz-check"><input type="checkbox" @bind="f.Hidden" /><span>Hidden (no menu entries; layouts, themes)</span></label>
+    <label class="blz-check"><input type="checkbox" @bind="f.RequiresAuth" /><span>@L["Requires sign-in"]</span></label>
+    <label class="blz-check"><input type="checkbox" @bind="f.Hidden" /><span>@L["Hidden (no menu entries; layouts, themes)"]</span></label>
   </div>;
 
-  private static string DraftState(ClientModuleUpload d) =>
-      d.IsCore == true ? "Core module: updated with the WebApi release, an upload is refused"
-      : d.CurrentVersion is null ? "New module"
-      : d.VersionExists == true && d.SamePackage == true ? $"Version {d.Version} is installed with these files"
-      : d.VersionExists == true ? $"Version {d.Version} is installed with other files"
-      : $"Update: active version {d.CurrentVersion}";
+  private string DraftState(ClientModuleUpload d) =>
+      d.IsCore == true ? L["Core module: updated with the WebApi release, an upload is refused"]
+      : d.CurrentVersion is null ? L["New module"]
+      : d.VersionExists == true && d.SamePackage == true ? L["Version {0} is installed with these files", d.Version]
+      : d.VersionExists == true ? L["Version {0} is installed with other files", d.Version]
+      : L["Update: active version {0}", d.CurrentVersion ?? ""];
 
   private async Task RefreshAsync()
   {
@@ -404,21 +411,21 @@
     });
   }
 
-  private static object ToRow(ClientModuleRecord m)
+  private object ToRow(ClientModuleRecord m)
   {
     var s = m.Settings ?? new ClientModuleSettings();
-    var access = s.RequiresAuth == false ? "everyone"
-        : s.RequiredRole is { } role ? $"role {role}"
-        : s.AvailableToRoles is { Count: > 0 } roles ? $"roles {string.Join(", ", roles)}"
-        : "signed-in users";
-    if (s.AvailableToTenants is { Count: > 0 } tenants) access += $"; tenants {string.Join(", ", tenants)}";
+    var access = s.RequiresAuth == false ? L["everyone"].Value
+        : s.RequiredRole is { } role ? L["role {0}", role].Value
+        : s.AvailableToRoles is { Count: > 0 } roles ? L["roles {0}", string.Join(", ", roles)].Value
+        : L["signed-in users"].Value;
+    if (s.AvailableToTenants is { Count: > 0 } tenants) access += L["; tenants {0}", string.Join(", ", tenants)].Value;
     return new
     {
       id = m.Id,
       name = s.Name ?? m.Id,
       version = m.ActiveVersion,
       versions = m.Versions?.Count ?? 0,
-      strategy = (s.LoadStrategy ?? ClientModuleLoadStrategy.Lazy).ToString(),
+      strategy = L[(s.LoadStrategy ?? ClientModuleLoadStrategy.Lazy).ToString()].Value,
       access,
       routes = s.RoutePrefixes is { Count: > 0 } prefixes ? string.Join(", ", prefixes.Select(p => "/" + p)) : "-",
       enabled = m.Enabled != false,
@@ -457,7 +464,7 @@
         Replace = _draftReplace
       });
       _draft = null;
-      await MudTail.ToastAsync($"{record.Id} {draft.Version} installed{(record.ActiveVersion == draft.Version ? " and active" : "")}.", "success");
+      await MudTail.ToastAsync(record.ActiveVersion == draft.Version ? L["{0} {1} installed and active.", record.Id, draft.Version] : L["{0} {1} installed.", record.Id, draft.Version], "success");
     }, changed: true);
   }
 
@@ -495,7 +502,7 @@
         await RunAsync(async () =>
         {
           await Api.EnableAsync(module.Id);
-          await MudTail.ToastAsync($"{module.Id} is enabled: users receive it on their next manifest check.", "success");
+          await MudTail.ToastAsync(L["{0} is enabled: users receive it on their next manifest check.", module.Id], "success");
         }, changed: true);
         break;
 
@@ -503,7 +510,7 @@
         await RunAsync(async () =>
         {
           await Api.DisableAsync(module.Id);
-          await MudTail.ToastAsync($"{module.Id} is disabled: it leaves every user's module list on their next check.", "warning");
+          await MudTail.ToastAsync(L["{0} is disabled: it leaves every user's module list on their next check.", module.Id], "warning");
         }, changed: true);
         break;
 
@@ -511,7 +518,7 @@
         await RunAsync(async () =>
         {
           await Api.DeleteAsync(module.Id);
-          await MudTail.ToastAsync($"{module.Id} and its files are deleted.", "success");
+          await MudTail.ToastAsync(L["{0} and its files are deleted.", module.Id], "success");
           if (_editing?.Id == module.Id) _editing = null;
           if (_versionsOf?.Id == module.Id) _versionsOf = null;
         }, changed: true);
@@ -526,7 +533,7 @@
     await RunAsync(async () =>
     {
       await Api.UpdateSettingsAsync(id, _editForm.ToSettings());
-      await MudTail.ToastAsync($"Settings of {id} saved.", "success");
+      await MudTail.ToastAsync(L["Settings of {0} saved.", id], "success");
       _editing = null;
     }, changed: true);
   }
@@ -534,13 +541,13 @@
   private Task ActivateVersionAsync(string id, string version) => RunAsync(async () =>
   {
     await Api.ActivateVersionAsync(id, version);
-    await MudTail.ToastAsync($"{id} {version} is the active version.", "success");
+    await MudTail.ToastAsync(L["{0} {1} is the active version.", id, version], "success");
   }, changed: true);
 
   private Task DeleteVersionAsync(string id, string version) => RunAsync(async () =>
   {
     await Api.DeleteVersionAsync(id, version);
-    await MudTail.ToastAsync($"{id} {version} deleted.", "success");
+    await MudTail.ToastAsync(L["{0} {1} deleted.", id, version], "success");
   }, changed: true);
 
   /// <summary>
@@ -579,14 +586,14 @@
     StateHasChanged();
   }
 
-  private static string Describe(Exception ex) => ex switch
+  private string Describe(Exception ex) => ex switch
   {
-    ClientModulesApiException<Problem> problem => $"{problem.StatusCode}: {problem.Result.Detail ?? problem.Result.Title ?? "request failed"}",
-    ClientModulesApiException api when api.StatusCode == 401 => "401: the gateway did not accept the access token. Sign in again.",
-    ClientModulesApiException api when api.StatusCode == 403 => "403: your account may not manage client modules (platform.modules.manage).",
-    ClientModulesApiException api when api.StatusCode == 404 => "404: the WebApi has no client-modules module (restart the lab after building it), or the item is gone.",
+    ClientModulesApiException<Problem> problem => $"{problem.StatusCode}: {problem.Result.Detail ?? problem.Result.Title ?? L["request failed"]}",
+    ClientModulesApiException api when api.StatusCode == 401 => L["401: the gateway did not accept the access token. Sign in again."],
+    ClientModulesApiException api when api.StatusCode == 403 => L["403: your account may not manage client modules (platform.modules.manage)."],
+    ClientModulesApiException api when api.StatusCode == 404 => L["404: the WebApi has no client-modules module (restart the lab after building it), or the item is gone."],
     ClientModulesApiException api => $"{api.StatusCode}: {FirstLine(api.Response) ?? FirstLine(api.Message)}",
-    HttpRequestException http => $"The gateway is not reachable ({http.Message}). Is the Aspire lab running, and does WebApi allow this origin (CORS)?",
+    HttpRequestException http => L["The gateway is not reachable ({0}). Is the Aspire lab running, and does WebApi allow this origin (CORS)?", http.Message],
     _ => ex.Message,
   };
 

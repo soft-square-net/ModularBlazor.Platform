@@ -39,6 +39,8 @@ public sealed class OidcAuthenticationService : IAuthenticationService
             ReturnUrl = _navigation.ToAbsoluteUri(string.IsNullOrWhiteSpace(returnUrl) ? "" : returnUrl).ToString(),
         };
         if (!string.IsNullOrWhiteSpace(tenant)) request.TryAddAdditionalParameter(TenantParameter, tenant.Trim());
+        // OIDC ui_locales: the identity service shows its pages in the app's language (Arabic by default).
+        request.TryAddAdditionalParameter("ui_locales", System.Globalization.CultureInfo.CurrentUICulture.Name);
         _navigation.NavigateToLogin(LoginPath, request);
     }
 

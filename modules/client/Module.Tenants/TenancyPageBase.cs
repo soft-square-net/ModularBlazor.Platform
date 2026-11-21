@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
+using Microsoft.Extensions.Localization;
 using soft.square.net.ModularBlazor.Abstractions;
 using soft.square.net.ModularBlazor.Abstractions.MudTail;
 using soft.square.net.WebApi.Modules.Core.Tenancy.Client;
@@ -15,6 +16,12 @@ public abstract class TenancyPageBase : ComponentBase
     [Inject] protected IHttpClientFactory HttpClients { get; set; } = default!;
     [Inject] protected MudTailRuntime MudTail { get; set; } = default!;
     [Inject] protected NavigationManager Nav { get; set; } = default!;
+    [Inject] protected IStringLocalizerFactory Texts { get; set; } = default!;
+
+    private IStringLocalizer? _l;
+
+    /// <summary>The texts of this module (its embedded i18n/{culture}.json), English keys.</summary>
+    protected IStringLocalizer L => _l ??= Texts.Create(GetType());
 
     /// <summary>Tenancy routes (/api/tenancy/...) reach the core pool through the gateway's catch-all route.</summary>
     protected TenancyClient Tenancy => new(HttpClients.CreateClient(HttpClientNames.WebApi));
@@ -54,17 +61,17 @@ public abstract class TenancyPageBase : ComponentBase
         return true;
     }
 
-    protected static string Describe(Exception ex) => ex switch
+    protected string Describe(Exception ex) => ex switch
     {
         TenancyApiException<HttpValidationProblemDetails> v =>
-            $"{v.StatusCode}: {v.Result.Detail ?? v.Result.Title ?? "invalid request"}"
+            $"{v.StatusCode}: {v.Result.Detail ?? v.Result.Title ?? L["invalid request"]}"
             + (v.Result.Errors is { Count: > 0 } errors ? " " + string.Join(" ", errors.SelectMany(e => e.Value)) : ""),
-        TenancyApiException<ProblemDetails> p => $"{p.StatusCode}: {p.Result.Detail ?? p.Result.Title ?? "request failed"}",
-        TenancyApiException { StatusCode: 401 } => "401: the gateway did not accept the access token. Sign in again.",
-        TenancyApiException { StatusCode: 403 } => "403: your account may not manage tenants (platform.tenants.manage).",
-        TenancyApiException { StatusCode: 503 } => "503: the tenant store is not configured on the WebApi.",
+        TenancyApiException<ProblemDetails> p => $"{p.StatusCode}: {p.Result.Detail ?? p.Result.Title ?? L["request failed"]}",
+        TenancyApiException { StatusCode: 401 } => L["401: the gateway did not accept the access token. Sign in again."],
+        TenancyApiException { StatusCode: 403 } => L["403: your account may not manage tenants (platform.tenants.manage)."],
+        TenancyApiException { StatusCode: 503 } => L["503: the tenant store is not configured on the WebApi."],
         TenancyApiException api => $"{api.StatusCode}: {FirstLine(api.Response) ?? FirstLine(api.Message)}",
-        HttpRequestException http => $"The gateway is not reachable ({http.Message}).",
+        HttpRequestException http => L["The gateway is not reachable ({0}).", http.Message],
         _ => ex.Message,
     };
 

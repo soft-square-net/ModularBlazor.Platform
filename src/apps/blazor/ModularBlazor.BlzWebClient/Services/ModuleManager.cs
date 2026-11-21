@@ -71,6 +71,7 @@ public sealed class ModuleManager : IModuleNavigation
   private readonly ModuleAssetStore _assets;
   private readonly ModuleCache _cache;
   private readonly MudTailRuntime _mudTail;
+  private readonly Microsoft.Extensions.Localization.IStringLocalizer<App> _texts;
   private readonly IReadOnlyDictionary<ModuleKind, IModulePackageReader> _readers;
 
   private readonly Dictionary<string, ModuleDescriptor> _catalog = new(StringComparer.OrdinalIgnoreCase);
@@ -101,6 +102,7 @@ public sealed class ModuleManager : IModuleNavigation
       ModuleAssetStore assets,
       ModuleCache cache,
       MudTailRuntime mudTail,
+      Microsoft.Extensions.Localization.IStringLocalizer<App> texts,
       IEnumerable<IModulePackageReader> readers)
   {
     _local = local;
@@ -110,6 +112,7 @@ public sealed class ModuleManager : IModuleNavigation
     _assets = assets;
     _cache = cache;
     _mudTail = mudTail;
+    _texts = texts;
     _readers = readers.ToDictionary(r => r.Kind);
 
     // Signing in (the OIDC callback) brings the user's modules; signing out ends them, whichever page triggered it.
@@ -141,6 +144,16 @@ public sealed class ModuleManager : IModuleNavigation
 
   public IReadOnlyList<ModuleDescriptor> Catalog =>
       _catalog.Values.OrderBy(d => !d.LoadOnStartup).ThenBy(d => d.Id).ToList();
+
+  /// <summary>A menu entry for one of this app's own pages, with its title in every language of the app's i18n files.</summary>
+  private static ModuleNavItem HostNavItem(string title, string href, int order)
+  {
+    var catalog = soft.square.net.Share.All.Localization.TextCatalog.Of(typeof(App).Assembly);
+    var titles = catalog.Cultures
+      .Where(c => catalog.For(c).ContainsKey(title))
+      .ToDictionary(c => c, c => catalog.For(c)[title], StringComparer.OrdinalIgnoreCase);
+    return new ModuleNavItem(title, href, order, titles);
+  }
 
   public IReadOnlyList<ModuleNavItem> Items =>
       _catalog.Values
@@ -410,13 +423,13 @@ public sealed class ModuleManager : IModuleNavigation
     _hostNav.Clear();
     if (user.IsInRole(PlatformAdminRole))
     {
-      _hostNav.Add(new ModuleNavItem("Host modules", "host-modules", 910));
-      _hostNav.Add(new ModuleNavItem("Client modules", "client-modules", 911));
+      _hostNav.Add(HostNavItem("Host modules", "host-modules", 910));
+      _hostNav.Add(HostNavItem("Client modules", "client-modules", 911));
     }
 
     Changed?.Invoke();
     if (updated.Count > 0)
-      _ = _mudTail.ToastAsync($"New version of {string.Join(", ", updated)}: reload the page (or the module) to use it.", "info");
+      _ = _mudTail.ToastAsync(_texts["New version of {0}: reload the page (or the module) to use it.", string.Join(", ", updated)], "info");
   }
 
   private static bool SameContent(ModuleDescriptor a, ModuleDescriptor b) =>

@@ -6,6 +6,7 @@
 @inject HostModulesApi Api
 @inject ICurrentUserService Users
 @inject MudTailRuntime MudTail
+@inject IStringLocalizer<App> L
 
 @*
   Host (WebApi) module management through the YARP gateway, with the OpenIddict access token:
@@ -13,23 +14,22 @@
   Needs the platform permission platform.modules.manage, which the platform-admin role grants.
 *@
 
-<PageTitle>Host modules</PageTitle>
+<PageTitle>@L["Host modules"]</PageTitle>
 
 <div class="mud-container blz-page">
   <header class="blz-page-header">
     <div>
-      <h1 class="mud-typography mud-typography-h4">Host modules</h1>
+      <h1 class="mud-typography mud-typography-h4">@L["Host modules"]</h1>
       <p class="mud-typography mud-typography-body1">
-        Runtime modules of the WebApi pools behind the gateway. The catalog is shared by every pool, and each lifecycle
-        change is broadcast to every replica.
+        @L["Runtime modules of the WebApi pools behind the gateway. The catalog is shared by every pool, and each lifecycle change is broadcast to every replica."]
       </p>
     </div>
     <div class="blz-page-actions">
       <div class="mud-input-control blz-inline-control">
-        <label class="mud-input-label" for="pool">Pool</label>
+        <label class="mud-input-label" for="pool">@L["Pool"]</label>
         <div class="mud-input-wrapper mud-input-wrapper--select mud-input-wrapper--dense">
           <select id="pool" class="mud-input-slot" value="@_pool" @onchange="PoolChangedAsync" disabled="@(!_allowed)">
-            <option value="">Gateway (core pool)</option>
+            <option value="">@L["Gateway (core pool)"]</option>
             @foreach (var pool in Api.Pools)
             {
               <option value="@pool">@pool</option>
@@ -38,7 +38,7 @@
         </div>
       </div>
       <button type="button" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" @onclick="RefreshAsync" disabled="@(_busy || !_allowed)">
-        Refresh
+        @L["Refresh"]
       </button>
     </div>
   </header>
@@ -46,8 +46,8 @@
   @if (!_allowed)
   {
     <section class="mud-paper mud-elevation-1 blz-card">
-      <h2 class="mud-typography mud-typography-h6">Access denied</h2>
-      <p class="mud-typography mud-typography-body1">Managing host modules needs the <code>@ModuleManager.PlatformAdminRole</code> role.</p>
+      <h2 class="mud-typography mud-typography-h6">@L["Access denied"]</h2>
+      <p class="mud-typography mud-typography-body1">@((MarkupString)L["Managing host modules needs the <code>{0}</code> role.", ModuleManager.PlatformAdminRole].Value)</p>
     </section>
   }
   else
@@ -55,13 +55,13 @@
     @if (_poolInfo is not null)
     {
       <div class="blz-facts">
-        <span class="blz-chip">Pool <strong>@_poolInfo.Pool</strong></span>
-        <span class="blz-chip">Role <strong>@_poolInfo.Role</strong></span>
-        <span class="blz-chip">Instance <strong>@_poolInfo.Instance</strong></span>
-        <span class="blz-chip">Enabled <strong>@(_poolInfo.EnabledModules.Count == 0 ? "all" : string.Join(", ", _poolInfo.EnabledModules))</strong></span>
+        <span class="blz-chip">@L["Pool"] <strong>@_poolInfo.Pool</strong></span>
+        <span class="blz-chip">@L["Role"] <strong>@_poolInfo.Role</strong></span>
+        <span class="blz-chip">@L["Instance"] <strong>@_poolInfo.Instance</strong></span>
+        <span class="blz-chip">@L["Enabled"] <strong>@(_poolInfo.EnabledModules.Count == 0 ? L["all"] : string.Join(", ", _poolInfo.EnabledModules))</strong></span>
         @if (_unloading.Count > 0)
         {
-          <span class="blz-chip blz-chip-warning">Unloading <strong>@string.Join(", ", _unloading)</strong></span>
+          <span class="blz-chip blz-chip-warning">@L["Unloading"] <strong>@string.Join(", ", _unloading)</strong></span>
         }
       </div>
     }
@@ -72,18 +72,18 @@
     }
 
     <section class="mud-paper mud-elevation-1 blz-card">
-      <h2 class="mud-typography mud-typography-h6">Install a module</h2>
+      <h2 class="mud-typography mud-typography-h6">@L["Install a module"]</h2>
       <p class="mud-typography mud-typography-body2 blz-muted">
-        Upload a module package (.nupkg). It is installed inactive; activate it to load it and map its routes.
+        @L["Upload a module package (.nupkg). It is installed inactive; activate it to load it and map its routes."]
       </p>
       <div class="blz-install">
         <label class="mud-button-root mud-button-outlined mud-button-surface mud-button-medium blz-file">
           <InputFile OnChange="FileChosen" accept=".nupkg,.zip" />
-          <span>@(_file?.Name ?? "Choose a package…")</span>
+          <span>@(_file?.Name ?? L["Choose a package…"])</span>
         </label>
         <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="InstallAsync" disabled="@(_file is null || _busy)">
           @if (_busy && _installing) { <span class="blz-spinner" aria-hidden="true"></span> }
-          Install
+          @L["Install"]
         </button>
       </div>
     </section>
@@ -95,9 +95,9 @@
     @if (_settingsFor is not null)
     {
       <section class="mud-paper mud-elevation-2 blz-card">
-        <h2 class="mud-typography mud-typography-h6">Settings of @_settingsFor</h2>
+        <h2 class="mud-typography mud-typography-h6">@L["Settings of {0}", _settingsFor]</h2>
         <p class="mud-typography mud-typography-body2 blz-muted">
-          One <code>key=value</code> per line. They become configuration section <code>Modules:&lt;name&gt;</code> the next time the module is activated.
+          @((MarkupString)L["One <code>key=value</code> per line. They become configuration section <code>Modules:&lt;name&gt;</code> the next time the module is activated."].Value)
         </p>
         <div class="mud-input-control">
           <div class="mud-input-wrapper">
@@ -105,8 +105,8 @@
           </div>
         </div>
         <div class="blz-row-actions">
-          <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="SaveSettingsAsync" disabled="@_busy">Save</button>
-          <button type="button" class="mud-button-root mud-button-text mud-button-surface mud-button-medium" @onclick="() => _settingsFor = null">Cancel</button>
+          <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="SaveSettingsAsync" disabled="@_busy">@L["Save"]</button>
+          <button type="button" class="mud-button-root mud-button-text mud-button-surface mud-button-medium" @onclick="() => _settingsFor = null">@L["Cancel"]</button>
         </div>
       </section>
     }
@@ -114,25 +114,25 @@
 </div>
 
 @code {
-  private static readonly IReadOnlyList<object> Columns =
+  private IReadOnlyList<object> Columns =>
   [
-    new { key = "id", title = "Module" },
-    new { key = "version", title = "Version", width = "100px" },
-    new { key = "desired", title = "Desired state", type = "enum", options = new[] { "Installed", "Active", "Inactive" } },
-    new { key = "loaded", title = "Loaded here", type = "boolean", format = "boolean" },
-    new { key = "enabledInPool", title = "Enabled in pool", type = "boolean", format = "boolean" },
-    new { key = "core", title = "Core", type = "boolean", format = "boolean" },
-    new { key = "routes", title = "Routes", type = "number", width = "90px" },
-    new { key = "notes", title = "Notes" },
+    new { key = "id", title = L["Module"].Value },
+    new { key = "version", title = L["Version"].Value, width = "100px" },
+    new { key = "desired", title = L["Desired state"].Value, type = "enum", options = new[] { L["Installed"].Value, L["Active"].Value, L["Inactive"].Value } },
+    new { key = "loaded", title = L["Loaded here"].Value, type = "boolean", format = "boolean" },
+    new { key = "enabledInPool", title = L["Enabled in pool"].Value, type = "boolean", format = "boolean" },
+    new { key = "core", title = L["Core"].Value, type = "boolean", format = "boolean" },
+    new { key = "routes", title = L["Routes"].Value, type = "number", width = "90px" },
+    new { key = "notes", title = L["Notes"].Value },
   ];
 
-  private static readonly IReadOnlyList<object> RowActions =
+  private IReadOnlyList<object> RowActions =>
   [
-    new { id = "activate", label = "Activate" },
-    new { id = "deactivate", label = "Deactivate" },
-    new { id = "unload", label = "Unload" },
-    new { id = "settings", label = "Settings" },
-    new { id = "uninstall", label = "Uninstall", color = "error" },
+    new { id = "activate", label = L["Activate"].Value },
+    new { id = "deactivate", label = L["Deactivate"].Value },
+    new { id = "unload", label = L["Unload"].Value },
+    new { id = "settings", label = L["Settings"].Value },
+    new { id = "uninstall", label = L["Uninstall"].Value, color = "error" },
   ];
 
   private MudTailDataTable? _table;
@@ -181,20 +181,20 @@
     });
   }
 
-  private static object ToRow(ModuleStatus s) => new
+  private object ToRow(ModuleStatus s) => new
   {
     id = s.Module.Id,
-    version = s.LoadedVersion is { } loaded && loaded != s.Module.Version ? $"{s.Module.Version} (loaded {loaded})" : s.Module.Version,
-    desired = s.Module.DesiredState?.ToString() ?? "-",
+    version = s.LoadedVersion is { } loaded && loaded != s.Module.Version ? L["{0} (loaded {1})", s.Module.Version, loaded].Value : s.Module.Version,
+    desired = s.Module.DesiredState is { } desired ? L[desired.ToString()].Value : "-",
     loaded = s.Loaded,
     enabledInPool = s.EnabledInPool,
     core = s.Module.Core ?? false,
     routes = s.Routes.Count,
     notes = string.Join("; ", new[]
     {
-      s.RestartRequired == true ? "restart required" : null,
-      s.Module.HotUnload == false ? "no hot unload" : null,
-      s.HostedServices?.Any(h => h.Error is not null) == true ? "hosted service error" : null,
+      s.RestartRequired == true ? L["restart required"].Value : null,
+      s.Module.HotUnload == false ? L["no hot unload"].Value : null,
+      s.HostedServices?.Any(h => h.Error is not null) == true ? L["hosted service error"].Value : null,
     }.Where(n => n is not null)),
   };
 
@@ -208,7 +208,7 @@
     {
       await using var stream = _file.OpenReadStream(MaxPackageSize);
       var record = await Modules.InstallAsync(new FileParameter(stream, _file.Name, string.IsNullOrEmpty(_file.ContentType) ? "application/octet-stream" : _file.ContentType));
-      await MudTail.ToastAsync($"{record.Id} {record.Version} installed. Activate it to load it.", "success");
+      await MudTail.ToastAsync(L["{0} {1} installed. Activate it to load it.", record.Id, record.Version], "success");
       _file = null;
     }, refresh: true);
     _installing = false;
@@ -223,7 +223,7 @@
         await RunAsync(async () =>
         {
           var status = await Modules.ActivateAsync(id);
-          await MudTail.ToastAsync($"{id} activated{(status.Loaded ? $", {status.Routes.Count} route(s)" : "")}.", "success");
+          await MudTail.ToastAsync(status.Loaded ? L["{0} activated, {1} route(s).", id, status.Routes.Count] : L["{0} activated.", id], "success");
         }, refresh: true);
         break;
 
@@ -231,7 +231,7 @@
         await RunAsync(async () =>
         {
           await Modules.DeactivateAsync(id);
-          await MudTail.ToastAsync($"{id} deactivated: its routes are gone, the code stays loaded.", "success");
+          await MudTail.ToastAsync(L["{0} deactivated: its routes are gone, the code stays loaded.", id], "success");
         }, refresh: true);
         break;
 
@@ -240,8 +240,8 @@
         {
           var result = await Modules.UnloadAsync(id, deferred: false);
           await MudTail.ToastAsync(result.Unloaded
-              ? $"{id} unloaded after {result.GcPasses} GC pass(es)."
-              : $"{id} is unloading; its memory is not released yet{(result.Note is null ? "" : $" ({result.Note})")}.",
+              ? L["{0} unloaded after {1} GC pass(es).", id, result.GcPasses]
+              : result.Note is null ? L["{0} is unloading; its memory is not released yet.", id] : L["{0} is unloading; its memory is not released yet ({1}).", id, result.Note],
               result.Unloaded ? "success" : "warning");
         }, refresh: true);
         break;
@@ -250,7 +250,7 @@
         await RunAsync(async () =>
         {
           var result = await Modules.UninstallAsync(id, deferred: false);
-          await MudTail.ToastAsync($"{id} uninstalled{(result.Unloaded ? "" : "; it finishes unloading in the background")}.", "success");
+          await MudTail.ToastAsync(result.Unloaded ? L["{0} uninstalled.", id] : L["{0} uninstalled; it finishes unloading in the background.", id], "success");
         }, refresh: true);
         break;
 
@@ -275,7 +275,7 @@
     await RunAsync(async () =>
     {
       await Modules.UpdateSettingsAsync(_settingsFor, settings);
-      await MudTail.ToastAsync($"Settings of {_settingsFor} saved.", "success");
+      await MudTail.ToastAsync(L["Settings of {0} saved.", _settingsFor], "success");
       _settingsFor = null;
     }, refresh: true);
   }
@@ -309,13 +309,13 @@
     StateHasChanged();
   }
 
-  private static string Describe(Exception ex) => ex switch
+  private string Describe(Exception ex) => ex switch
   {
-    WebApiException<ProblemDetails> problem => $"{problem.StatusCode}: {problem.Result.Detail ?? problem.Result.Title ?? "request failed"}",
-    WebApiException api when api.StatusCode == 401 => "401: the gateway did not accept the access token. Sign in again.",
-    WebApiException api when api.StatusCode == 403 => "403: your account may not manage host modules (platform.modules.manage).",
+    WebApiException<ProblemDetails> problem => $"{problem.StatusCode}: {problem.Result.Detail ?? problem.Result.Title ?? L["request failed"]}",
+    WebApiException api when api.StatusCode == 401 => L["401: the gateway did not accept the access token. Sign in again."],
+    WebApiException api when api.StatusCode == 403 => L["403: your account may not manage host modules (platform.modules.manage)."],
     WebApiException api => $"{api.StatusCode}: {FirstLine(api.Response) ?? FirstLine(api.Message)}",
-    HttpRequestException http => $"The gateway is not reachable ({http.Message}). Is the Aspire lab running, and does WebApi allow this origin (CORS)?",
+    HttpRequestException http => L["The gateway is not reachable ({0}). Is the Aspire lab running, and does WebApi allow this origin (CORS)?", http.Message],
     _ => ex.Message,
   };
 

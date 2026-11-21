@@ -24,7 +24,9 @@
   ],
   "sideEffects": [
     "*.css",
-    "*.scss"
+    "*.scss",
+    "./src/index.js",
+    "./src/locales/*.js"
   ],
   "scripts": {
     "dev": "vite",

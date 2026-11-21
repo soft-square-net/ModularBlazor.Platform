@@ -3,28 +3,41 @@
 @inject ActiveModuleService Active
 @inject AuthenticationStateProvider AuthProvider
 @inject NavigationManager Nav
+@inject ILocaleService Locale
+@inject IStringLocalizer<App> L
+@implements IDisposable
 
+@* Keyed by the language: switching it renders the whole app again (layouts, pages, dialogs), so every component reads
+   its texts in the new language without having to listen for the switch itself. *@
+<CascadingValue Value="Locale.Culture" Name="Culture" @key="Locale.Culture">
   <Router AppAssembly="@typeof(App).Assembly"
           AdditionalAssemblies="Modules.RouterAssemblies"
           OnNavigateAsync="OnNavigateAsync">
     <Navigating>
-      <div class="route-loading" role="status"><span class="spinner"></span> Loading module…</div>
+      <div class="route-loading" role="status"><span class="spinner"></span> @L["Loading module…"]</div>
     </Navigating>
     <Found Context="routeData">
       <ModuleRouteView RouteData="routeData" />
     </Found>
     <NotFound>
       <ModuleLayoutHost>
-        <PageTitle>Not found</PageTitle>
+        <PageTitle>@L["Not found"]</PageTitle>
         <h1>404</h1>
-        <p>There is nothing at this address.</p>
+        <p>@L["There is nothing at this address."]</p>
       </ModuleLayoutHost>
     </NotFound>
   </Router>
 
   @* Dialogs opened through IModuleDialogs, above any page and layout. *@
   <ModuleDialogHost />
+</CascadingValue>
 @code {
+
+  protected override void OnInitialized() => Locale.Changed += OnLocaleChanged;
+
+  private void OnLocaleChanged() => _ = InvokeAsync(StateHasChanged);
+
+  public void Dispose() => Locale.Changed -= OnLocaleChanged;
 
   // Pages that never need a module download or a signed-in user (this app's own pages; host-modules checks the role itself).
   private static readonly HashSet<string> PublicPaths = new(StringComparer.OrdinalIgnoreCase)

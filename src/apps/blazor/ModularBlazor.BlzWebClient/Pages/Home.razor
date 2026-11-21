@@ -7,41 +7,42 @@
 @inject ICurrentUserService Users
 @inject MudTailRuntime MudTail
 @inject NavigationManager Nav
+@inject IStringLocalizer<App> L
 
-<PageTitle>Client modules</PageTitle>
+<PageTitle>@L["Client modules"]</PageTitle>
 
 <div class="mud-container blz-page">
   <header class="blz-page-header">
     <div>
-      <h1 class="mud-typography mud-typography-h4">Client modules</h1>
+      <h1 class="mud-typography mud-typography-h4">@L["Client modules"]</h1>
       @if (_user is not null)
       {
         <p class="mud-typography mud-typography-body1">
-          Signed in as <strong>@_user.Name</strong>@(_user.Tenant is null ? "" : $" ({_user.Tenant})").
-          Open a module from the menu, or load and unload it here, and watch its state change.
+          @((MarkupString)L["Signed in as <strong>{0}</strong>{1}.", System.Net.WebUtility.HtmlEncode(_user.Name), _user.Tenant is null ? "" : $" ({System.Net.WebUtility.HtmlEncode(_user.Tenant)})"].Value)
+          @L["Open a module from the menu, or load and unload it here, and watch its state change."]
         </p>
       }
       else
       {
         <p class="mud-typography mud-typography-body1">
-          The startup modules (layouts, theme) were loaded before this page rendered.
-          <a href="login">Sign in</a> to receive your module list; a module's code downloads when you first open it.
+          @L["The startup modules (layouts, theme) were loaded before this page rendered."]
+          @((MarkupString)L["<a href=\"login\">Sign in</a> to receive your module list; a module's code downloads when you first open it."].Value)
         </p>
       }
     </div>
     <div class="blz-page-actions">
-      <span class="blz-chip">@_rows.Count(r => r.State != "not loaded") of @_rows.Count loaded</span>
+      <span class="blz-chip">@L["{0} of {1} loaded", _rows.Count(r => r.Loaded), _rows.Count]</span>
       @if (Modules.Source == ModuleCatalogSource.Api)
       {
-        <span class="blz-chip" title="GET api/client-modules/manifest">From the WebApi</span>
+        <span class="blz-chip" title="GET api/client-modules/manifest">@L["From the WebApi"]</span>
       }
       else if (Modules.Source == ModuleCatalogSource.Cached)
       {
-        <span class="blz-chip blz-chip-warning" title="@Modules.ManifestError">WebApi not reachable: last public modules this browser received</span>
+        <span class="blz-chip blz-chip-warning" title="@Modules.ManifestError">@L["WebApi not reachable: last public modules this browser received"]</span>
       }
       else
       {
-        <span class="blz-chip blz-chip-warning" title="@Modules.ManifestError">WebApi not reachable: no modules</span>
+        <span class="blz-chip blz-chip-warning" title="@Modules.ManifestError">@L["WebApi not reachable: no modules"]</span>
       }
     </div>
   </header>
@@ -52,26 +53,26 @@
 </div>
 
 @code {
-  private sealed record Row(string Id, string Name, string Version, string Kind, string Strategy, string Access, string Routes, string State);
+  private sealed record Row(string Id, string Name, string Version, string Kind, string Strategy, string Access, string Routes, string State, bool Loaded);
 
-  private static readonly IReadOnlyList<object> Columns =
+  private IReadOnlyList<object> Columns =>
   [
-    new { key = "id", title = "Module" },
-    new { key = "name", title = "Name" },
-    new { key = "version", title = "Version", width = "110px" },
-    new { key = "kind", title = "Kind", type = "enum", options = new[] { "Dll", "NuPkg" }, width = "110px" },
-    new { key = "strategy", title = "Strategy", type = "enum", options = new[] { "startup", "lazy", "preload" } },
-    new { key = "access", title = "Access" },
-    new { key = "routes", title = "Routes" },
-    new { key = "state", title = "State", type = "enum", options = new[] { "loaded", "not loaded", "update available" } },
+    new { key = "id", title = L["Module"].Value },
+    new { key = "name", title = L["Name"].Value },
+    new { key = "version", title = L["Version"].Value, width = "110px" },
+    new { key = "kind", title = L["Kind"].Value, type = "enum", options = new[] { "Dll", "NuPkg" }, width = "110px" },
+    new { key = "strategy", title = L["Strategy"].Value, type = "enum", options = new[] { "startup", "lazy", "preload" } },
+    new { key = "access", title = L["Access"].Value },
+    new { key = "routes", title = L["Routes"].Value },
+    new { key = "state", title = L["State"].Value, type = "enum", options = new[] { L["loaded"].Value, L["not loaded"].Value, L["update available"].Value } },
   ];
 
-  private static readonly IReadOnlyList<object> RowActions =
+  private IReadOnlyList<object> RowActions =>
   [
-    new { id = "open", label = "Open" },
-    new { id = "load", label = "Load" },
-    new { id = "reload", label = "Reload" },
-    new { id = "unload", label = "Unload", color = "error" },
+    new { id = "open", label = L["Open"].Value },
+    new { id = "load", label = L["Load"].Value },
+    new { id = "reload", label = L["Reload"].Value },
+    new { id = "unload", label = L["Unload"].Value, color = "error" },
   ];
 
   private MudTailDataTable? _table;
@@ -97,9 +98,10 @@
       m.Version,
       m.Kind.ToString(),
       Modules.StrategyOf(m),
-      m.RequiredRole is { } role ? $"role {role}" : m.RequiresAuth ? "signed in" : "everyone",
+      m.RequiredRole is { } role ? L["role {0}", role].Value : m.RequiresAuth ? L["signed in"].Value : L["everyone"].Value,
       m.RoutePrefixes.Length == 0 ? "-" : string.Join(", ", m.RoutePrefixes.Select(p => "/" + p.Trim('/'))),
-      !Modules.IsLoaded(m.Id) ? "not loaded" : Modules.UpdatesAvailable.Contains(m.Id) ? "update available" : "loaded")).ToList();
+      !Modules.IsLoaded(m.Id) ? L["not loaded"].Value : Modules.UpdatesAvailable.Contains(m.Id) ? L["update available"].Value : L["loaded"].Value,
+      Modules.IsLoaded(m.Id))).ToList();
 
   private void OnChanged() => _ = InvokeAsync(async () =>
   {
@@ -120,34 +122,34 @@
       {
         case "open":
           var prefix = module.RoutePrefixes.FirstOrDefault();
-          if (prefix is null) await MudTail.ToastAsync($"{module.Id} has no pages of its own.", "info");
+          if (prefix is null) await MudTail.ToastAsync(L["{0} has no pages of its own.", module.Id], "info");
           else Nav.NavigateTo(prefix.Trim('/'));
           break;
 
         case "load":
-          if (Modules.IsLoaded(module.Id)) { await MudTail.ToastAsync($"{module.Id} is already loaded.", "info"); break; }
+          if (Modules.IsLoaded(module.Id)) { await MudTail.ToastAsync(L["{0} is already loaded.", module.Id], "info"); break; }
           await Modules.EnsureLoadedAsync(module.Id);
-          await MudTail.ToastAsync($"{module.Id} loaded.", "success");
+          await MudTail.ToastAsync(L["{0} loaded.", module.Id], "success");
           break;
 
         case "reload":
           await Modules.ReloadAsync(module.Id);
-          await MudTail.ToastAsync($"{module.Id} reloaded.", "success");
+          await MudTail.ToastAsync(L["{0} reloaded.", module.Id], "success");
           break;
 
         case "unload":
           if (module.LoadOnStartup)
           {
             // The startup layout provides MudTail and the shell for every page, this one included.
-            await MudTail.ToastAsync($"{module.Id} is a startup module and stays loaded for the session.", "warning");
+            await MudTail.ToastAsync(L["{0} is a startup module and stays loaded for the session.", module.Id], "warning");
             break;
           }
           if (Modules.Unload(module.Id))
           {
             await Active.NavigateAsync(null); // its styles and scripts go with it
-            await MudTail.ToastAsync($"{module.Id} unloaded: its routes, styles and scripts are gone.", "success");
+            await MudTail.ToastAsync(L["{0} unloaded: its routes, styles and scripts are gone.", module.Id], "success");
           }
-          else await MudTail.ToastAsync($"{module.Id} is not loaded.", "info");
+          else await MudTail.ToastAsync(L["{0} is not loaded.", module.Id], "info");
           break;
       }
     }

@@ -17,5 +17,8 @@
     <ProjectReference Include="..\Share.All\Share.All.csproj" />
     <!-- NSwag settings: a build input, not something a package consumer needs. -->
     <Content Update="Api/nswag.json" Pack="false" />
+    <!-- The shared words (Save, Cancel, ...) every module falls back to: i18n/{culture}.json. -->
+    <Content Remove="i18n/**" />
+    <EmbeddedResource Include="i18n/*.json" />
   </ItemGroup>
 </Project>

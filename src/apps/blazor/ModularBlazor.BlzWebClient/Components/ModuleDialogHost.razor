@@ -1,5 +1,7 @@
 @implements IDisposable
 @inject ModuleDialogService Dialogs
+@inject IStringLocalizerFactory Texts
+@inject IStringLocalizer<App> L
 
 @*
   Renders the dialogs opened through IModuleDialogs, in MudTail's dialog shell (the mud-dialog-* classes of the active
@@ -17,8 +19,9 @@
     <div class="mud-dialog" style="max-width:@dialog.Options.MaxWidth" role="dialog" aria-modal="true"
          aria-labelledby="@($"dlg-{dialog.Key:n}")" tabindex="-1" @ref="_frames[dialog.Key]">
       <div class="mud-dialog-title">
-        <span id="@($"dlg-{dialog.Key:n}")">@dialog.Options.Title</span>
-        <button type="button" class="module-dialog-close" aria-label="Close" @onclick="dialog.Cancel">✕</button>
+        @* The title in the dialog module's own language files (its [ClientDialog] Title, or the caller's). *@
+        <span id="@($"dlg-{dialog.Key:n}")">@Texts.Create(dialog.Component)[dialog.Options.Title ?? ""]</span>
+        <button type="button" class="module-dialog-close" aria-label="@L["Close"]" @onclick="dialog.Cancel">✕</button>
       </div>
       <CascadingValue Value="(IDialogReference)dialog" IsFixed="true">
         <ErrorBoundary>
@@ -27,10 +30,10 @@
           </ChildContent>
           <ErrorContent Context="error">
             <div class="mud-dialog-content" role="alert">
-              This dialog failed: @error.Message
+              @L["This dialog failed: {0}", error.Message]
             </div>
             <div class="mud-dialog-actions">
-              <button type="button" class="mud-button-root mud-button-text mud-button-medium" @onclick="dialog.Cancel">Close</button>
+              <button type="button" class="mud-button-root mud-button-text mud-button-medium" @onclick="dialog.Cancel">@L["Close"]</button>
             </div>
           </ErrorContent>
         </ErrorBoundary>

@@ -1670,6 +1670,9 @@ namespace soft.square.net.WebApi.Modules.Core.ClientModules.Client
         [System.Text.Json.Serialization.JsonPropertyName("order")]
         public int? Order { get; set; } = 100;
 
+        [System.Text.Json.Serialization.JsonPropertyName("titles")]
+        public System.Collections.Generic.IDictionary<string, string>? Titles { get; set; } = default!;
+
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
         [System.Text.Json.Serialization.JsonExtensionData]

@@ -15,4 +15,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- IStringLocalizer: part of ASP.NET Core on the server; a package in Blazor WebAssembly. -->
+    <PackageReference Include="Microsoft.Extensions.Localization.Abstractions" Version="10.0.*" />
+  </ItemGroup>
+
 </Project>

@@ -13,7 +13,7 @@
 
 html, body {
     margin: 0;
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Tahoma, "Noto Sans Arabic", sans-serif;
     color: var(--text);
     background: var(--bg);
 }
@@ -26,7 +26,7 @@ code { background: #eef0f4; padding: 1px 5px; border-radius: 4px; }
 
 .boot, .route-loading { padding: 2rem; color: var(--muted); }
 .spinner {
-    display: inline-block; width: 14px; height: 14px; margin-right: 6px; vertical-align: -2px;
+    display: inline-block; width: 14px; height: 14px; margin-inline-end: 6px; vertical-align: -2px;
     border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%;
     animation: spin .8s linear infinite;
 }
@@ -81,7 +81,7 @@ code { background: #eef0f4; padding: 1px 5px; border-radius: 4px; }
 
 /* ---------- shared bits ---------- */
 table.modules { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: 8px; overflow: hidden; }
-table.modules th, table.modules td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid var(--border); }
+table.modules th, table.modules td { text-align: start; padding: .6rem .8rem; border-bottom: 1px solid var(--border); }
 table.modules th { background: #eef0f4; font-size: .85rem; }
 small { color: var(--muted); }
 .badge { padding: 2px 8px; border-radius: 999px; font-size: .78rem; }
@@ -93,9 +93,9 @@ small { color: var(--muted); }
 
 #blazor-error-ui {
     background: #fff3cd; bottom: 0; box-shadow: 0 -1px 2px rgba(0, 0, 0, .2); display: none;
-    left: 0; padding: .6rem 1.25rem; position: fixed; width: 100%; z-index: 1000;
+    inset-inline-start: 0; padding: .6rem 1.25rem; position: fixed; width: 100%; z-index: 1000;
 }
-#blazor-error-ui .dismiss { cursor: pointer; position: absolute; right: .75rem; top: .5rem; }
+#blazor-error-ui .dismiss { cursor: pointer; position: absolute; inset-inline-end: .75rem; top: .5rem; }
 
 /* ---------- BlzWebClient pages (MudTail markup; colours from the --mud-palette-* tokens of Layouts.Default) ---------- */
 .blz-page { padding-block: 8px 32px; }
@@ -121,7 +121,7 @@ small { color: var(--muted); }
 .blz-row-actions { display: flex; gap: 8px; margin-top: 12px; }
 .blz-spinner {
   display: inline-block; width: 16px; height: 16px; margin-inline-end: 8px; vertical-align: -3px;
-  border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite;
+  border: 2px solid currentColor; border-inline-end-color: transparent; border-radius: 50%; animation: spin .8s linear infinite;
 }
 .blz-status { display: flex; align-items: center; }
 .blz-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 4px 16px; }
@@ -161,3 +161,17 @@ small { color: var(--muted); }
 }
 .module-dialog-close:hover, .module-dialog-close:focus-visible { background: var(--mud-palette-action-default-hover, rgba(0, 0, 0, .06)); }
 .module-dialog .mud-dialog:focus { outline: none; }
+
+/* ---------- right-to-left ----------
+   Arabic is the default language (<html dir="rtl">): the rules above use logical properties (inline-start/end), so
+   they mirror themselves. Arabic letters join, so letter-spacing would break the words apart. */
+[dir="rtl"] body { letter-spacing: 0; }
+/* Code, ids, keys and URLs read left to right on an Arabic page too. */
+[dir="rtl"] code, [dir="rtl"] pre, [dir="rtl"] kbd, [dir="rtl"] samp, [dir="rtl"] .ltr { direction: ltr; unicode-bidi: isolate; }
+/* The language switcher shared by the layouts. */
+.locale-switcher { display: inline-flex; gap: 2px; }
+.locale-switcher button {
+    font: inherit; font-size: .8rem; padding: .15rem .5rem; border-radius: 6px; cursor: pointer;
+    border: 1px solid currentColor; background: transparent; color: inherit; opacity: .75;
+}
+.locale-switcher button[aria-pressed="true"] { opacity: 1; font-weight: 600; }

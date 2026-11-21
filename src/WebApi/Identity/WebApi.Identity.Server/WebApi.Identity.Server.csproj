@@ -23,6 +23,13 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.11.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Translations of the sign-in pages: i18n/{culture}.json, read by IStringLocalizer<T> (Share.All). -->
+    <ProjectReference Include="../../../Share.All/Share.All.csproj" />
+    <Content Remove="i18n/**" />
+    <EmbeddedResource Include="i18n/*.json" LogicalName="i18n/%(Filename)%(Extension)" />
+  </ItemGroup>
+
   <!-- The sign-in pages use MudTail's stylesheet. wwwroot/css/mudtail.css is a committed copy, refreshed from
        src/MudTail/dist when that has been built (npm run build in src/MudTail). -->
   <Target Name="CopyMudTailCss" BeforeTargets="BeforeBuild" Condition="Exists('$(MSBuildProjectDirectory)/../../../MudTail/dist/mudtail.css')">

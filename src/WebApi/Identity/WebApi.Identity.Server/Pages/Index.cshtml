@@ -1,18 +1,18 @@
 @page
 @using System.Security.Claims
-@{ ViewData["Title"] = "Account"; }
+@{ ViewData["Title"] = L["Account"].Value; }
 @if (User.Identity?.IsAuthenticated == true)
 {
-    <p class="mud-typography mud-typography-body1">Signed in as <strong>@User.FindFirstValue("name")</strong> (@User.FindFirstValue("email")).</p>
+    <p class="mud-typography mud-typography-body1">@Html.Raw(L["Signed in as <strong>{0}</strong> ({1}).", System.Net.WebUtility.HtmlEncode(User.FindFirstValue("name") ?? ""), System.Net.WebUtility.HtmlEncode(User.FindFirstValue("email") ?? "")].Value)</p>
     <div class="id-stack">
-        <a class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium id-block" href="/Account/Invitations">Pending invitations</a>
-        <a class="mud-button-root mud-button-filled mud-button-primary mud-button-medium id-block" href="/Account/Logout">Sign out</a>
+        <a class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium id-block" href="/Account/Invitations">@L["Pending invitations"]</a>
+        <a class="mud-button-root mud-button-filled mud-button-primary mud-button-medium id-block" href="/Account/Logout">@L["Sign out"]</a>
     </div>
 }
 else
 {
-    <p class="mud-typography mud-typography-body2 id-muted">This service issues tokens for the Modular WebApi. Applications send you here to sign in.</p>
+    <p class="mud-typography mud-typography-body2 id-muted">@L["This service issues tokens for the Modular WebApi. Applications send you here to sign in."]</p>
     <div class="id-stack">
-        <a class="mud-button-root mud-button-filled mud-button-primary mud-button-medium id-block" href="/Account/Login">Sign in</a>
+        <a class="mud-button-root mud-button-filled mud-button-primary mud-button-medium id-block" href="/Account/Login">@L["Sign in"]</a>
     </div>
 }
