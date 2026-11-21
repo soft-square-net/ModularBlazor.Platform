@@ -17,6 +17,7 @@ sidebar:
 | مجموعات المحتوى | الواجهة البرمجية وبيانات الوحدات | — |
 | توجيه اللغات (`/ar/…`) | `CultureInfo`، `IStringLocalizer` | `setLocale`، `t`، `translateElement` |
 | `dir="rtl"` على `<html>` | كذلك | يتبع `dir`، بخصائص منطقية |
+| — | `[ClientDialog("Module.X/name")]`، `IModuleDialogs.ShowAsync` ([نوافذ الحوار](/ar/guides/module-dialogs/)) | إطار `mud-dialog-*` |
 
 ## تحميل الجزر
 

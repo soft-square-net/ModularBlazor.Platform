@@ -17,6 +17,7 @@ sidebar:
 | Content collections | API + module data | — |
 | i18n routing (`/ar/…`) | `CultureInfo`, `IStringLocalizer` | `setLocale`, `t`, `translateElement` |
 | `dir="rtl"` on `<html>` | same | follows `dir`, logical properties |
+| — | `[ClientDialog("Module.X/name")]`, `IModuleDialogs.ShowAsync` ([dialogs](/guides/module-dialogs/)) | `mud-dialog-*` frame |
 
 ## Island loading
 
