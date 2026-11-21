@@ -73,6 +73,9 @@ public sealed class ModuleDescriptor
     public string[] Scripts { get; set; } = [];
 
     public ModuleNavItem[] Nav { get; set; } = [];
+
+    /// <summary>The module's menu groups and links (its MenuGroup and MenuLink attributes), in every zone.</summary>
+    public MenuItem[] Menu { get; set; } = [];
 }
 
 public sealed class ModuleManifest

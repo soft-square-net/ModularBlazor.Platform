@@ -155,6 +155,9 @@ public sealed class ModuleManager : IModuleNavigation
     return new ModuleNavItem(title, href, order, titles);
   }
 
+  /// <summary>This app's own pages (module management) for the roles that may use them; MenuService puts them in the secondary menu.</summary>
+  public IReadOnlyList<ModuleNavItem> HostNav => _hostNav;
+
   public IReadOnlyList<ModuleNavItem> Items =>
       _catalog.Values
           .Where(d => !d.Hidden)

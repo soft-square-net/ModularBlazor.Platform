@@ -27,6 +27,7 @@ internal sealed record InspectedPackage(
     IReadOnlyList<PackageFile> Files,
     IReadOnlyList<string> Routes,
     IReadOnlyList<string> Layouts,
+    IReadOnlyList<ClientModuleMenuItem> Menu,
     IReadOnlyList<string> Warnings)
 {
     /// <summary>
@@ -73,6 +74,8 @@ internal static partial class ClientModuleInspector
 {
     private const string ClientAttribute = "soft.square.net.ModularBlazor.Abstractions.ClientModuleAttribute";
     private const string LayoutKeyAttribute = "soft.square.net.ModularBlazor.Abstractions.LayoutKeyAttribute";
+    private const string MenuLinkAttribute = "soft.square.net.ModularBlazor.Abstractions.MenuLinkAttribute";
+    private const string MenuGroupAttribute = "soft.square.net.ModularBlazor.Abstractions.MenuGroupAttribute";
     private const string RouteAttribute = "Microsoft.AspNetCore.Components.RouteAttribute";
     private const string AssemblyPrefix = "soft.square.net.";
     public const string SettingsFile = "client-module.json";
@@ -208,11 +211,13 @@ internal static partial class ClientModuleInspector
         if (primary.Info.Routes.Count == 0 && primary.Info.Layouts.Count == 0)
             warnings.Add("No pages (@page) and no layouts ([LayoutKey]) were found.");
 
+        var menu = Menu(id, primary.Info.Menu, detected.RoutePrefixes, primary.Info.Texts, warnings);
+
         var ordered = new List<PackageFile> { primary.File };
         ordered.AddRange(files.Where(f => f != primary.File).OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase));
 
         return new InspectedPackage(ClientModuleKind.Dll, id, primary.Info.Version, detected, ordered,
-            primary.Info.Routes, primary.Info.Layouts, warnings);
+            primary.Info.Routes, primary.Info.Layouts, menu, warnings);
     }
 
     // ---------------------------------------------------------------- settings
@@ -271,6 +276,79 @@ internal static partial class ClientModuleInspector
         return segment.Length == 0 || segment.StartsWith('{') ? null : segment;
     }
 
+    // ---------------------------------------------------------------- menu
+
+    /// <summary>One [assembly: MenuLink] or [assembly: MenuGroup] as written: its constructor arguments and named ones.</summary>
+    private sealed record MenuDeclaration(string Kind, IReadOnlyList<string?> Arguments, IReadOnlyDictionary<string, object?> Named);
+
+    /// <summary>
+    /// The module's menu, checked: ids are made unique across modules ("{module}:{id}"), a parent without ':' is one of
+    /// the module's own groups, a link goes to one of the module's pages (under its route prefixes). What does not fit is
+    /// left out with a warning; the module still installs.
+    /// </summary>
+    private static List<ClientModuleMenuItem> Menu(string moduleId, IReadOnlyList<MenuDeclaration> declarations, IReadOnlyList<string> prefixes,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> texts, List<string> warnings)
+    {
+        var items = new List<ClientModuleMenuItem>();
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var d in declarations)
+        {
+            var group = d.Kind == "group";
+            var what = group ? "MenuGroup" : "MenuLink";
+            var local = d.Arguments.ElementAtOrDefault(0)?.Trim() ?? "";
+            var title = d.Arguments.ElementAtOrDefault(1)?.Trim() ?? "";
+            var href = (group ? d.Named.GetValueOrDefault("Href") as string : d.Arguments.ElementAtOrDefault(2))?.Trim();
+            string? Named(string name) => d.Named.GetValueOrDefault(name) is string { Length: > 0 } s ? s.Trim() : null;
+
+            if (!MenuIdPattern().IsMatch(local)) { warnings.Add($"{what} '{local}': the id must be 1-64 letters, digits, '-', '_' or '.'; left out."); continue; }
+            if (title.Length is 0 or > 100) { warnings.Add($"{what} '{local}': the title must be 1-100 characters; left out."); continue; }
+            if (!ids.Add(local)) { warnings.Add($"{what} '{local}': another menu entry of the module has this id; left out."); continue; }
+
+            if (href is { Length: > 0 })
+            {
+                if (Uri.TryCreate(href, UriKind.Absolute, out var absolute) && absolute.Scheme is "http" or "https" || href.StartsWith("//", StringComparison.Ordinal))
+                {
+                    warnings.Add($"{what} '{local}': '{href}' is an external link; a module's menu links go to its own pages (an administrator adds external links). Left out.");
+                    continue;
+                }
+                if (href.Contains(':') || href.Contains('\\'))
+                {
+                    warnings.Add($"{what} '{local}': '{href}' is not a page of the module; left out.");
+                    continue;
+                }
+                href = href.TrimStart('/');
+                var segment = href.Split(['/', '?', '#'], 2)[0];
+                if (!prefixes.Any(p => p.Equals(segment, StringComparison.OrdinalIgnoreCase)))
+                {
+                    warnings.Add($"{what} '{local}': '{href}' is not under the module's routes ({string.Join(", ", prefixes.DefaultIfEmpty("none"))}); left out.");
+                    continue;
+                }
+            }
+            else if (!group) { warnings.Add($"MenuLink '{local}': it has no link; left out."); continue; }
+            else href = null;
+
+            var zone = Named("Zone")?.ToLowerInvariant() ?? "main";
+            if (!MenuIdPattern().IsMatch(zone)) { warnings.Add($"{what} '{local}': '{zone}' is not a valid zone; left out."); continue; }
+            if (zone is not ("main" or "secondary" or "user"))
+                warnings.Add($"{what} '{local}': zone '{zone}' is not one of main, secondary, user; only layouts that show it will.");
+
+            var parent = Named("Parent");
+            if (parent is not null && !parent.Contains(':')) parent = $"{moduleId}:{parent}";
+
+            items.Add(new ClientModuleMenuItem($"{moduleId}:{local}", group ? "group" : "link", zone, title, href, parent, Named("Icon"),
+                d.Named.GetValueOrDefault("Order") as int? ?? 100, Translations(title, texts)));
+        }
+
+        // A parent of the module's own that it does not declare: shown at the zone's top level instead.
+        var own = items.Where(i => i.Kind == "group").Select(i => i.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in items.Where(i => i.Parent is { } p && p.StartsWith(moduleId + ":", StringComparison.OrdinalIgnoreCase) && !own.Contains(p)))
+            warnings.Add($"Menu '{item.Id}': the module has no MenuGroup '{item.Parent![(moduleId.Length + 1)..]}'; it is shown at the top of its zone.");
+        return items;
+    }
+
+    [GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")]
+    private static partial Regex MenuIdPattern();
+
     // ---------------------------------------------------------------- translations
 
     /// <summary>The menu title in every language the module translates it into (culture → text).</summary>
@@ -321,7 +399,7 @@ internal static partial class ClientModuleInspector
 
     private sealed record AssemblyInfo(string Name, string Version, IReadOnlyDictionary<string, object?>? Attribute,
         IReadOnlyList<string> Routes, IReadOnlyList<string> Layouts, IReadOnlyList<string> References,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> Texts);
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> Texts, IReadOnlyList<MenuDeclaration> Menu);
 
     private static AssemblyInfo ReadAssembly(PackageFile file)
     {
@@ -335,12 +413,15 @@ internal static partial class ClientModuleInspector
             var assembly = md.GetAssemblyDefinition();
             IReadOnlyDictionary<string, object?>? client = null;
             string? informational = null;
+            var menu = new List<MenuDeclaration>();
             foreach (var handle in assembly.GetCustomAttributes())
             {
                 var attribute = md.GetCustomAttribute(handle);
                 switch (AttributeName(md, attribute))
                 {
                     case ClientAttribute: client = Values(attribute); break;
+                    case MenuLinkAttribute: menu.Add(new MenuDeclaration("link", Arguments(attribute), Values(attribute))); break;
+                    case MenuGroupAttribute: menu.Add(new MenuDeclaration("group", Arguments(attribute), Values(attribute))); break;
                     case "System.Reflection.AssemblyInformationalVersionAttribute": informational = FirstString(attribute); break;
                 }
             }
@@ -361,7 +442,7 @@ internal static partial class ClientModuleInspector
             var references = md.AssemblyReferences.Select(r => md.GetString(md.GetAssemblyReference(r).Name)).ToList();
             var version = NormalizeVersion(informational) ?? assembly.Version.ToString(3);
             return new AssemblyInfo(md.GetString(assembly.Name), version, client, routes.Distinct().Order().ToList(), layouts.Distinct().ToList(), references,
-                ReadTexts(pe, md));
+                ReadTexts(pe, md), menu);
         }
         catch (BadImageFormatException)
         {
@@ -398,6 +479,10 @@ internal static partial class ClientModuleInspector
         var value = attribute.DecodeValue(TypeProvider.Instance);
         return value.FixedArguments.Length > 0 ? value.FixedArguments[0].Value as string : null;
     }
+
+    /// <summary>The constructor arguments of an attribute that are strings (others: null).</summary>
+    private static List<string?> Arguments(CustomAttribute attribute) =>
+        attribute.DecodeValue(TypeProvider.Instance).FixedArguments.Select(a => a.Value as string).ToList();
 
     /// <summary>Named arguments of an attribute (arrays become string[]).</summary>
     private static Dictionary<string, object?> Values(CustomAttribute attribute)

@@ -617,7 +617,8 @@
           "dependencies",
           "styles",
           "scripts",
-          "nav"
+          "nav",
+          "menu"
         ],
         "type": "object",
         "properties": {
@@ -710,6 +711,12 @@
             "items": {
               "$ref": "#/components/schemas/ClientModuleNavItem"
             }
+          },
+          "menu": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientModuleMenuItem"
+            }
           }
         }
       },
@@ -763,6 +770,65 @@
             "items": {
               "$ref": "#/components/schemas/ClientModuleDescriptor"
             }
+          }
+        }
+      },
+      "ClientModuleMenuItem": {
+        "required": [
+          "id",
+          "kind",
+          "zone",
+          "title"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "zone": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "href": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "parent": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "icon": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "order": {
+            "type": "integer",
+            "format": "int32",
+            "default": 100
+          },
+          "titles": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "external": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -994,6 +1060,12 @@
               "type": "string"
             }
           },
+          "menu": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientModuleMenuItem"
+            }
+          },
           "warnings": {
             "type": "array",
             "items": {
@@ -1057,6 +1129,12 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "menu": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientModuleMenuItem"
             }
           }
         }

@@ -66,6 +66,51 @@ public sealed class ClientModuleAttribute : Attribute
 }
 
 /// <summary>
+/// A link the module adds to a menu, read from its metadata when it is uploaded (no code is run), so it is in the menu
+/// before the module is downloaded and leaves it when the module is unloaded or deactivated:
+/// <c>[assembly: MenuLink("reports", "Reports", "reports", Zone = "main", Parent = "insights", Order = 20)]</c>.
+/// The title is English; the module's i18n files translate it like any other text.
+/// </summary>
+/// <param name="id">Local to the module (letters, digits, '-', '_', '.'); the menu knows it as "{moduleId}:{id}".</param>
+/// <param name="href">A page of this module, relative to the app base (under its route prefixes).</param>
+[AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
+public sealed class MenuLinkAttribute(string id, string title, string href) : Attribute
+{
+  public string Id { get; } = id;
+  public string Title { get; } = title;
+  public string Href { get; } = href;
+
+  /// <summary>"main" (default), "secondary" or "user" (see MenuZones).</summary>
+  public string Zone { get; set; } = "main";
+
+  /// <summary>The group it goes in: a local id ("insights") or another module's ("Module.Admin:admin").</summary>
+  public string? Parent { get; set; }
+
+  public string? Icon { get; set; }
+  public int Order { get; set; } = 100;
+}
+
+/// <summary>
+/// A group (submenu) the module adds to a menu; links and groups of this or other modules go in it with Parent.
+/// <c>[assembly: MenuGroup("insights", "Insights", Order = 40)]</c>. A group with no link in it is not shown, unless it
+/// links somewhere itself (Href).
+/// </summary>
+[AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
+public sealed class MenuGroupAttribute(string id, string title) : Attribute
+{
+  public string Id { get; } = id;
+  public string Title { get; } = title;
+
+  /// <summary>Optional: a page of this module the group's heading links to.</summary>
+  public string? Href { get; set; }
+
+  public string Zone { get; set; } = "main";
+  public string? Parent { get; set; }
+  public string? Icon { get; set; }
+  public int Order { get; set; } = 100;
+}
+
+/// <summary>
 /// The default settings of a host (API) module, written once in the module itself:
 /// <c>[assembly: HostModule(Name = "Billing", DefaultConfiguration = "{\"Currency\":\"EUR\"}")]</c>.
 /// </summary>

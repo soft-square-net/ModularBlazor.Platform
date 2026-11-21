@@ -123,7 +123,7 @@ internal sealed class ClientModuleCatalog
             v.ExtraAssemblies.Select(f => f.Sha256).ToList(),
             s.LoadStrategy, s.LoadStrategy == ClientModuleLoadStrategy.Startup,
             s.Hidden, s.RequiresAuth, s.RequiredRole, s.AvailableToRoles, s.RoutePrefixes, s.Layout,
-            s.Dependencies, s.Styles, s.Scripts, s.Nav);
+            s.Dependencies, s.Styles, s.Scripts, s.Nav, v.Menu);
     }
 
     /// <summary>Relative to the WebApi base address. The hash makes the URL change whenever the content does.</summary>
@@ -177,7 +177,7 @@ internal sealed class ClientModuleCatalog
         var files = new List<PackageFile>();
         foreach (var f in staged.Upload.Files) files.Add(new PackageFile(f.Name, await File.ReadAllBytesAsync(Path.Combine(folder, f.Name), ct)));
         var u = staged.Upload;
-        var package = new InspectedPackage(u.Kind, u.Id, u.Version, u.Detected, files, u.Routes, u.Layouts, u.Warnings);
+        var package = new InspectedPackage(u.Kind, u.Id, u.Version, u.Detected, files, u.Routes, u.Layouts, u.Menu, u.Warnings);
         if (package.PackageHash != staged.PackageHash) throw new ClientModuleException("The upload's files changed; upload the package again.", 409);
 
         var record = await ChangeAsync(records =>
@@ -207,6 +207,7 @@ internal sealed class ClientModuleCatalog
             Files = package.Files.Select(f => f.Describe()).ToList(),
             Routes = package.Routes,
             Layouts = package.Layouts,
+            Menu = package.Menu,
             Warnings = package.Warnings,
             ExpiresAt = DateTimeOffset.UtcNow + UploadLifetime
         };
@@ -483,7 +484,8 @@ internal sealed class ClientModuleCatalog
             UploadedAt = existing?.PackageHash == package.PackageHash ? existing.UploadedAt : now,
             UploadedBy = existing?.PackageHash == package.PackageHash ? existing.UploadedBy : user,
             Routes = package.Routes,
-            Layouts = package.Layouts
+            Layouts = package.Layouts,
+            Menu = package.Menu
         };
 
         if (record is null)

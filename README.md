@@ -66,6 +66,23 @@ example.
   `RoutePrefixes`, `Dependencies` (other client modules, loaded first), `HostDependencies` (WebApi modules it needs),
   `RequiredRole` / `AvailableToRoles`, `Styles`, `Scripts` and the menu entry (`NavTitle`, `NavHref`, `NavOrder`). An
   admin can change them after upload.
+* **Menus:** the client has three menus (zones): `main`, `secondary` and `user`. A module puts links and groups
+  (submenus) in them with assembly attributes, read from its metadata on upload like `[ClientModule]`:
+
+  ```csharp
+  [assembly: MenuGroup("admin", "Administration", Href = "admin", Zone = "secondary", Order = 90)]
+  [assembly: MenuLink("members", "Members", "admin/members", Parent = "admin")]
+  // another module joins that group by its full id, "{moduleId}:{id}":
+  [assembly: MenuLink("tenants", "Tenants", "tenants", Zone = "secondary", Parent = "Module.Admin:admin")]
+  ```
+
+  The links are in the menu before the module is downloaded and leave it when the module leaves the user's catalog
+  (deactivated, deleted, no longer for their roles or tenant). A link goes to one of the module's own pages (under its
+  route prefixes); the upload warns about and leaves out anything else (external links, other modules' pages). Titles
+  are English and translated by the module's `i18n/*.json`. A child shows in its parent's zone; if the parent's module
+  is not there, at the top of its own zone; a group with nothing in it and no `Href` is hidden. A module without menu
+  attributes keeps its `NavTitle` entry, as a link in `main`. Layouts show a zone with
+  `<MenuZone Zone="@MenuZones.Main" />` or build their own from `IMenuService.Zone(...)`.
 * **Layout module:** a `LayoutComponentBase` with `@attribute [LayoutKey("my-layout")]`. Any module can ship one; a
   module's pages choose it with `Layout` in `[ClientModule]`, or a page can pick with `@attribute [UseLayout("my-layout")]`.
   Layout precedence: page `@layout` > `[UseLayout]` > the module's `Layout` > `default`.
