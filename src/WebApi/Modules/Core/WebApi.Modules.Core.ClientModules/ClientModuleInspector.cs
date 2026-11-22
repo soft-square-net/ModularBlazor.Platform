@@ -335,8 +335,19 @@ internal static partial class ClientModuleInspector
             var parent = Named("Parent");
             if (parent is not null && !parent.Contains(':')) parent = $"{moduleId}:{parent}";
 
+            // The badge: the module's own API (relative "api/..."), asked by the client with the user's token.
+            var badge = Named("Badge")?.TrimStart('/');
+            if (badge is not null && (!badge.StartsWith("api/", StringComparison.OrdinalIgnoreCase) || badge.Contains("//") || badge.Contains('\\')
+                                      || badge.Split(['?', '#'], 2)[0].Contains(':') || badge.Length > 500))
+            {
+                warnings.Add($"{what} '{local}': the badge '{badge}' is not an API url of the WebApi (api/...); the entry is kept without it.");
+                badge = null;
+            }
+            var refresh = badge is null ? 0 : d.Named.GetValueOrDefault("BadgeRefresh") as int? ?? 0;
+            if (refresh != 0) refresh = Math.Clamp(refresh, 15, 3600);
+
             items.Add(new ClientModuleMenuItem($"{moduleId}:{local}", group ? "group" : "link", zone, title, href, parent, Named("Icon"),
-                d.Named.GetValueOrDefault("Order") as int? ?? 100, Translations(title, texts)));
+                d.Named.GetValueOrDefault("Order") as int? ?? 100, Translations(title, texts), Badge: badge, BadgeRefresh: refresh));
         }
 
         // A parent of the module's own that it does not declare: shown at the zone's top level instead.

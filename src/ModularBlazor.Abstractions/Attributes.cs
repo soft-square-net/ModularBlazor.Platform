@@ -88,6 +88,16 @@ public sealed class MenuLinkAttribute(string id, string title, string href) : At
 
   public string? Icon { get; set; }
   public int Order { get; set; } = 100;
+
+  /// <summary>
+  /// The module's own API url ("api/content/posts/review-count") the host asks for the entry's badge, with the user's
+  /// token: a number, an array (its length) or { count, text, tone, label } (see MenuBadge). Works before the module's
+  /// code is downloaded.
+  /// </summary>
+  public string? Badge { get; set; }
+
+  /// <summary>Seconds between two asks for the badge (15-3600; default 60).</summary>
+  public int BadgeRefresh { get; set; }
 }
 
 /// <summary>
@@ -108,6 +118,11 @@ public sealed class MenuGroupAttribute(string id, string title) : Attribute
   public string? Parent { get; set; }
   public string? Icon { get; set; }
   public int Order { get; set; } = 100;
+
+  /// <summary>An API url for the group's badge, like <see cref="MenuLinkAttribute.Badge"/>.</summary>
+  public string? Badge { get; set; }
+
+  public int BadgeRefresh { get; set; }
 }
 
 /// <summary>

@@ -56,3 +56,9 @@ public sealed record TenantSubscriptionStatus(
     int? DaysLeft,
     DateTimeOffset? LastEndedAt,
     bool NeedsAttention);
+
+/// <summary>
+/// How many tenants need an admin's attention (see <see cref="TenantSubscriptionStatus.NeedsAttention"/>), in the shape
+/// a menu badge url answers: the client shows Count next to the menu entry, in Tone.
+/// </summary>
+public sealed record TenantAttentionCount(int Count, string Tone = "warning", string? Label = null);

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
 using Microsoft.Extensions.Localization;
 using soft.square.net.ModularBlazor.Abstractions;
+using soft.square.net.ModularBlazor.Abstractions.Menus;
 using soft.square.net.ModularBlazor.Abstractions.MudTail;
 using soft.square.net.WebApi.Modules.Core.Tenancy.Client;
 
@@ -17,6 +18,10 @@ public abstract class TenancyPageBase : ComponentBase
     [Inject] protected MudTailRuntime MudTail { get; set; } = default!;
     [Inject] protected NavigationManager Nav { get; set; } = default!;
     [Inject] protected IStringLocalizerFactory Texts { get; set; } = default!;
+    [Inject] protected IMenuBadges Badges { get; set; } = default!;
+
+    /// <summary>This module's Tenants menu link (ModuleInfo.cs), whose badge counts the tenants that need attention.</summary>
+    protected const string MenuEntry = "Module.Tenants:tenants";
 
     private IStringLocalizer? _l;
 
@@ -58,6 +63,7 @@ public abstract class TenancyPageBase : ComponentBase
 
         if (then is not null) await then();
         StateHasChanged();
+        _ = Badges.RefreshAsync(MenuEntry); // a change here may change the badge's count
         return true;
     }
 
