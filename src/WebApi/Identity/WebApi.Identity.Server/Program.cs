@@ -71,7 +71,7 @@ builder.Services.AddOpenIddict()
          .AllowClientCredentialsFlow()
          .AllowRefreshTokenFlow();
 
-        o.RegisterScopes(Scopes.OpenId, Scopes.Profile, Scopes.Email, Scopes.OfflineAccess, IdentityClaims.ApiScope);
+        o.RegisterScopes(Scopes.OpenId, Scopes.Profile, Scopes.Email, Scopes.OfflineAccess, IdentityClaims.ApiScope, IdentityClaims.AdminScope);
         o.RegisterClaims(Claims.Subject, Claims.Name, Claims.Email, Claims.Role, IdentityClaims.Tenant, IdentityClaims.Amr);
 
         o.SetAccessTokenLifetime(options.AccessTokenLifetime)
@@ -106,15 +106,16 @@ builder.Services.AddOpenIddict()
     })
     .AddValidation(o =>
     {
-        // Bearer tokens for this service's own admin API.
+        // Bearer tokens for this service's own APIs: users' tokens (membership admin) and the admin client's (service admin).
         o.UseLocalServer();
         o.UseAspNetCore();
-        o.AddAudiences(IdentityClaims.Audience);
+        o.AddAudiences(IdentityClaims.Audience, IdentityClaims.IdentityAudience);
     });
 
 builder.Services.AddScoped<TokenIssuer>();
 builder.Services.AddScoped<TenantAuthorizations>();
 builder.Services.AddMembershipAdmin();
+builder.Services.AddServiceAdmin();
 builder.Services.AddIdentityLocalization(builder.Configuration);
 builder.Services.AddRazorPages();
 builder.Services.AddHealthChecks();
@@ -148,6 +149,7 @@ app.UseAuthorization();
 app.MapHealthChecks("/health");
 app.MapConnectEndpoints();
 app.MapMembershipAdmin();
+app.MapServiceAdmin();
 app.MapRazorPages();
 
 app.Run();

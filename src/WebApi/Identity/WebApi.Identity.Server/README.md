@@ -29,13 +29,18 @@ tokens last 10 minutes (`Identity:AccessTokenLifetime`). Refresh tokens last 14 
 | --- | --- | --- | --- |
 | `blazor-client` | public | Authorization Code + **PKCE (required)**, refresh token | `openid profile email offline_access api` |
 | `elsa-workflows` | confidential | client credentials | `api` |
+| `webapi-identity-admin` | confidential | client credentials | `identity.admin` (alone) |
 
-The seeder registers both clients (create or update) at every start. The `blazor-client` redirect URIs are in
+The seeder registers the clients (create or update) at every start. The `blazor-client` redirect URIs are in
 `appsettings.json` (`Identity:BlazorClient`), for the Blazor client on `https://localhost:5001`. The
 `elsa-workflows` secret is in `appsettings.Development.json`. Outside Development it must come from a secret store,
 and the client isn't registered while the secret is missing.
 
-Asking for the `api` scope (or any scope) gives a token whose audience is `modular-webapi`.
+Asking for the `api` scope (or any scope) gives a token whose audience is `modular-webapi`. The one exception is
+`identity.admin`: it must be asked for alone, and its token's audience is `modular-identity`, so the WebApi never
+accepts it and this service accepts it only on the service admin API (below). The `webapi-identity-admin` secret is in
+`appsettings.Development.json` (`Identity:AdminClient`); elsewhere a secret store, and the client is not registered
+while it is missing.
 
 ## Claims
 
@@ -129,6 +134,25 @@ authorization. Access tokens already issued stay valid until they expire (at mos
 per-request membership check closes that gap.
 
 TODO: an invitation email with a set-password link for new accounts.
+
+## Service admin API
+
+The same membership operations for a **service**, not a user: the WebApi's `identity-admin` runtime module
+(repository Module.Admin.OpenIddict), which checks the caller's module permissions and tenant first and then calls
+here. Callers need a client-credentials token of `webapi-identity-admin` with the scope `identity.admin` (audience
+`modular-identity`); policy `identity-service`. The acting user's id goes in `X-Acting-User` (recorded as the inviter).
+Errors are `{"error","message"}` problems with the usual status codes (404 not a member, 409 already one).
+
+| Method and path | What it does |
+| --- | --- |
+| `GET /api/service/tenants/{tenant}/members?search=` | Members with their account facts (email confirmed, locked out, two-factor, password set) |
+| `GET …/members/{userId}` | One member |
+| `POST …/members` `{"email","role","displayName?","jobTitle?"}` | Invites; creates the account if needed, and the tenant's settings row if the tenant has none yet |
+| `PUT …/members/{userId}` `{"role?","displayName?","jobTitle?"}` | Changes the role and the tenant profile |
+| `POST …/members/{userId}/suspend` / `activate` | As above; suspending revokes the tenant's authorizations |
+| `DELETE …/members/{userId}` | Removes the membership and profile, revokes the tenant's authorizations |
+
+Both APIs share one implementation (`Admin/Memberships.cs`).
 
 ## Data
 

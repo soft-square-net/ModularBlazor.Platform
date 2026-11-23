@@ -113,8 +113,14 @@ public static class ConnectEndpoints
             var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType, Claims.Name, Claims.Role);
             identity.SetClaim(Claims.Subject, await applications.GetClientIdAsync(application, ct))
                     .SetClaim(Claims.Name, await applications.GetDisplayNameAsync(application, ct));
-            identity.SetScopes(request.GetScopes());
-            identity.SetResources(IdentityClaims.Audience);
+            var scopes = request.GetScopes();
+            // The service admin scope gets a token for this service only: never mixed with the WebApi's scopes, so one
+            // token is never good for both.
+            var admin = scopes.Contains(IdentityClaims.AdminScope);
+            if (admin && scopes.Length > 1)
+                return Forbid(Errors.InvalidScope, $"Ask for '{IdentityClaims.AdminScope}' alone.");
+            identity.SetScopes(scopes);
+            identity.SetResources(admin ? IdentityClaims.IdentityAudience : IdentityClaims.Audience);
             identity.SetDestinations(_ => [Destinations.AccessToken]);
             return Results.SignIn(new ClaimsPrincipal(identity), authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }

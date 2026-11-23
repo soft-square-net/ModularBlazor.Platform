@@ -14,6 +14,8 @@ public sealed class IdentityServerOptions
     public TimeSpan RefreshTokenLifetime { get; set; } = TimeSpan.FromDays(14);
     public BlazorClientOptions BlazorClient { get; set; } = new();
     public ServiceClientOptions ElsaClient { get; set; } = new();
+    /// <summary>The WebApi's identity-admin module: the only caller of the service admin API (scope identity.admin).</summary>
+    public ServiceClientOptions AdminClient { get; set; } = new() { ClientId = "webapi-identity-admin" };
     public SeedOptions Seed { get; set; } = new();
 }
 
@@ -88,6 +90,16 @@ public static class IdentitySeeder
         };
         if (await scopes.FindByNameAsync(descriptor.Name, ct) is { } existing) await scopes.UpdateAsync(existing, descriptor, ct);
         else await scopes.CreateAsync(descriptor, ct);
+
+        // The service admin API: a token for this service itself (audience modular-identity), not for the WebApi.
+        var admin = new OpenIddictScopeDescriptor
+        {
+            Name = IdentityClaims.AdminScope,
+            DisplayName = "Identity service administration",
+            Resources = { IdentityClaims.IdentityAudience },
+        };
+        if (await scopes.FindByNameAsync(admin.Name, ct) is { } existingAdmin) await scopes.UpdateAsync(existingAdmin, admin, ct);
+        else await scopes.CreateAsync(admin, ct);
     }
 
     private static async Task EnsureClientsAsync(IOpenIddictApplicationManager applications, IdentityServerOptions options, ILogger logger, CancellationToken ct)
@@ -112,6 +124,24 @@ public static class IdentitySeeder
         foreach (var uri in options.BlazorClient.RedirectUris) blazor.RedirectUris.Add(new Uri(uri));
         foreach (var uri in options.BlazorClient.PostLogoutRedirectUris) blazor.PostLogoutRedirectUris.Add(new Uri(uri));
         await UpsertAsync(applications, blazor, ct);
+
+        // The WebApi's identity-admin module: client credentials, the service admin scope only. Not registered without
+        // a secret (Development: appsettings.Development.json; elsewhere a secret store).
+        if (string.IsNullOrEmpty(options.AdminClient.ClientSecret))
+            logger.LogWarning("Identity:AdminClient:ClientSecret is not set; the {Client} client is not registered.", options.AdminClient.ClientId);
+        else
+            await UpsertAsync(applications, new OpenIddictApplicationDescriptor
+            {
+                ClientId = options.AdminClient.ClientId,
+                ClientSecret = options.AdminClient.ClientSecret,
+                ClientType = ClientTypes.Confidential,
+                DisplayName = "WebApi identity admin",
+                Permissions =
+                {
+                    Permissions.Endpoints.Token, Permissions.GrantTypes.ClientCredentials,
+                    Permissions.Prefixes.Scope + IdentityClaims.AdminScope,
+                },
+            }, ct);
 
         // Confidential service client: client credentials only.
         if (string.IsNullOrEmpty(options.ElsaClient.ClientSecret))

@@ -19,6 +19,13 @@ public static class IdentityClaims
     public const string Audience = "modular-webapi";
     /// <summary>Scope that asks for an access token for <see cref="Audience"/>.</summary>
     public const string ApiScope = "api";
+    /// <summary>
+    /// Scope of the service admin API (<c>/api/service</c>), for the admin client only. Its tokens are issued for
+    /// <see cref="IdentityAudience"/> alone, so the WebApi never accepts them.
+    /// </summary>
+    public const string AdminScope = "identity.admin";
+    /// <summary>This service as a resource server: the audience of <see cref="AdminScope"/> tokens.</summary>
+    public const string IdentityAudience = "modular-identity";
     /// <summary>Platform roles; tenant roles are memberships and never go into the token.</summary>
     public const string PlatformAdmin = "platform-admin";
     public static readonly string[] PlatformRoles = [PlatformAdmin];
