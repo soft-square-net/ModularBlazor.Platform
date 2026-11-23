@@ -154,6 +154,28 @@ Errors are `{"error","message"}` problems with the usual status codes (404 not a
 
 Both APIs share one implementation (`Admin/Memberships.cs`).
 
+### Sessions
+
+A session is one sign-in of a member in a tenant: an ad-hoc authorization tagged with the tenant, plus the tokens
+issued under it (`Admin/Sessions.cs`).
+
+| Method and path | What it does |
+| --- | --- |
+| `GET /api/service/tenants/{tenant}/sessions?userId=&includeEnded=` | The members' sessions. Each has its client, its times and how many live tokens it has. A session is active while an access or refresh token of it is valid |
+| `POST …/sessions/{sessionId}/revoke` | Revokes that authorization and its tokens |
+| `POST …/members/{userId}/sessions/revoke` | Revokes all of the member's sessions in the tenant |
+
+Revoking a session alone would not stop the browser from coming back. While its login cookie is valid, the client
+silently gets a new authorization (`prompt=none`). So revoking also records the ended login (`Auth/SessionEnds.cs`):
+
+- **One login.** Each login cookie carries a `login_at` claim. It does not change on sliding renewal and is kept
+  through the security stamp refresh. The claim is copied onto every authorization the login creates.
+- **All logins.** A "not before" time for the tenant.
+
+The record is kept per user and tenant in `AspNetUserTokens` (provider `tenant-sessions`). `/connect/authorize`
+checks it once it knows the tenant. A matching login gets `login_required` (with `prompt=none`) or the login page. A
+new login gets a new `login_at`, so it passes. Other tenants are not affected.
+
 ## Data
 
 - PostgreSQL database `identity` (Aspire resource `identity-db` on the `tenant-data` server, passed as `ConnectionStrings:identity`), schema `identity`, with

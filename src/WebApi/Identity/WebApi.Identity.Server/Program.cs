@@ -114,6 +114,8 @@ builder.Services.AddOpenIddict()
 
 builder.Services.AddScoped<TokenIssuer>();
 builder.Services.AddScoped<TenantAuthorizations>();
+builder.Services.AddScoped<SessionEnds>();
+builder.Services.AddLoginTime(); // login_at in the login cookie: lets an admin end one browser's sign-in (SessionEnds)
 builder.Services.AddMembershipAdmin();
 builder.Services.AddServiceAdmin();
 builder.Services.AddIdentityLocalization(builder.Configuration);

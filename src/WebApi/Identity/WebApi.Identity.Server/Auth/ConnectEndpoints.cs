@@ -36,7 +36,7 @@ public static class ConnectEndpoints
     }
 
     private static async Task<IResult> AuthorizeAsync(HttpContext context, UserManager<ApplicationUser> users, IdentityDb db,
-        TokenIssuer issuer, TenantAuthorizations tenantAuthorizations, IOpenIddictApplicationManager applications)
+        TokenIssuer issuer, TenantAuthorizations tenantAuthorizations, IOpenIddictApplicationManager applications, SessionEnds sessionEnds)
     {
         var request = context.GetOpenIddictServerRequest()
             ?? throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
@@ -47,15 +47,17 @@ public static class ConnectEndpoints
         var tooOld = request.MaxAge is { } maxAge && result.Properties?.IssuedUtc is { } issued &&
                      DateTimeOffset.UtcNow - issued > TimeSpan.FromSeconds(maxAge);
         if (!result.Succeeded || request.HasPromptValue(PromptValues.Login) || tooOld)
+            return LoginAgain("The user is not signed in.");
+
+        // The login page, then back here without prompt=login (it would loop); prompt=none can only refuse.
+        IResult LoginAgain(string reason)
         {
             if (request.HasPromptValue(PromptValues.None))
-                return Forbid(Errors.LoginRequired, "The user is not signed in.");
-
-            // Come back here after the login, without prompt=login (it would loop).
+                return Forbid(Errors.LoginRequired, reason);
             var parameters = ParametersOf(context.Request)
                 .Where(p => p.Key != Parameters.Prompt)
                 .ToList();
-            var prompt = string.Join(' ', request.GetPromptValues().Remove(PromptValues.Login));
+            var prompt = string.Join(' ', request.GetPromptValues().Remove(PromptValues.Login).Remove(PromptValues.None));
             if (prompt.Length > 0) parameters.Add(new(Parameters.Prompt, prompt));
             return Results.Challenge(
                 new AuthenticationProperties { RedirectUri = context.Request.PathBase + context.Request.Path + QueryString.Create(parameters) },
@@ -85,6 +87,12 @@ public static class ConnectEndpoints
             // No membership: only a platform role gets a token (without a tenant); CheckAsync decides.
         }
 
+        // An admin ended this browser's sign-in for the tenant (Sessions): it signs in again before it gets anything here.
+        var loginAt = LoginTime.Read(result.Principal!);
+        // (The login page signs in afresh, with a new login time; the cookie stays, so other tenants are not touched.)
+        if (tenantId is not null && await sessionEnds.MustSignInAgainAsync(user, tenantId, loginAt))
+            return LoginAgain("The sign-in for this tenant was ended; sign in again.");
+
         var amr = TokenIssuer.ReadAmr(result.Principal!);
         if (await issuer.CheckAsync(user, tenantId, amr, ct) is { } refusal)
             return Forbid(refusal.Error, refusal.Description);
@@ -92,7 +100,7 @@ public static class ConnectEndpoints
         var identity = await issuer.CreateIdentityAsync(user, tenantId, amr, request.GetScopes(), ct);
         var application = await applications.FindByClientIdAsync(request.ClientId!, ct)
             ?? throw new InvalidOperationException("The client application cannot be found.");
-        var authorizationId = await tenantAuthorizations.CreateAsync(identity, (await applications.GetIdAsync(application, ct))!, user.Id, tenantId, ct);
+        var authorizationId = await tenantAuthorizations.CreateAsync(identity, (await applications.GetIdAsync(application, ct))!, user.Id, tenantId, ct, loginAt);
         identity.SetAuthorizationId(authorizationId);
 
         return Results.SignIn(new ClaimsPrincipal(identity), authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);

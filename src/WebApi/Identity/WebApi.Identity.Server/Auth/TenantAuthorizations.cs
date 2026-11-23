@@ -14,7 +14,11 @@ public sealed class TenantAuthorizations(IOpenIddictAuthorizationManager authori
 {
     private const string TenantProperty = "tenant";
 
-    public async Task<string> CreateAsync(ClaimsIdentity identity, string applicationId, string userId, string? tenantId, CancellationToken ct)
+    /// <summary>The browser login this authorization came from (<see cref="LoginTime"/>), so it can be ended alone.</summary>
+    public const string LoginProperty = "login_at";
+
+    public async Task<string> CreateAsync(ClaimsIdentity identity, string applicationId, string userId, string? tenantId, CancellationToken ct,
+        long? loginAt = null)
     {
         var descriptor = new OpenIddictAuthorizationDescriptor
         {
@@ -28,6 +32,8 @@ public sealed class TenantAuthorizations(IOpenIddictAuthorizationManager authori
         descriptor.Scopes.UnionWith(identity.GetScopes());
         if (tenantId is not null)
             descriptor.Properties[TenantProperty] = JsonSerializer.SerializeToElement(tenantId);
+        if (loginAt is not null)
+            descriptor.Properties[LoginProperty] = JsonSerializer.SerializeToElement(loginAt.Value);
 
         var authorization = await authorizations.CreateAsync(descriptor, ct);
         return (await authorizations.GetIdAsync(authorization, ct))!;

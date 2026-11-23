@@ -20,7 +20,9 @@ public static class ServiceAdminEndpoints
     public const string Policy = "identity-service";
     public const string ActingUserHeader = "X-Acting-User";
 
-    public static void AddServiceAdmin(this IServiceCollection services) =>
+    public static void AddServiceAdmin(this IServiceCollection services)
+    {
+        services.AddScoped<Sessions>();
         services.AddAuthorizationBuilder().AddPolicy(Policy, p => p
             .AddAuthenticationSchemes(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)
             .RequireAuthenticatedUser()
@@ -35,6 +37,7 @@ public static class ServiceAdminEndpoints
                     && caller.HasAudience(IdentityClaims.IdentityAudience)
                     && string.Equals(caller.GetClaim(Claims.Subject), client, StringComparison.Ordinal);
             }));
+    }
 
     public static void MapServiceAdmin(this IEndpointRouteBuilder app)
     {
@@ -72,6 +75,16 @@ public static class ServiceAdminEndpoints
 
         members.MapDelete("/{userId}", (string tenant, string userId, Memberships m, CancellationToken ct) =>
             m.RemoveAsync(tenant, userId, ct));
+
+        // ------------------------------------------------------------ sessions (tenant-bound sign-ins)
+        service.MapGet("/tenants/{tenant}/sessions", (string tenant, string? userId, bool? includeEnded, Sessions s, CancellationToken ct) =>
+            s.ListAsync(tenant, userId, includeEnded ?? false, ct));
+
+        service.MapPost("/tenants/{tenant}/sessions/{sessionId}/revoke", (string tenant, string sessionId, Sessions s, CancellationToken ct) =>
+            s.RevokeAsync(tenant, sessionId, ct));
+
+        members.MapPost("/{userId}/sessions/revoke", async (string tenant, string userId, Memberships m, Sessions s, CancellationToken ct) =>
+            await m.GetAsync(tenant, userId, ct) is null ? Results.NotFound() : Results.Ok(await s.RevokeAllAsync(tenant, userId, ct)));
     }
 
     private static string? ActingUser(HttpContext http) =>
