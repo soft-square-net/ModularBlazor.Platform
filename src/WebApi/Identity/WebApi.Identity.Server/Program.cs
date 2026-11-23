@@ -56,7 +56,12 @@ builder.Services.ConfigureApplicationCookie(o =>
 
 // ---------------------------------------------------------------- OpenIddict
 builder.Services.AddOpenIddict()
-    .AddCore(o => o.UseEntityFrameworkCore().UseDbContext<IdentityDb>())
+    .AddCore(o =>
+    {
+        o.UseEntityFrameworkCore().UseDbContext<IdentityDb>();
+        // Secret rotation with an overlap window, and config/ui-managed clients (Auth/RotatingApplicationManager.cs).
+        o.ReplaceApplicationManager<OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreApplication, RotatingApplicationManager>();
+    })
     .AddServer(o =>
     {
         if (options.Issuer is not null) o.SetIssuer(options.Issuer);
@@ -71,7 +76,7 @@ builder.Services.AddOpenIddict()
          .AllowClientCredentialsFlow()
          .AllowRefreshTokenFlow();
 
-        o.RegisterScopes(Scopes.OpenId, Scopes.Profile, Scopes.Email, Scopes.OfflineAccess, IdentityClaims.ApiScope);
+        o.RegisterScopes(Scopes.OpenId, Scopes.Profile, Scopes.Email, Scopes.OfflineAccess, IdentityClaims.ApiScope, IdentityClaims.AdminScope);
         o.RegisterClaims(Claims.Subject, Claims.Name, Claims.Email, Claims.Role, IdentityClaims.Tenant, IdentityClaims.Amr);
 
         o.SetAccessTokenLifetime(options.AccessTokenLifetime)
@@ -106,15 +111,19 @@ builder.Services.AddOpenIddict()
     })
     .AddValidation(o =>
     {
-        // Bearer tokens for this service's own admin API.
+        // Bearer tokens for this service's own APIs: users' tokens (membership admin) and the admin client's (service admin).
         o.UseLocalServer();
         o.UseAspNetCore();
-        o.AddAudiences(IdentityClaims.Audience);
+        o.AddAudiences(IdentityClaims.Audience, IdentityClaims.IdentityAudience);
     });
 
 builder.Services.AddScoped<TokenIssuer>();
 builder.Services.AddScoped<TenantAuthorizations>();
+builder.Services.AddScoped<SessionEnds>();
+builder.Services.AddScoped<soft.square.net.WebApi.Identity.Server.Admin.PlatformAdmin>();
+builder.Services.AddLoginTime(); // login_at in the login cookie: lets an admin end one browser's sign-in (SessionEnds)
 builder.Services.AddMembershipAdmin();
+builder.Services.AddServiceAdmin();
 builder.Services.AddIdentityLocalization(builder.Configuration);
 builder.Services.AddRazorPages();
 builder.Services.AddHealthChecks();
@@ -148,6 +157,7 @@ app.UseAuthorization();
 app.MapHealthChecks("/health");
 app.MapConnectEndpoints();
 app.MapMembershipAdmin();
+app.MapServiceAdmin();
 app.MapRazorPages();
 
 app.Run();

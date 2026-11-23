@@ -92,6 +92,21 @@ example.
   the tenant). The module never reads the modules' entries: it stores changes by id and the client applies them, so an
   entry whose module leaves the catalog simply has nothing to change. Added entries are known as `@platform:{id}` and
   `@tenant:{id}`; a save sends the version it read (409 when someone saved meanwhile).
+
+  An entry can show a **badge** (a count, "new") from the module's own API:
+
+  ```csharp
+  [assembly: MenuLink("tenants", "Tenants", "tenants", Zone = "secondary", Parent = "Module.Admin:admin",
+      Badge = "api/tenancy/subscriptions/attention", BadgeRefresh = 300)]
+  ```
+
+  The client asks the url (relative to the WebApi, it must start with `api/`) with the user's token when the entry is
+  in the menu, then every `BadgeRefresh` seconds (15-3600; default 60). The answer is a number, an array (its length)
+  or `{"count": 3, "tone": "warning", "label": "..."}` (or `"text"` instead of `count`, up to 12 characters); tones
+  are `neutral`, `info`, `success`, `warning` and `error`. 0, an empty array or 204 shows no badge; an error (403, 404)
+  shows none and is asked again after ten minutes. Entries with the same url share one request. A loaded module's code
+  injects `IMenuBadges`: `RefreshAsync(entryId)` after it changed what is counted, `Set(entryId, badge)` for an entry
+  without a url. Layouts style `.menu-badge` and `.menu-badge--{tone}`.
 * **Layout module:** a `LayoutComponentBase` with `@attribute [LayoutKey("my-layout")]`. Any module can ship one; a
   module's pages choose it with `Layout` in `[ClientModule]`, or a page can pick with `@attribute [UseLayout("my-layout")]`.
   Layout precedence: page `@layout` > `[UseLayout]` > the module's `Layout` > `default`.

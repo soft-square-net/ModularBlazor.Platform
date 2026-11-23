@@ -29,13 +29,38 @@ tokens last 10 minutes (`Identity:AccessTokenLifetime`). Refresh tokens last 14 
 | --- | --- | --- | --- |
 | `blazor-client` | public | Authorization Code + **PKCE (required)**, refresh token | `openid profile email offline_access api` |
 | `elsa-workflows` | confidential | client credentials | `api` |
+| `webapi-identity-admin` | confidential | client credentials | `identity.admin` (alone) |
 
-The seeder registers both clients (create or update) at every start. The `blazor-client` redirect URIs are in
+The seeder registers the clients (create or update) at every start. The `blazor-client` redirect URIs are in
 `appsettings.json` (`Identity:BlazorClient`), for the Blazor client on `https://localhost:5001`. The
 `elsa-workflows` secret is in `appsettings.Development.json`. Outside Development it must come from a secret store,
 and the client isn't registered while the secret is missing.
 
-Asking for the `api` scope (or any scope) gives a token whose audience is `modular-webapi`.
+Asking for the `api` scope (or any scope) gives a token whose audience is `modular-webapi`. The one exception is
+`identity.admin`: it must be asked for alone, and its token's audience is `modular-identity`, so the WebApi never
+accepts it and this service accepts it only on the service admin API (below). The `webapi-identity-admin` secret is in
+`appsettings.Development.json` (`Identity:AdminClient`); elsewhere a secret store, and the client is not registered
+while it is missing.
+
+These are the **built-in** clients (property `managed_by` = `config`). Extra clients can be created in the admin UI
+(`managed_by` = `ui`, see [Platform admin API](#platform-admin-api)); the seeder never touches those.
+
+### Rotating a built-in client's secret
+
+`Auth/RotatingApplicationManager.cs` replaces OpenIddict's application manager so that a confidential client can have
+a second, **next** secret (stored hashed in the application's properties) during a rotation:
+
+1. The admin UI starts a rotation: a new secret is made and shown once. Both secrets are accepted.
+2. The admin puts the new secret in the secret store (for `elsa-workflows`: `Identity:ElsaClient:ClientSecret` of this
+   service and of the WebApi) and restarts the client. The first token issued with the new secret records
+   `next_secret_used`.
+3. The admin completes the rotation (allowed only once the new secret was used): it becomes the secret and the old
+   one stops working. Cancelling drops the new one instead.
+
+The seeder agrees with a rotation at start: a configured secret that is the current one keeps its hash; one that is
+the next one is promoted (the rotation completes); a configured secret older than a completed rotation
+(`secret_rotated`) is ignored with a warning (update the secret store); any other configured secret replaces the
+stored one, as before.
 
 ## Claims
 
@@ -129,6 +154,74 @@ authorization. Access tokens already issued stay valid until they expire (at mos
 per-request membership check closes that gap.
 
 TODO: an invitation email with a set-password link for new accounts.
+
+## Service admin API
+
+The same membership operations for a **service**, not a user: the WebApi's `identity-admin` runtime module
+(repository Module.Admin.OpenIddict), which checks the caller's module permissions and tenant first and then calls
+here. Callers need a client-credentials token of `webapi-identity-admin` with the scope `identity.admin` (audience
+`modular-identity`); policy `identity-service`. The acting user's id goes in `X-Acting-User` (recorded as the inviter).
+Errors are `{"error","message"}` problems with the usual status codes (404 not a member, 409 already one).
+
+| Method and path | What it does |
+| --- | --- |
+| `GET /api/service/tenants/{tenant}/members?search=` | Members with their account facts (email confirmed, locked out, two-factor, password set) |
+| `GET …/members/{userId}` | One member |
+| `POST …/members` `{"email","role","displayName?","jobTitle?"}` | Invites; creates the account if needed, and the tenant's settings row if the tenant has none yet |
+| `PUT …/members/{userId}` `{"role?","displayName?","jobTitle?"}` | Changes the role and the tenant profile |
+| `POST …/members/{userId}/suspend` / `activate` | As above; suspending revokes the tenant's authorizations |
+| `DELETE …/members/{userId}` | Removes the membership and profile, revokes the tenant's authorizations |
+
+Both APIs share one implementation (`Admin/Memberships.cs`).
+
+### Sessions
+
+A session is one sign-in of a member in a tenant: an ad-hoc authorization tagged with the tenant, plus the tokens
+issued under it (`Admin/Sessions.cs`).
+
+| Method and path | What it does |
+| --- | --- |
+| `GET /api/service/tenants/{tenant}/sessions?userId=&includeEnded=` | The members' sessions. Each has its client, its times and how many live tokens it has. A session is active while an access or refresh token of it is valid |
+| `POST …/sessions/{sessionId}/revoke` | Revokes that authorization and its tokens |
+| `POST …/members/{userId}/sessions/revoke` | Revokes all of the member's sessions in the tenant |
+
+Revoking a session alone would not stop the browser from coming back. While its login cookie is valid, the client
+silently gets a new authorization (`prompt=none`). So revoking also records the ended login (`Auth/SessionEnds.cs`):
+
+- **One login.** Each login cookie carries a `login_at` claim. It does not change on sliding renewal and is kept
+  through the security stamp refresh. The claim is copied onto every authorization the login creates.
+- **All logins.** A "not before" time for the tenant.
+
+The record is kept per user and tenant in `AspNetUserTokens` (provider `tenant-sessions`). `/connect/authorize`
+checks it once it knows the tenant. A matching login gets `login_required` (with `prompt=none`) or the login page. A
+new login gets a new `login_at`, so it passes. Other tenants are not affected. A platform login (no tenant) is
+recorded under the key `*`.
+
+### Platform admin API
+
+What only platform admins manage; the module checks `platform.tenants.manage` first. No tenant in the path
+(`Admin/PlatformAdmin.cs`).
+
+| Method and path | What it does |
+| --- | --- |
+| `GET /api/service/platform/tenants` | Every tenant known here: name, `requireMfa`, members by status |
+| `PUT …/tenants/{tenant}` `{"displayName?","requireMfa?"}` | Sets the policy (creates the tenant's row if needed); applies at the next token |
+| `GET …/accounts?search=` | Up to 100 accounts with platform roles and memberships |
+| `GET …/accounts/{userId}` | One account |
+| `POST …/accounts/{userId}/lock` / `unlock` | Lockout without end, then every session ends (all tenants and `*`) / clears it |
+| `POST …/accounts/{userId}/sign-out` | Revokes every authorization and token, ends all logins, renews the security stamp |
+| `PUT …/accounts/{userId}/roles` `{"platformAdmin"}` | Grants or takes the `platform-admin` role, then renews the sessions |
+| `GET …/applications`, `GET …/applications/{clientId}` | Clients with grant types, scopes, URIs, secret and rotation state, live tokens |
+| `POST …/applications` | Creates a UI-managed client (secret returned once for a confidential one) |
+| `PUT` / `DELETE …/applications/{clientId}` | Changes or deletes a UI-managed client (409 `built_in` for configured ones) |
+| `POST …/applications/{clientId}/secret` | UI client: a new secret now. Built-in client: starts a rotation |
+| `POST …/applications/{clientId}/rotation/complete` / `cancel` | Completes (409 until the new secret was used) or cancels a rotation |
+| `POST …/applications/{clientId}/tokens/revoke` | Revokes every authorization and token of the client |
+| `GET …/scopes` | The standard scopes and the stored ones |
+
+A UI-managed client may use `authorization_code` (PKCE always required, at least one absolute redirect URI),
+`refresh_token` (with the code grant) and `client_credentials` (confidential only). Its scopes must exist;
+`identity.admin` is never allowed. `openid` needs no permission, so it is listed for every code-flow client.
 
 ## Data
 

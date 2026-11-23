@@ -7,4 +7,6 @@ using soft.square.net.ModularBlazor.Abstractions;
     NavTitle = "Tenants", NavHref = "tenants", NavOrder = 30)]
 
 // In Module.Admin's "Administration" group when that module is there; at the top of the secondary menu when it is not.
-[assembly: MenuLink("tenants", "Tenants", "tenants", Zone = "secondary", Parent = "Module.Admin:admin", Order = 10)]
+// Its badge: how many tenants need attention (subscription ended or ending), asked every five minutes.
+[assembly: MenuLink("tenants", "Tenants", "tenants", Zone = "secondary", Parent = "Module.Admin:admin", Order = 10,
+    Badge = "api/tenancy/subscriptions/attention", BadgeRefresh = 300)]

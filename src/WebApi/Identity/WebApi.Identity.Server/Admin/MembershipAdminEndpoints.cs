@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using OpenIddict.Abstractions;
 using OpenIddict.Validation.AspNetCore;
@@ -9,7 +8,6 @@ using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace soft.square.net.WebApi.Identity.Server.Admin;
 
-public sealed record InviteMember(string Email, string? Role, string? DisplayName);
 public sealed record MemberView(string UserId, string? Email, string? DisplayName, string Status, string Role,
     string? InvitedBy, DateTimeOffset InvitedAt, DateTimeOffset? JoinedAt);
 public sealed record TenantSettingsInput(string? DisplayName, bool RequireMfa);
@@ -17,7 +15,8 @@ public sealed record TenantSettingsInput(string? DisplayName, bool RequireMfa);
 /// <summary>
 /// Minimal membership admin API, called with a bearer token from this service (audience modular-webapi).
 /// Allowed for the platform role, or for an active tenant-admin member whose token is for the same tenant.
-/// A tenant admin sees only that tenant's memberships, never the user's other tenants.
+/// A tenant admin sees only that tenant's memberships, never the user's other tenants. The rules of the data are in
+/// <see cref="Memberships"/>, shared with the service API.
 /// </summary>
 public static class MembershipAdminEndpoints
 {
@@ -31,19 +30,22 @@ public static class MembershipAdminEndpoints
 
         tenants.MapGet("/members", ListAsync);
         tenants.MapPost("/members", InviteAsync);
-        tenants.MapPost("/members/{userId}/suspend", (string tenant, string userId, ClaimsPrincipal caller, IdentityDb db,
-            TenantAuthorizations auth, CancellationToken ct) => SetStatusAsync(tenant, userId, MembershipStatus.Suspended, caller, db, auth, ct));
-        tenants.MapPost("/members/{userId}/activate", (string tenant, string userId, ClaimsPrincipal caller, IdentityDb db,
-            TenantAuthorizations auth, CancellationToken ct) => SetStatusAsync(tenant, userId, MembershipStatus.Active, caller, db, auth, ct));
+        tenants.MapPost("/members/{userId}/suspend", (string tenant, string userId, ClaimsPrincipal caller, IdentityDb db, Memberships members,
+            CancellationToken ct) => SetStatusAsync(tenant, userId, MembershipStatus.Suspended, caller, db, members, ct));
+        tenants.MapPost("/members/{userId}/activate", (string tenant, string userId, ClaimsPrincipal caller, IdentityDb db, Memberships members,
+            CancellationToken ct) => SetStatusAsync(tenant, userId, MembershipStatus.Active, caller, db, members, ct));
         tenants.MapDelete("/members/{userId}", RemoveAsync);
         // Tenant security policy: platform role only.
         tenants.MapPut("/", PutTenantAsync);
     }
 
-    public static void AddMembershipAdmin(this IServiceCollection services) =>
+    public static void AddMembershipAdmin(this IServiceCollection services)
+    {
+        services.AddScoped<Memberships>();
         services.AddAuthorizationBuilder().AddPolicy(Policy, p => p
             .AddAuthenticationSchemes(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)
             .RequireAuthenticatedUser());
+    }
 
     private static IResult Denied => Results.Problem("Requires the platform-admin role or an active tenant-admin membership in this tenant (token for the same tenant).", statusCode: StatusCodes.Status403Forbidden);
 
@@ -58,20 +60,11 @@ public static class MembershipAdminEndpoints
             m.Status == MembershipStatus.Active && m.Role == MembershipRoles.Admin, ct);
     }
 
-    private static async Task<IResult> ListAsync(string tenant, ClaimsPrincipal caller, IdentityDb db, CancellationToken ct)
+    private static async Task<IResult> ListAsync(string tenant, ClaimsPrincipal caller, IdentityDb db, Memberships members, CancellationToken ct)
     {
         if (!await CanAdministerAsync(caller, tenant, db, ct)) return Denied;
-        var members = await db.TenantMemberships.AsNoTracking()
-            .Where(m => m.TenantId == tenant)
-            .Select(m => new
-            {
-                m,
-                m.User!.Email,
-                Profile = db.TenantProfiles.Where(p => p.UserId == m.UserId && p.TenantId == tenant).Select(p => p.DisplayName).FirstOrDefault(),
-            })
-            .ToListAsync(ct);
-        return Results.Ok(members.Select(x => new MemberView(x.m.UserId, x.Email, x.Profile, x.m.Status.ToString(), x.m.Role,
-            x.m.InvitedBy, x.m.InvitedAt, x.m.JoinedAt)));
+        return Results.Ok((await members.ListAsync(tenant, null, ct)).Select(m => new MemberView(m.UserId, m.Email, m.DisplayName,
+            m.Status, m.Role, m.InvitedBy, m.InvitedAt, m.JoinedAt)));
     }
 
     /// <summary>
@@ -79,67 +72,31 @@ public static class MembershipAdminEndpoints
     /// email gets a new account without a password. TODO: send the invitation email and a set-password link.
     /// </summary>
     private static async Task<IResult> InviteAsync(string tenant, InviteMember input, ClaimsPrincipal caller, IdentityDb db,
-        UserManager<ApplicationUser> users, CancellationToken ct)
+        Memberships members, CancellationToken ct)
     {
         if (!await CanAdministerAsync(caller, tenant, db, ct)) return Denied;
-        if (!await db.Tenants.AnyAsync(t => t.TenantId == tenant, ct))
-            return Results.Problem($"Tenant '{tenant}' is not known to the identity service.", statusCode: StatusCodes.Status404NotFound);
-        var role = input.Role ?? MembershipRoles.Member;
-        if (role is not (MembershipRoles.Member or MembershipRoles.Admin))
-            return Results.ValidationProblem(new Dictionary<string, string[]> { ["role"] = [$"Use '{MembershipRoles.Member}' or '{MembershipRoles.Admin}'."] });
-
-        var user = await users.FindByEmailAsync(input.Email);
-        if (user is null)
+        try
         {
-            user = new ApplicationUser { UserName = input.Email, Email = input.Email, DisplayName = input.DisplayName };
-            var created = await users.CreateAsync(user);
-            if (!created.Succeeded)
-                return Results.ValidationProblem(created.Errors.GroupBy(e => e.Code).ToDictionary(g => g.Key, g => g.Select(e => e.Description).ToArray()));
+            var invited = await members.InviteAsync(tenant, input, caller.GetClaim(Claims.Subject), ensureTenant: false, ct);
+            return Results.Created($"/api/admin/tenants/{tenant}/members/{invited.UserId}", invited);
         }
-
-        if (await db.TenantMemberships.AnyAsync(m => m.UserId == user.Id && m.TenantId == tenant, ct))
-            return Results.Conflict(new { error = "already_member", userId = user.Id });
-
-        db.TenantMemberships.Add(new TenantMembership
-        {
-            UserId = user.Id, TenantId = tenant, Status = MembershipStatus.Invited, Role = role,
-            InvitedBy = caller.GetClaim(Claims.Subject),
-        });
-        if (input.DisplayName is not null)
-            db.TenantProfiles.Add(new TenantProfile { UserId = user.Id, TenantId = tenant, DisplayName = input.DisplayName });
-        await db.SaveChangesAsync(ct);
-        return Results.Created($"/api/admin/tenants/{tenant}/members/{user.Id}", new { userId = user.Id, status = nameof(MembershipStatus.Invited) });
+        catch (MembershipException e) { return e.ToResult(); }
     }
 
     private static async Task<IResult> SetStatusAsync(string tenant, string userId, MembershipStatus status, ClaimsPrincipal caller,
-        IdentityDb db, TenantAuthorizations auth, CancellationToken ct)
+        IdentityDb db, Memberships members, CancellationToken ct)
     {
         if (!await CanAdministerAsync(caller, tenant, db, ct)) return Denied;
-        var membership = await db.TenantMemberships.FirstOrDefaultAsync(m => m.UserId == userId && m.TenantId == tenant, ct);
-        if (membership is null) return Results.NotFound();
-        if (status == MembershipStatus.Active && membership.Status == MembershipStatus.Invited)
-            return Results.Conflict(new { error = "invitation_pending", message = "The user has to accept the invitation." });
-
-        membership.Status = status;
-        await db.SaveChangesAsync(ct);
-        // A suspended member's refresh tokens die now; a refresh would be refused anyway, this also ends sessions.
-        var revoked = status == MembershipStatus.Suspended ? await auth.RevokeAsync(userId, tenant, ct) : 0;
-        return Results.Ok(new { userId, tenant, status = status.ToString(), revokedAuthorizations = revoked });
+        try { return Results.Ok(await members.SetStatusAsync(tenant, userId, status, ct)); }
+        catch (MembershipException e) { return e.ToResult(); }
     }
 
     private static async Task<IResult> RemoveAsync(string tenant, string userId, ClaimsPrincipal caller, IdentityDb db,
-        TenantAuthorizations auth, CancellationToken ct)
+        Memberships members, CancellationToken ct)
     {
         if (!await CanAdministerAsync(caller, tenant, db, ct)) return Denied;
-        var membership = await db.TenantMemberships.FirstOrDefaultAsync(m => m.UserId == userId && m.TenantId == tenant, ct);
-        if (membership is null) return Results.NotFound();
-
-        db.TenantMemberships.Remove(membership);
-        await db.TenantProfiles.Where(p => p.UserId == userId && p.TenantId == tenant).ExecuteDeleteAsync(ct);
-        await db.SaveChangesAsync(ct);
-        // Removing a membership revokes that tenant's refresh tokens (and pending codes) for the user.
-        var revoked = await auth.RevokeAsync(userId, tenant, ct);
-        return Results.Ok(new { userId, tenant, removed = true, revokedAuthorizations = revoked });
+        try { return Results.Ok(await members.RemoveAsync(tenant, userId, ct)); }
+        catch (MembershipException e) { return e.ToResult(); }
     }
 
     private static async Task<IResult> PutTenantAsync(string tenant, TenantSettingsInput input, ClaimsPrincipal caller, IdentityDb db, CancellationToken ct)

@@ -55,6 +55,8 @@ builder.Services.AddScoped<ActiveModuleService>();
 builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.IModuleNavigation>(sp => sp.GetRequiredService<ModuleManager>());
 // The menus (main, secondary, user) the modules' MenuGroup / MenuLink attributes fill, shown by <MenuZone> in layouts.
 builder.Services.AddScoped<MenuCustomizations>();
+builder.Services.AddScoped<MenuBadgeService>();
+builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Menus.IMenuBadges>(sp => sp.GetRequiredService<MenuBadgeService>());
 builder.Services.AddScoped<MenuService>();
 builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Menus.IMenuService>(sp => sp.GetRequiredService<MenuService>());
 // Dialogs one module opens in another by id (IModuleDialogs), shown by Components/ModuleDialogHost in App.razor.

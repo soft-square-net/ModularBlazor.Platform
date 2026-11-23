@@ -26,13 +26,15 @@ public sealed class MenuService : IMenuService, IDisposable
 
   private readonly ModuleManager _modules;
   private readonly MenuCustomizations _customizations;
+  private readonly MenuBadgeService _badges;
   private Dictionary<string, IReadOnlyList<MenuNode>>? _zones; // built on first use after a change
   private string? _culture;                                    // ...in this UI culture (the titles' order depends on it)
 
-  public MenuService(ModuleManager modules, MenuCustomizations customizations)
+  public MenuService(ModuleManager modules, MenuCustomizations customizations, MenuBadgeService badges)
   {
     _modules = modules;
     _customizations = customizations;
+    _badges = badges;
     _modules.Changed += OnCatalogChanged;
     _customizations.Changed += OnCatalogChanged;
   }
@@ -45,7 +47,12 @@ public sealed class MenuService : IMenuService, IDisposable
   public IReadOnlyList<MenuNode> Zone(string zone)
   {
     var culture = System.Globalization.CultureInfo.CurrentUICulture.Name;
-    if (_zones is null || _culture != culture) (_zones, _culture) = (Build(Items()), culture);
+    if (_zones is null || _culture != culture)
+    {
+      var items = Items();
+      (_zones, _culture) = (Build(items), culture);
+      _badges.Track(items); // the entries with a Badge url, as they are now
+    }
     return _zones.GetValueOrDefault(zone.ToLowerInvariant()) ?? [];
   }
 
