@@ -64,7 +64,13 @@ public sealed class SyncResult
 {
     public Dictionary<string, UnloadResult> Unloaded { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, Exception> Errors { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Copies released by the sync whose load contexts are waited on after it (see ModuleRuntime.SyncAsync).</summary>
+    internal List<ReleasedCopy> Released { get; } = [];
 }
+
+/// <summary>A released module copy: only a weak reference to its load context, so holding this never keeps it alive.</summary>
+internal sealed record ReleasedCopy(string Id, string Version, WeakReference Context, string? StopNote);
 
 public sealed record UnloadResult(string Id, bool Unloaded, int GcPasses, string? Note);
 
