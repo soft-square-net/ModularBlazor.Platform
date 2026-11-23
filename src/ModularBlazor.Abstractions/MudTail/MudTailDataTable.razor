@@ -82,10 +82,15 @@
       ["rowClick"] = OnRowClick.HasDelegate,
     };
     if (EmptyText is not null) options["emptyText"] = EmptyText;
+    var created = _pendingRows;
     _table = await runtime.InvokeAsync<IJSObjectReference>("create", "datatable", _host, options, _self);
+
+    // Rows set while the table was being created (SetDataAsync saw no table yet) are not in its options: send them now.
+    if (!ReferenceEquals(_pendingRows, created) && _pendingRows is { } latest)
+      await _table.InvokeVoidAsync("setData", latest);
   }
 
-  /// <summary>Replaces the rows (before the table exists they are kept and used when it is created).</summary>
+  /// <summary>Replaces the rows (before the table exists, or while it is being created, they are kept and sent once it is).</summary>
   public async Task SetDataAsync(object rows)
   {
     _pendingRows = rows;
