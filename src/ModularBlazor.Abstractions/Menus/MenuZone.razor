@@ -3,6 +3,7 @@
 @using soft.square.net.Share.All
 @implements IDisposable
 @inject IMenuService Menus
+@inject IMenuBadges Badges
 
 @*
   One menu (zone) as nested lists: <MenuZone Zone="main" />. Links are NavLinks (class "active" on the current page),
@@ -39,11 +40,19 @@
   /// <summary>False: a plain div, for a zone placed inside the layout's own nav. Default true: a nav landmark.</summary>
   [Parameter] public bool Landmark { get; set; } = true;
 
-  protected override void OnInitialized() => Menus.Changed += OnChanged;
+  protected override void OnInitialized()
+  {
+    Menus.Changed += OnChanged;
+    Badges.Changed += OnChanged;
+  }
 
   private void OnChanged() => _ = InvokeAsync(StateHasChanged);
 
-  public void Dispose() => Menus.Changed -= OnChanged;
+  public void Dispose()
+  {
+    Menus.Changed -= OnChanged;
+    Badges.Changed -= OnChanged;
+  }
 
   private RenderFragment List(IReadOnlyList<MenuNode> nodes) => @<ul>
     @foreach (var node in nodes)
@@ -68,16 +77,22 @@
   private RenderFragment Entry(MenuItem item) => @<text>
     @if (string.IsNullOrEmpty(item.Href))
     {
-      <span class="menu-group-title" data-icon="@item.Icon">@item.LocalTitle</span>
+      <span class="menu-group-title" data-icon="@item.Icon">@Title(item)</span>
     }
     else if (item.External)
     {
-      <a class="menu-link @(item.IsGroup ? "menu-group-title" : null)" href="@item.Href" target="_blank" rel="noopener noreferrer" data-icon="@item.Icon">@item.LocalTitle</a>
+      <a class="menu-link @(item.IsGroup ? "menu-group-title" : null)" href="@item.Href" target="_blank" rel="noopener noreferrer" data-icon="@item.Icon">@Title(item)</a>
     }
     else
     {
       <NavLink class="@(item.IsGroup ? "menu-link menu-group-title" : "menu-link")" href="@item.Href" data-icon="@item.Icon"
-               Match="@(item.Href is "" or "/" ? NavLinkMatch.All : NavLinkMatch.Prefix)">@item.LocalTitle</NavLink>
+               Match="@(item.Href is "" or "/" ? NavLinkMatch.All : NavLinkMatch.Prefix)">@Title(item)</NavLink>
     }
   </text>;
+
+  /// <summary>The title, and the entry's badge (.menu-badge .menu-badge--{tone}) when it has one.</summary>
+  private RenderFragment Title(MenuItem item) => @<text>@item.LocalTitle@if (Badges.Of(item.Id) is { } badge)
+    {
+      <span class="menu-badge menu-badge--@badge.Tone" title="@badge.Label" aria-label="@badge.Label">@badge.Text</span>
+    }</text>;
 }

@@ -377,6 +377,37 @@
         }
       }
     },
+    "/api/tenancy/subscriptions/attention": {
+      "get": {
+        "tags": [
+          "Tenancy"
+        ],
+        "summary": "How many tenants the subscription report flags (NeedsAttention, 30 days): the Tenants menu entry's badge.",
+        "operationId": "Tenancy_AttentionCount",
+        "responses": {
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantAttentionCount"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/tenancy/tenants/{id}/subscriptions": {
       "get": {
         "tags": [
@@ -912,6 +943,28 @@
           "Cancelled"
         ],
         "type": "string"
+      },
+      "TenantAttentionCount": {
+        "required": [
+          "count"
+        ],
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tone": {
+            "type": "string",
+            "default": "warning"
+          },
+          "label": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
       },
       "TenantInfo": {
         "required": [

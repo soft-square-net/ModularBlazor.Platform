@@ -35,6 +35,8 @@ public sealed record ClientModuleNavItem(string Title, string Href, int Order = 
 /// <param name="Parent">The id of the group it is in (this module's or another's); null: the zone's top level.</param>
 /// <param name="Titles">The title in other languages (culture → text), from the module's i18n files.</param>
 /// <param name="External">An absolute http(s) link. Modules cannot declare one; kept for links an admin adds.</param>
+/// <param name="Badge">An API url ("api/...") the client asks for the entry's badge.</param>
+/// <param name="BadgeRefresh">Seconds between two asks (15-3600); 0: the client's default.</param>
 public sealed record ClientModuleMenuItem(
     string Id,
     string Kind,
@@ -45,7 +47,9 @@ public sealed record ClientModuleMenuItem(
     string? Icon = null,
     int Order = 100,
     IReadOnlyDictionary<string, string>? Titles = null,
-    bool External = false);
+    bool External = false,
+    string? Badge = null,
+    int BadgeRefresh = 0);
 
 /// <summary>What an admin decides about a client module. Kept across versions: a new version keeps the module's settings.</summary>
 public sealed record ClientModuleSettings

@@ -249,6 +249,14 @@ public sealed partial class TenancyEndpoints : ICarterModule
             .WithSummary("Every tenant with its current and next subscription and when its covered time ends. NeedsAttention: " +
                          "an Active tenant with nothing covering now, or ending within endingWithinDays (default 30).");
 
+        subscriptions.MapGet("/subscriptions/attention", async (HttpContext http, CancellationToken ct) =>
+            {
+                var report = await Store(http).ReportAsync(TimeSpan.FromDays(30), ct);
+                return new TenantAttentionCount(report.Count(r => r.NeedsAttention));
+            })
+            .WithName("Tenancy_AttentionCount")
+            .WithSummary("How many tenants the subscription report flags (NeedsAttention, 30 days): the Tenants menu entry's badge.");
+
         subscriptions.MapGet("/tenants/{id}/subscriptions", (string id, HttpContext http, CancellationToken ct) => Store(http).ListAsync(id, ct))
             .ProducesProblem(StatusCodes.Status404NotFound)
             .WithName("Tenancy_ListSubscriptions")

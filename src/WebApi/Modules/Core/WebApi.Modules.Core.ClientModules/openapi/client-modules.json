@@ -829,6 +829,17 @@
           "external": {
             "type": "boolean",
             "default": false
+          },
+          "badge": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "badgeRefresh": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
           }
         }
       },

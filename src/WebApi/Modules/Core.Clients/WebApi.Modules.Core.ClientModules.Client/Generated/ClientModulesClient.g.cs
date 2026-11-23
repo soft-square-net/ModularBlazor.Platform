@@ -1697,6 +1697,12 @@ namespace soft.square.net.WebApi.Modules.Core.ClientModules.Client
         [System.Text.Json.Serialization.JsonPropertyName("external")]
         public bool? External { get; set; } = false;
 
+        [System.Text.Json.Serialization.JsonPropertyName("badge")]
+        public string? Badge { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("badgeRefresh")]
+        public int? BadgeRefresh { get; set; } = 0;
+
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
         [System.Text.Json.Serialization.JsonExtensionData]
