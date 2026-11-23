@@ -13,6 +13,9 @@ src/                  the library (everything published)
   behaviors/          autoInit + the data-mud behaviours (ticker, score strip, lightbox, mega-nav, reading progress, reveal, theme toggle)
   dock/               MudDock: IDE docking layout (model.js = the layout tree, MudDock.js = the view)
   datatable/          MudDataTable + the shared query engine (client evaluation, PaginationFilter query strings)
+  explorer/           MudExplorer: a Windows 11 style file explorer (tabs, address bar, command bar, navigation and
+                      details panes, six views, selection, rename, drag and drop) and its parts: MudFileView,
+                      MudCommandBar, MudAddressBar, MudContextMenu, and the pure model (sorting, selection, history)
   locales/            message packs for MudTail's own UI (ar.js: Arabic)
   styles/             SCSS sources (mudtail.scss entry) and the Tailwind preset (tailwind.css)
 demo/                 the showcase; it uses the library only through `mudtail`

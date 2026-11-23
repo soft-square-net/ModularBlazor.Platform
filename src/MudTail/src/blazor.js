@@ -47,6 +47,8 @@ import {
   createStatCard,
   MudImageEditor,
   renderRecipe,
+  MudExplorer,
+  fileKind,
   loadPlugin as libLoadPlugin,
   removePlugin as libRemovePlugin,
   getPlugin,
@@ -298,6 +300,102 @@ const factories = {
       upload: () => editor.upload(),
       download: (name = null) => editor.download(name),
       dispose: () => editor.dispose(),
+    };
+  },
+
+  /**
+   * File explorer (Windows 11 style). The provider is .NET: every question the Explorer has raises
+   * OnMudEvent("request", { requestId, kind, ... }), answered with handle.resolve(requestId, value) or
+   * handle.reject(requestId, message). Kinds:
+   *   places → [{ id, name, hasChildren, icon? }]            list { folderId, search } → { folder, path, items }
+   *   children { folderId } → [{ id, name, hasChildren }]     home → { recent }   gallery → { items }
+   *   resolvePath { text } → id | null                       rename { item, name } → true | "error"
+   *   preview { item } → url | null                          command { command, items, folder, target?, mode?, name?,
+   *                                                            files?: { token, files: [{ index, name, size, type, path }] },
+   *                                                            permanent? } → { refresh?, select? } | null
+   * Files dropped or picked for an upload stay in the browser: read them with
+   * InvokeAsync<IJSStreamReference>("readFile", token, index, offset, length) and call releaseFiles(token) when done.
+   * options: the MudExplorer options that are data (start, pinned, view, sort, groupBy, detailsPane, navWidth) plus
+   *   home, gallery, resolvePath, preview: true when .NET answers those kinds; renameInPlace (default true: "rename"
+   *   requests while the name is being edited, else a "rename" command); menuItems / newItems: [{ id, label, icon,
+   *   kinds?: ['image', 'folder', …], single?: true }] for the context menu / the New menu (they come back as commands).
+   * Rights are data: an item's or the folder's deny list (see MudExplorer).
+   * Other events: navigate ({ location, folder, path }), selection ([ids]), pinned ([{ id, name }]), view (name).
+   */
+  explorer(host, options, emit) {
+    const pending = new Map();
+    let seq = 0;
+    const ask = (kind, args = {}) => new Promise((resolve, reject) => {
+      const requestId = ++seq;
+      pending.set(requestId, { resolve, reject });
+      emit('request', { requestId, kind, ...args });
+    });
+    const files = new Map();
+    let fileSeq = 0;
+    const keepFiles = (list) => {
+      const token = `files-${++fileSeq}`;
+      files.set(token, list);
+      return { token, files: list.map((f, index) => ({ index, name: f.name, size: f.size, type: f.type, lastModified: f.lastModified, path: f.webkitRelativePath || '' })) };
+    };
+    const slim = ({ iconSvg, ...item }) => item;
+    const ctxOut = (ctx) => ({
+      items: (ctx.items ?? []).map(slim), folder: ctx.folder ?? null, path: ctx.path ?? [], location: ctx.location ?? null,
+      ...(ctx.target ? { target: slim(ctx.target) } : {}), ...(ctx.mode ? { mode: ctx.mode } : {}), ...(ctx.from ? { from: ctx.from } : {}),
+      ...(ctx.name != null ? { name: ctx.name } : {}), ...(ctx.permanent ? { permanent: true } : {}),
+      ...(ctx.files ? { files: keepFiles(ctx.files) } : {}),
+    });
+    const entries = (list, ctx) => (list ?? []).filter((m) => {
+      if (m.single && ctx.items.length !== 1) return false;
+      if (m.kinds?.length && !ctx.items.every((i) => m.kinds.includes(fileKind(i)))) return false;
+      return true;
+    }).map(({ kinds, single, ...m }) => m);
+    const explorer = new MudExplorer({
+      ...options,
+      provider: {
+        places: () => ask('places'),
+        list: (folderId, { search }) => ask('list', { folderId, search }),
+        children: (folderId) => ask('children', { folderId }),
+        ...(options.home ? { home: () => ask('home') } : {}),
+        ...(options.gallery ? { gallery: () => ask('gallery') } : {}),
+        ...(options.resolvePath ? { resolvePath: (text) => ask('resolvePath', { text }) } : {}),
+        ...(options.renameInPlace !== false ? { rename: (item, name) => ask('rename', { item: slim(item), name }) } : {}),
+        ...(options.preview ? { preview: (item) => ask('preview', { item: slim(item) }) } : {}),
+      },
+      menuItems: (ctx) => entries(options.menuItems, ctx),
+      newItems: (ctx) => entries(options.newItems, ctx),
+      onCommand: (command, ctx) => ask('command', { command, ...ctxOut(ctx) }),
+      onNavigate: (e) => emit('navigate', e),
+      onSelectionChange: (items) => emit('selection', items.map((i) => i.id)),
+      onPinnedChange: (pinned) => emit('pinned', pinned),
+      onViewChange: (view) => emit('view', view),
+    });
+    mountInto(host, explorer.getElement());
+    return {
+      resolve: (requestId, value = null) => { const p = pending.get(requestId); if (p) { pending.delete(requestId); p.resolve(value); } },
+      reject: (requestId, message = '') => { const p = pending.get(requestId); if (p) { pending.delete(requestId); p.reject(new Error(message || 'The request failed.')); } },
+      navigate: (id, search = '') => explorer.navigate(id, { search }),
+      refresh: (select = null) => explorer.refresh({ select }),
+      refreshTree: (folderId) => explorer.refreshTree(folderId),
+      select: (ids) => explorer.select(ids ?? []),
+      rename: (id = null) => explorer.rename(id ?? undefined),
+      setView: (view) => explorer.setView(view),
+      setSort: (key, direction = null) => explorer.setSort(direction ? { key, direction } : { key }),
+      setGroupBy: (by) => explorer.setGroupBy(by),
+      toggleDetails: (show = null) => explorer.toggleDetails(show ?? undefined),
+      setProgress: (progress) => explorer.setProgress(progress),
+      setPinned: (pinned) => explorer.setPinned(pinned),
+      newTab: (id = null) => explorer.newTab(id ?? MudExplorer.HOME),
+      getState: () => explorer.getState(),
+      focus: () => explorer.focus(),
+      // A slice of a kept file, for .NET to stream (IJSStreamReference); length null reads to the end.
+      readFile: async (token, index, offset = 0, length = null) => {
+        const file = files.get(token)?.[index];
+        if (!file) throw new Error(`MudTail: no file ${index} under "${token}"`);
+        const end = length == null ? file.size : Math.min(file.size, offset + length);
+        return new Uint8Array(await file.slice(offset, end).arrayBuffer());
+      },
+      releaseFiles: (token) => files.delete(token),
+      dispose: () => { pending.forEach((p) => p.reject(new Error('disposed'))); pending.clear(); files.clear(); explorer.dispose(); },
     };
   },
 
@@ -561,7 +659,7 @@ export function pageLoading(state = true) {
 
 /**
  * Creates a component and returns its handle.
- * @param {'button'|'autocomplete'|'tabs'|'accordion'|'drawer'|'dialog'|'dock'|'datatable'|'progress'|'progressCircular'|'spinner'|'loading'|'tree'|'statCard'|'imageEditor'} name
+ * @param {'button'|'autocomplete'|'tabs'|'accordion'|'drawer'|'dialog'|'dock'|'datatable'|'progress'|'progressCircular'|'spinner'|'loading'|'tree'|'statCard'|'imageEditor'|'explorer'} name
  * @param {Element|null} host   Blazor ElementReference to render into (ignored for drawer/dialog)
  * @param {object} options      The component's options (see the component's constructor)
  * @param {object|null} dotNetRef DotNetObjectReference that receives OnMudEvent(name, payload)

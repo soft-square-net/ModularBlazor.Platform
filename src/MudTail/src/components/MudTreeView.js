@@ -39,7 +39,7 @@ function clone(nodes) {
 export class MudTreeView {
   /**
    * @param {object} o
-   * @param {Array} o.nodes   [{ id, label, icon?, badge?, expanded?, disabled?, draggable?, droppable?, children?, …your data }]
+   * @param {Array} o.nodes   [{ id, label, icon? (a MudTail icon name), iconSvg? (your own markup, wins over icon), badge?, expanded?, disabled?, draggable?, droppable?, children?, …your data }]
    * @param {string} [o.label]          the tree's accessible name
    * @param {'any'|'level'|'siblings'|'none'} [o.dragMode='any']
    * @param {boolean} [o.orderButtons=true]   the move up / move down buttons
@@ -239,7 +239,7 @@ export class MudTreeView {
         <div class="mud-tree__row" style="--mud-tree-level: ${level - 1}">
           ${draggable ? `<span class="mud-tree__grip" data-tree="grip" aria-hidden="true" title="${esc(t('tree.drag', {}, 'Drag to reorder'))}">${getIconSvg('grip', 15)}</span>` : '<span class="mud-tree__grip is-empty" aria-hidden="true"></span>'}
           ${hasKids ? `<span class="mud-tree__toggle" data-tree="toggle" aria-hidden="true">${getIconSvg('chevronRight', 16)}</span>` : '<span class="mud-tree__toggle is-leaf" aria-hidden="true"></span>'}
-          ${icon ? `<span class="mud-tree__icon" aria-hidden="true">${getIconSvg(icon, 17)}</span>` : ''}
+          ${n.iconSvg ? `<span class="mud-tree__icon" aria-hidden="true">${n.iconSvg}</span>` : icon ? `<span class="mud-tree__icon" aria-hidden="true">${getIconSvg(icon, 17)}</span>` : ''}
           <span class="mud-tree__label">${label}</span>
           ${n.badge != null ? `<span class="mud-tree__badge">${esc(typeof n.badge === 'number' ? formatNumber(n.badge) : n.badge)}</span>` : ''}
           ${order}
