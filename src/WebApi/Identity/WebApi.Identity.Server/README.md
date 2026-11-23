@@ -42,6 +42,26 @@ accepts it and this service accepts it only on the service admin API (below). Th
 `appsettings.Development.json` (`Identity:AdminClient`); elsewhere a secret store, and the client is not registered
 while it is missing.
 
+These are the **built-in** clients (property `managed_by` = `config`). Extra clients can be created in the admin UI
+(`managed_by` = `ui`, see [Platform admin API](#platform-admin-api)); the seeder never touches those.
+
+### Rotating a built-in client's secret
+
+`Auth/RotatingApplicationManager.cs` replaces OpenIddict's application manager so that a confidential client can have
+a second, **next** secret (stored hashed in the application's properties) during a rotation:
+
+1. The admin UI starts a rotation: a new secret is made and shown once. Both secrets are accepted.
+2. The admin puts the new secret in the secret store (for `elsa-workflows`: `Identity:ElsaClient:ClientSecret` of this
+   service and of the WebApi) and restarts the client. The first token issued with the new secret records
+   `next_secret_used`.
+3. The admin completes the rotation (allowed only once the new secret was used): it becomes the secret and the old
+   one stops working. Cancelling drops the new one instead.
+
+The seeder agrees with a rotation at start: a configured secret that is the current one keeps its hash; one that is
+the next one is promoted (the rotation completes); a configured secret older than a completed rotation
+(`secret_rotated`) is ignored with a warning (update the secret store); any other configured secret replaces the
+stored one, as before.
+
 ## Claims
 
 User tokens carry only these claims:
@@ -174,7 +194,34 @@ silently gets a new authorization (`prompt=none`). So revoking also records the 
 
 The record is kept per user and tenant in `AspNetUserTokens` (provider `tenant-sessions`). `/connect/authorize`
 checks it once it knows the tenant. A matching login gets `login_required` (with `prompt=none`) or the login page. A
-new login gets a new `login_at`, so it passes. Other tenants are not affected.
+new login gets a new `login_at`, so it passes. Other tenants are not affected. A platform login (no tenant) is
+recorded under the key `*`.
+
+### Platform admin API
+
+What only platform admins manage; the module checks `platform.tenants.manage` first. No tenant in the path
+(`Admin/PlatformAdmin.cs`).
+
+| Method and path | What it does |
+| --- | --- |
+| `GET /api/service/platform/tenants` | Every tenant known here: name, `requireMfa`, members by status |
+| `PUT …/tenants/{tenant}` `{"displayName?","requireMfa?"}` | Sets the policy (creates the tenant's row if needed); applies at the next token |
+| `GET …/accounts?search=` | Up to 100 accounts with platform roles and memberships |
+| `GET …/accounts/{userId}` | One account |
+| `POST …/accounts/{userId}/lock` / `unlock` | Lockout without end, then every session ends (all tenants and `*`) / clears it |
+| `POST …/accounts/{userId}/sign-out` | Revokes every authorization and token, ends all logins, renews the security stamp |
+| `PUT …/accounts/{userId}/roles` `{"platformAdmin"}` | Grants or takes the `platform-admin` role, then renews the sessions |
+| `GET …/applications`, `GET …/applications/{clientId}` | Clients with grant types, scopes, URIs, secret and rotation state, live tokens |
+| `POST …/applications` | Creates a UI-managed client (secret returned once for a confidential one) |
+| `PUT` / `DELETE …/applications/{clientId}` | Changes or deletes a UI-managed client (409 `built_in` for configured ones) |
+| `POST …/applications/{clientId}/secret` | UI client: a new secret now. Built-in client: starts a rotation |
+| `POST …/applications/{clientId}/rotation/complete` / `cancel` | Completes (409 until the new secret was used) or cancels a rotation |
+| `POST …/applications/{clientId}/tokens/revoke` | Revokes every authorization and token of the client |
+| `GET …/scopes` | The standard scopes and the stored ones |
+
+A UI-managed client may use `authorization_code` (PKCE always required, at least one absolute redirect URI),
+`refresh_token` (with the code grant) and `client_credentials` (confidential only). Its scopes must exist;
+`identity.admin` is never allowed. `openid` needs no permission, so it is listed for every code-flow client.
 
 ## Data
 

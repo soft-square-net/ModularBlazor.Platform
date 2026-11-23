@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using OpenIddict.Abstractions;
@@ -123,7 +124,7 @@ public static class IdentitySeeder
         };
         foreach (var uri in options.BlazorClient.RedirectUris) blazor.RedirectUris.Add(new Uri(uri));
         foreach (var uri in options.BlazorClient.PostLogoutRedirectUris) blazor.PostLogoutRedirectUris.Add(new Uri(uri));
-        await UpsertAsync(applications, blazor, ct);
+        await UpsertAsync(applications, blazor, ct, logger);
 
         // The WebApi's identity-admin module: client credentials, the service admin scope only. Not registered without
         // a secret (Development: appsettings.Development.json; elsewhere a secret store).
@@ -141,7 +142,7 @@ public static class IdentitySeeder
                     Permissions.Endpoints.Token, Permissions.GrantTypes.ClientCredentials,
                     Permissions.Prefixes.Scope + IdentityClaims.AdminScope,
                 },
-            }, ct);
+            }, ct, logger);
 
         // Confidential service client: client credentials only.
         if (string.IsNullOrEmpty(options.ElsaClient.ClientSecret))
@@ -161,7 +162,7 @@ public static class IdentitySeeder
                 Permissions.Prefixes.Scope + IdentityClaims.ApiScope,
             },
         };
-        await UpsertAsync(applications, elsa, ct);
+        await UpsertAsync(applications, elsa, ct, logger);
 
     /*───────────────────────Ahmed_Galal───────────────────────────*/
     var scalar = new OpenIddictApplicationDescriptor
@@ -204,12 +205,58 @@ public static class IdentitySeeder
     /*───────────────────────Ahmed_Galal───────────────────────────*/
   }
 
-  private static async Task UpsertAsync(IOpenIddictApplicationManager applications, OpenIddictApplicationDescriptor descriptor, CancellationToken ct)
+  /// <summary>
+  /// Creates or updates a client from configuration (marked managed_by=config: the admin UI shows it, never edits it).
+  /// The configured secret wins, except around a rotation done in the admin UI (RotatingApplicationManager):
+  /// <list type="bullet">
+  /// <item>it is the pending next secret: the secret store was updated, so the rotation completes here;</item>
+  /// <item>the secret was rotated in the UI and configuration still has an older one: the rotated secret stays (a warning
+  /// says to update the secret store), so a restart never locks the client out.</item>
+  /// </list>
+  /// </summary>
+  private static async Task UpsertAsync(IOpenIddictApplicationManager applications, OpenIddictApplicationDescriptor descriptor, CancellationToken ct,
+      ILogger? logger = null)
     {
-        if (await applications.FindByClientIdAsync(descriptor.ClientId!, ct) is { } existing)
-            await applications.UpdateAsync(existing, descriptor, ct); // re-hashes the secret from configuration
-        else
-            await applications.CreateAsync(descriptor, ct);
+        descriptor.Properties[RotatingApplicationManager.ManagedBy] = JsonSerializer.SerializeToElement(RotatingApplicationManager.ManagedByConfig);
+        var manager = (RotatingApplicationManager)applications;
+        if (await manager.FindByClientIdAsync(descriptor.ClientId!, ct) is not { } existing)
+        {
+            await manager.CreateAsync(descriptor, ct);
+            return;
+        }
+
+        var stored = await manager.GetStoredPropertiesAsync(existing, ct);
+        foreach (var key in new[] { RotatingApplicationManager.NextSecret, RotatingApplicationManager.NextSecretCreated,
+                     RotatingApplicationManager.NextSecretUsed, RotatingApplicationManager.SecretRotated })
+            if (stored.TryGetValue(key, out var value)) descriptor.Properties[key] = value;
+
+        string? promote = null;
+        if (descriptor.ClientSecret is { Length: > 0 } configured)
+        {
+            var current = await manager.GetSecretHashAsync(existing, ct);
+            if (await manager.IsCurrentSecretAsync(existing, configured, ct))
+                descriptor.ClientSecret = current; // unchanged: keep the hash as it is
+            else if (await manager.IsNextSecretAsync(existing, configured, ct))
+            {
+                promote = RotatingApplicationManager.Text(stored, RotatingApplicationManager.NextSecret);
+                descriptor.ClientSecret = current;
+                foreach (var key in new[] { RotatingApplicationManager.NextSecret, RotatingApplicationManager.NextSecretCreated, RotatingApplicationManager.NextSecretUsed })
+                    descriptor.Properties.Remove(key);
+                descriptor.Properties[RotatingApplicationManager.SecretRotated] = JsonSerializer.SerializeToElement(DateTimeOffset.UtcNow.ToString("O"));
+                logger?.LogInformation("The configured secret of {Client} is its rotated one: the rotation is complete.", descriptor.ClientId);
+            }
+            else if (stored.ContainsKey(RotatingApplicationManager.SecretRotated))
+            {
+                descriptor.ClientSecret = current;
+                logger?.LogWarning("The configured secret of {Client} is older than the one rotated in the admin UI; the rotated one stays. Update the secret store.", descriptor.ClientId);
+            }
+            else
+                foreach (var key in new[] { RotatingApplicationManager.NextSecret, RotatingApplicationManager.NextSecretCreated, RotatingApplicationManager.NextSecretUsed })
+                    descriptor.Properties.Remove(key); // a new secret from the deployment: it replaces the current one
+        }
+
+        await manager.UpdateAsync(existing, descriptor, ct);
+        if (promote is not null) await manager.SetSecretHashAsync(existing, promote, ct);
     }
 
     private static async Task SeedDataAsync(IServiceProvider services, SeedOptions seed, ILogger logger, CancellationToken ct)

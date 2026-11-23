@@ -56,7 +56,12 @@ builder.Services.ConfigureApplicationCookie(o =>
 
 // ---------------------------------------------------------------- OpenIddict
 builder.Services.AddOpenIddict()
-    .AddCore(o => o.UseEntityFrameworkCore().UseDbContext<IdentityDb>())
+    .AddCore(o =>
+    {
+        o.UseEntityFrameworkCore().UseDbContext<IdentityDb>();
+        // Secret rotation with an overlap window, and config/ui-managed clients (Auth/RotatingApplicationManager.cs).
+        o.ReplaceApplicationManager<OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreApplication, RotatingApplicationManager>();
+    })
     .AddServer(o =>
     {
         if (options.Issuer is not null) o.SetIssuer(options.Issuer);
@@ -115,6 +120,7 @@ builder.Services.AddOpenIddict()
 builder.Services.AddScoped<TokenIssuer>();
 builder.Services.AddScoped<TenantAuthorizations>();
 builder.Services.AddScoped<SessionEnds>();
+builder.Services.AddScoped<soft.square.net.WebApi.Identity.Server.Admin.PlatformAdmin>();
 builder.Services.AddLoginTime(); // login_at in the login cookie: lets an admin end one browser's sign-in (SessionEnds)
 builder.Services.AddMembershipAdmin();
 builder.Services.AddServiceAdmin();

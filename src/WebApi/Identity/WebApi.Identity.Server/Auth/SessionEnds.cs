@@ -61,6 +61,9 @@ public static class LoginTime
 public sealed class SessionEnds(UserManager<ApplicationUser> users)
 {
     private const string Provider = "tenant-sessions";
+
+    /// <summary>The key for platform tokens (no tenant).</summary>
+    public const string Platform = "*";
     private static readonly TimeSpan KeepEnded = TimeSpan.FromDays(30);
 
     private sealed record State(long? NotBefore, List<long> Ended);

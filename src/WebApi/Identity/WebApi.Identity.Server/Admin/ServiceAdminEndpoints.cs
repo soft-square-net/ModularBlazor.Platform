@@ -85,6 +85,38 @@ public static class ServiceAdminEndpoints
 
         members.MapPost("/{userId}/sessions/revoke", async (string tenant, string userId, Memberships m, Sessions s, CancellationToken ct) =>
             await m.GetAsync(tenant, userId, ct) is null ? Results.NotFound() : Results.Ok(await s.RevokeAllAsync(tenant, userId, ct)));
+
+        MapPlatform(service.MapGroup("/platform"));
+    }
+
+    /// <summary>What only platform admins manage (the module checks the caller): tenants' policy, accounts, clients, scopes.</summary>
+    private static void MapPlatform(RouteGroupBuilder platform)
+    {
+        platform.MapGet("/tenants", (PlatformAdmin p, CancellationToken ct) => p.ListTenantsAsync(ct));
+        platform.MapPut("/tenants/{tenant}", (string tenant, TenantPolicyInput input, PlatformAdmin p, CancellationToken ct) => p.SetTenantAsync(tenant, input, ct));
+
+        platform.MapGet("/accounts", (string? search, int? take, PlatformAdmin p, CancellationToken ct) => p.ListAccountsAsync(search, take ?? 100, ct));
+        platform.MapGet("/accounts/{userId}", (string userId, PlatformAdmin p, CancellationToken ct) => p.GetAccountAsync(userId, ct));
+        platform.MapPost("/accounts/{userId}/lock", (string userId, PlatformAdmin p, CancellationToken ct) => p.LockAsync(userId, ct));
+        platform.MapPost("/accounts/{userId}/unlock", (string userId, PlatformAdmin p, CancellationToken ct) => p.UnlockAsync(userId, ct));
+        platform.MapPost("/accounts/{userId}/sign-out", (string userId, PlatformAdmin p, CancellationToken ct) => p.SignOutEverywhereAsync(userId, ct));
+        platform.MapPut("/accounts/{userId}/roles", (string userId, AccountRolesInput input, PlatformAdmin p, CancellationToken ct) => p.SetRolesAsync(userId, input, ct));
+
+        platform.MapGet("/applications", (PlatformAdmin p, CancellationToken ct) => p.ListApplicationsAsync(ct));
+        platform.MapGet("/applications/{clientId}", (string clientId, PlatformAdmin p, CancellationToken ct) => p.GetApplicationAsync(clientId, ct));
+        platform.MapPost("/applications", async (ApplicationInput input, PlatformAdmin p, CancellationToken ct) =>
+        {
+            var (application, secret) = await p.CreateApplicationAsync(input, ct);
+            return Results.Created($"/api/service/platform/applications/{application.ClientId}", new { application, secret });
+        });
+        platform.MapPut("/applications/{clientId}", (string clientId, ApplicationInput input, PlatformAdmin p, CancellationToken ct) => p.UpdateApplicationAsync(clientId, input, ct));
+        platform.MapDelete("/applications/{clientId}", (string clientId, PlatformAdmin p, CancellationToken ct) => p.DeleteApplicationAsync(clientId, ct));
+        platform.MapPost("/applications/{clientId}/secret", (string clientId, PlatformAdmin p, CancellationToken ct) => p.NewSecretAsync(clientId, ct));
+        platform.MapPost("/applications/{clientId}/rotation/complete", (string clientId, PlatformAdmin p, CancellationToken ct) => p.CompleteRotationAsync(clientId, ct));
+        platform.MapPost("/applications/{clientId}/rotation/cancel", (string clientId, PlatformAdmin p, CancellationToken ct) => p.CancelRotationAsync(clientId, ct));
+        platform.MapPost("/applications/{clientId}/tokens/revoke", (string clientId, PlatformAdmin p, CancellationToken ct) => p.RevokeApplicationTokensAsync(clientId, ct));
+
+        platform.MapGet("/scopes", (PlatformAdmin p, CancellationToken ct) => p.ListScopesAsync(ct));
     }
 
     private static string? ActingUser(HttpContext http) =>

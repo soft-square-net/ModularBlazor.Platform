@@ -90,7 +90,7 @@ public static class ConnectEndpoints
         // An admin ended this browser's sign-in for the tenant (Sessions): it signs in again before it gets anything here.
         var loginAt = LoginTime.Read(result.Principal!);
         // (The login page signs in afresh, with a new login time; the cookie stays, so other tenants are not touched.)
-        if (tenantId is not null && await sessionEnds.MustSignInAgainAsync(user, tenantId, loginAt))
+        if (await sessionEnds.MustSignInAgainAsync(user, tenantId ?? SessionEnds.Platform, loginAt))
             return LoginAgain("The sign-in for this tenant was ended; sign in again.");
 
         var amr = TokenIssuer.ReadAmr(result.Principal!);

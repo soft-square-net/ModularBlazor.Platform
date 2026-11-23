@@ -39,6 +39,19 @@ public sealed class TenantAuthorizations(IOpenIddictAuthorizationManager authori
         return (await authorizations.GetIdAsync(authorization, ct))!;
     }
 
+    /// <summary>Revokes every authorization of the user (every tenant, platform tokens too) and their tokens. Returns how many.</summary>
+    public async Task<int> RevokeAllAsync(string userId, CancellationToken ct)
+    {
+        var revoked = 0;
+        await foreach (var authorization in authorizations.FindBySubjectAsync(userId, ct))
+        {
+            var id = await authorizations.GetIdAsync(authorization, ct);
+            await tokens.RevokeByAuthorizationIdAsync(id!, ct);
+            if (await authorizations.GetStatusAsync(authorization, ct) == Statuses.Valid && await authorizations.TryRevokeAsync(authorization, ct)) revoked++;
+        }
+        return revoked;
+    }
+
     /// <summary>Revokes the user's authorizations (and their codes and refresh tokens) for one tenant. Returns how many.</summary>
     public async Task<int> RevokeAsync(string userId, string tenantId, CancellationToken ct)
     {
