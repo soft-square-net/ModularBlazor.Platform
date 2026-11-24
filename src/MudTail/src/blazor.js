@@ -319,7 +319,7 @@ const factories = {
    *   home, gallery, resolvePath, preview: true when .NET answers those kinds; renameInPlace (default true: "rename"
    *   requests while the name is being edited, else a "rename" command); menuItems / newItems: [{ id, label, icon,
    *   kinds?: ['image', 'folder', …], single?: true }] for the context menu / the New menu (they come back as commands).
-   * Rights are data: an item's or the folder's deny list (see MudExplorer).
+   * Rights are data: an item's or the folder's deny list (see MudExplorer); it also hides menuItems / newItems by id.
    * Other events: navigate ({ location, folder, path }), selection ([ids]), pinned ([{ id, name }]), view (name).
    */
   explorer(host, options, emit) {
@@ -347,6 +347,8 @@ const factories = {
     const entries = (list, ctx) => (list ?? []).filter((m) => {
       if (m.single && ctx.items.length !== 1) return false;
       if (m.kinds?.length && !ctx.items.every((i) => m.kinds.includes(fileKind(i)))) return false;
+      // Rights are data for your entries too: a selected item's, or the open folder's, deny list hides them.
+      if (ctx.items.some((i) => i.deny?.includes(m.id)) || ctx.folder?.deny?.includes(m.id)) return false;
       return true;
     }).map(({ kinds, single, ...m }) => m);
     const explorer = new MudExplorer({
