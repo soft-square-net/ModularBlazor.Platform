@@ -25,7 +25,7 @@ token, **403** without the permission. See [Authentication: implementation](/bac
 | `POST /api/admin/modules/{id}/unload` | Desired state `Installed`: remove routes, stop hosted services, dispose services, unload assemblies everywhere. `HotUnload = false`: `409` unless `?deferred=true` |
 | `PUT /api/admin/modules/{id}/settings` | Replace settings (JSON object); replicas that have the module loaded swap to a reconfigured copy (`HotUnload = false`: applied at the next restart) |
 | `DELETE /api/admin/modules/{id}` | Unload everywhere, delete the package, remove the registration. `409` for a core module; `HotUnload = false`: `409` unless `?deferred=true` |
-| `GET /api/admin/modules/unloading` | Unloaded or swapped-out copies on this replica whose memory is not freed yet |
+| `GET /api/admin/modules/unloading` | Unloaded or swapped-out copies on this replica whose memory is not freed yet. Runs GC passes first, so the list is accurate when read; listed copies are also re-checked in the background |
 
 Errors are problem details: `400` for an invalid package or manifest, or when activation finds an undeclared
 permission, a module-defined authorization requirement or a named policy; `404` for an unknown module; `409` when the
@@ -50,7 +50,9 @@ Module endpoints are served under `/api/{RoutePrefix}`.
 | `restartRequired` | `HotUnload = false` and the catalog asks for a change this replica applies only on its next restart |
 | `hostedServices` | The loaded copy's hosted services: `{ service, state, error }` |
 
-Unload and uninstall return `{ id, unloaded, gcPasses, note }` for the answering replica.
+Unload and uninstall return `{ id, unloaded, gcPasses, note }` for the answering replica. `unloaded` is normally
+`true` (the copy was collected within the request, typically after about 3 passes); `false` means something still
+held it after 20 passes, and the copy is then listed under `/unloading` and re-checked in the background.
 
 ## Other host endpoints
 

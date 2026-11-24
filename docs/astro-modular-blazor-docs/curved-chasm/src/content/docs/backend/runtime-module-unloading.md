@@ -56,9 +56,22 @@ heap dump showed "no managed roots". Bisecting found the cause:
 
 Unload, re-activate, regenerate the document and unload again now works repeatedly.
 
-Collection also needs patience: the loader allocator is freed by finalizers, so the unload waits between
-garbage-collection passes instead of spinning. Its own passes (about 1 s) are often not quite enough: the module is
-listed under `GET /api/admin/modules/unloading` first and collected by the next check, 2–5 s later.
+### The unload request held the module itself
+
+Until 2026-11-23 every unload, even of the trivial sample, reported `unloaded=false` after its 20 GC passes, and the
+copy was collected only by a later request. A heap dump taken *during* those passes showed a single root:
+`ModuleRuntime.SyncAsync`'s async state machine → `LoadedModule` → the module's load context. The variables of its
+`foreach` over the loaded modules are hoisted into the state machine (they live across an `await`), and the GC loop
+ran inside that call, so it could never succeed. (The routing data sources had already dropped the module's endpoints.)
+
+The sync now runs in two steps: `ConvergeAsync` releases the copies and keeps only weak references to their load
+contexts, then `CollectReleasedAsync` runs the GC passes once `ConvergeAsync` has finished and its state is gone.
+
+Collection still needs a few passes: the loader allocator is freed by finalizers, so the unload waits between passes
+instead of spinning. It now takes about 3 passes. A copy that something else still holds briefly (a request to the
+module that is still finishing) is listed under `GET /api/admin/modules/unloading` and **re-checked in the
+background** after 1 s, 5 s, 30 s, 2 min and 10 min, since an idle host runs no GC on its own. Reading `/unloading`
+also runs GC passes, so the list is accurate whenever it is read.
 
 ## Results with the sample module
 
@@ -75,7 +88,16 @@ Re-measured on 2026-11-11 (Greeting, fresh process per run, two runs each):
 | Repeated unload and activate cycles | Collected every time |
 | Layered `inventory` module with EF Core, specifications and tenant databases on four engines (2 core replicas, [lab](/backend/hybrid-lab/)) | Collected on both replicas within about 10 s, in repeated cycles, after the OpenTelemetry and expression-cache fixes. Without them, every copy that logged an EF error or ran the SKU specification stayed loaded |
 | A module protected with `RequirePermission` (403, then 200 after a grant) | Collected; the authorization pipeline holds no module types |
-| Upgrades and settings changes across 8 replicas ([lab](/backend/hybrid-lab/)) | Swapped-out copies often stay under `/unloading` for a while; later heap dumps showed only the active copy in each replica |
+| Upgrades and settings changes across 8 replicas ([lab](/backend/hybrid-lab/)) | Before the 2026-11-23 fix, swapped-out copies often stayed under `/unloading` for a while; later heap dumps showed only the active copy in each replica |
+
+Re-measured on 2026-11-23, after the `SyncAsync` fix (single Development host):
+
+| Scenario | Result of the unload request |
+| --- | --- |
+| Greeting: calls, its OpenAPI document, then unload (Debug and Release host) | `unloaded=true` after 3 GC passes |
+| Greeting: settings change (swap) | Old copy collected after 4 GC passes |
+| Storage: EF Core migrations and queries on PostgreSQL, the AWS SDK, its OpenAPI document | `unloaded=true` after 3 GC passes |
+| A copy held for 3 s on purpose | `unloaded=false`, then collected by the background re-check; `/unloading` empty |
 
 The unload result reports what really happened (`unloaded`, `gcPasses`), so the admin is never told memory was
 freed when it was not.
@@ -92,6 +114,6 @@ freed when it was not.
 | Operation | Treat as |
 | --- | --- |
 | Install, activate, deactivate | Fully live: no restart |
-| Upgrade, settings change | Live swap with no 404 window; the old copy's memory is reclaimed a few seconds later |
-| Unload | Routes gone immediately; memory reclaimed a few seconds later, confirmed by `/unloading` |
+| Upgrade, settings change | Live swap with no 404 window; the old copy's memory is reclaimed within the request |
+| Unload | Routes gone immediately; memory reclaimed within the request (`unloaded=true`), or by the background re-check, confirmed by `/unloading` |
 | Guaranteed memory reclamation | A rolling restart, which the [replicated deployment](/backend/deployment-scenarios/) does anyway |
