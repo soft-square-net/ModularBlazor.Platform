@@ -852,10 +852,10 @@ export class MudExplorer {
     const extra = this.o.menuItems?.(ctx) ?? [];
     const main = [
       { id: 'open', label: L('open', 'Open'), icon: folders ? 'folderOpen' : 'openExternal', shortcut: 'Enter', bold: true, disabled: dis('open') },
-      ...(folders ? [{ id: 'openTab', label: L('openTab', 'Open in new tab'), icon: 'plus' }] : []),
+      ...(folders && this._can('openTab', ctx) ? [{ id: 'openTab', label: L('openTab', 'Open in new tab'), icon: 'plus' }] : []),
       ...(one && this._can('edit', ctx) ? [{ id: 'edit', label: L('edit', 'Edit'), icon: 'edit' }] : []),
       ...(this._can('download', ctx) ? [{ id: 'download', label: L('download', 'Download'), icon: 'download' }] : []),
-      ...(folders ? (items.every((i) => this.pinned.some((p) => p.id === i.id))
+      ...(folders && this._can('pin', ctx) ? (items.every((i) => this.pinned.some((p) => p.id === i.id))
         ? [{ id: 'unpin', label: L('unpin', 'Unpin from Quick access'), icon: 'pinOff' }]
         : [{ id: 'pin', label: L('pin', 'Pin to Quick access'), icon: 'pin' }]) : []),
       ...(extra.length ? [{ separator: true }, ...extra] : []),
