@@ -1,11 +1,12 @@
 ---
 title: Menus
-description: How a client module puts links and groups in the app's three menus with assembly attributes, how administrators change the menus per platform and per tenant, and how an entry shows a live badge.
+description: How a client module puts links and groups in the app's menus with assembly attributes, how administrators change the menus per platform and per tenant, and how an entry shows a live badge.
 sidebar:
   order: 9
 ---
 
-The client has three menus, called **zones**: `main`, `secondary` and `user`. A client module puts links and groups
+The client has four menus, called **zones**: `main`, `secondary` and `user` in the app, and `public` for the public
+site's sections (see [Layouts](/guides/layouts/#the-public-layout)). A client module puts links and groups
 (submenus) in them with assembly attributes. The catalog reads them from the module's metadata on upload, as it reads
 `[ClientModule]`, so the entries are in the menu before the module is downloaded. Administrators then change the
 menus on the client's **Menus** page, kept by the WebApi's `menus` core module.
@@ -36,10 +37,11 @@ Another module joins that group by its full id, `{moduleId}:{id}`:
 | `id` | yes | yes | Unique in the module; the full id is `{moduleId}:{id}` |
 | `title` | yes | yes | English; translated from the module's `i18n/*.json` |
 | `href` | `Href`, optional | yes | One of the module's own pages (under its route prefixes) |
-| `Zone` | yes | yes | `main` (default), `secondary` or `user` |
+| `Zone` | yes | yes | `main` (default), `secondary`, `user` or `public` |
 | `Parent` | yes | yes | A group's id in this module, or `{moduleId}:{id}` in another |
 | `Icon`, `Order` | yes | yes | `Order` sorts within the parent (default 100) |
 | `Badge`, `BadgeRefresh` | yes | yes | See [Badges](#badges) |
+| `Permissions` | yes | yes | The user needs any one of them to see the entry (none: everyone who gets the module) |
 
 Rules:
 
@@ -49,6 +51,8 @@ Rules:
   deleted, no longer for their roles or tenant.
 - **Placement.** A child shows in its parent's zone. If the parent's module is not there, the child goes to the top
   of its own zone. A group with nothing in it and no `Href` is hidden.
+- **Permissions.** The WebApi leaves out of the user's manifest every entry whose `Permissions` they hold none of, so
+  the client never receives it. A grant that changes it changes the manifest's ETag.
 - **Old modules.** A module without menu attributes keeps its `NavTitle` entry, as a link in `main`.
 - **Titles** are English in code and translated at upload from the module's `i18n/{culture}.json` (see
   [Languages](/guides/i18n/)).

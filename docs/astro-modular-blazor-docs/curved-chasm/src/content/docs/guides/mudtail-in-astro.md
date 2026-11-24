@@ -5,9 +5,8 @@ sidebar:
   order: 2
 ---
 
-MudTail is plain CSS plus vanilla JavaScript, so it needs no Astro integration. The `Layouts.Default` module
-already consumes it the same way (`modules/client/Layouts.Default/node-app`), and an Astro site can copy that
-setup.
+MudTail is plain CSS plus vanilla JavaScript, so it needs no Astro integration. The `UI.MudTail` module
+already consumes it the same way (`modules/client/UI.MudTail/node-app`), and an Astro site can copy that setup.
 
 ## Install
 

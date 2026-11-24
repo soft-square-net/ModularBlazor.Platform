@@ -5,8 +5,8 @@ sidebar:
   order: 2
 ---
 
-MudTail عبارة عن CSS عادية وJavaScript عادية، فلا يحتاج إلى تكامل خاص مع Astro. والوحدة `Layouts.Default`
-تستخدمه أصلا بالطريقة نفسها (`modules/client/Layouts.Default/node-app`)، ويمكن لموقع Astro نسخ هذا الإعداد.
+MudTail عبارة عن CSS عادية وJavaScript عادية، فلا يحتاج إلى تكامل خاص مع Astro. والوحدة `UI.MudTail`
+تستخدمه أصلا بالطريقة نفسها (`modules/client/UI.MudTail/node-app`)، ويمكن لموقع Astro نسخ هذا الإعداد.
 
 ## التثبيت
 
