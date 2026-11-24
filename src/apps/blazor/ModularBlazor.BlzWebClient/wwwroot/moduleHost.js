@@ -18,7 +18,23 @@ window.moduleHost = (() => {
     }
   };
 
-  // spec = { styles: [{ id, css?, href? }], scripts: [{ id, code?, url? }] } -> string[] of per-script errors
+  // A module script fetched with its hash checked: <link rel=modulepreload integrity> puts the checked module in the
+  // module map, and import() of the same url uses it. Its own imports (chunks) are not checked: they are hash-named
+  // files under the same per-version url. Resolves false when the file does not match (or cannot be loaded).
+  const preload = (url, integrity, entry) => new Promise(resolve => {
+    const link = document.createElement('link');
+    if (!link.relList?.supports?.('modulepreload')) { resolve(true); return; } // older browsers: plain import
+    link.rel = 'modulepreload';
+    link.crossOrigin = 'anonymous';
+    link.integrity = integrity;
+    link.addEventListener('load', () => resolve(true), { once: true });
+    link.addEventListener('error', () => resolve(false), { once: true });
+    link.href = url;
+    document.head.appendChild(link);
+    entry.styles.push(link); // removed with the module
+  });
+
+  // spec = { styles: [{ id, css?, href?, integrity? }], scripts: [{ id, code?, url?, integrity? }] } -> string[] of errors
   async function activate(moduleId, spec) {
     deactivate(moduleId); // activating twice must not leave two copies behind
 
@@ -38,6 +54,11 @@ window.moduleHost = (() => {
         el.addEventListener('error', release, { once: true });
         el.href = blobUrl;
       } else if (s.href) {
+        if (s.integrity) {
+          // A file served by the WebApi: the browser checks its hash (cross-origin needs CORS for that).
+          el.crossOrigin = 'anonymous';
+          el.integrity = s.integrity;
+        }
         el.href = s.href;
       } else continue;
 
@@ -60,6 +81,10 @@ window.moduleHost = (() => {
       if (!url) continue;
 
       try {
+        if (s.integrity && !(await preload(url, s.integrity, entry))) {
+          errors.push(`${s.id}: ${url} could not be loaded or does not match its hash`);
+          continue;
+        }
         const mod = await import(/* @vite-ignore */ url);
         const ctx = { moduleId };
         const init = typeof mod.default === 'function' ? mod.default : mod.init;

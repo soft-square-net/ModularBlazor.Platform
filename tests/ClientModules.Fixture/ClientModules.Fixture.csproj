@@ -12,4 +12,10 @@
     <ProjectReference Include="..\..\src\ModularBlazor.Abstractions\ModularBlazor.Abstractions.csproj" />
   </ItemGroup>
 
+  <!-- wwwroot embedded as the Module SDK does it (ModuleAssets.targets): "module-assets/<path>" resources. -->
+  <ItemGroup>
+    <EmbeddedResource Include="wwwroot\**\*"
+                      LogicalName="module-assets/$([System.String]::Copy('%(RecursiveDir)').Replace('\','/'))%(Filename)%(Extension)" />
+  </ItemGroup>
+
 </Project>

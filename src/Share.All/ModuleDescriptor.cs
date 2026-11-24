@@ -79,6 +79,16 @@ public sealed class ModuleDescriptor
 
     /// <summary>What the module adds to the layout besides menus: header actions, docks, context panels.</summary>
     public ShellContribution[] Contributions { get; set; } = [];
+
+    /// <summary>
+    /// Where the server serves the module's static files (relative to the WebApi base address; a path under the
+    /// module's wwwroot is appended). Null: the files are taken from the module's own package and handed to the
+    /// browser from memory (an older server, or the cached manifest while the WebApi cannot be reached).
+    /// </summary>
+    public string? AssetBase { get; set; }
+
+    /// <summary>SHA-256 (hex) of the styles and scripts the client activates, by path: checked by the browser (integrity).</summary>
+    public Dictionary<string, string>? AssetHashes { get; set; }
 }
 
 public sealed class ModuleManifest
