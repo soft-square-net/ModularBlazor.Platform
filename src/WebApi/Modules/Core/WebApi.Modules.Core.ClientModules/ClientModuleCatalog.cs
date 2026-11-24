@@ -27,6 +27,7 @@ internal sealed class ClientModuleCatalog
     private readonly string _files;
     private readonly string _uploads;
     private (DateTime Written, long Length, IReadOnlyList<ClientModuleRecord> Records)? _cache;
+    private readonly Lazy<byte[]> _assetKey;
 
     public ClientModuleCatalog(IOptions<ClientModulesOptions> options, IHostEnvironment environment, ILogger<ClientModuleCatalog> log)
     {
@@ -39,6 +40,7 @@ internal sealed class ClientModuleCatalog
         _uploads = Path.Combine(Root, "uploads");
         Directory.CreateDirectory(_files);
         Directory.CreateDirectory(_uploads);
+        _assetKey = new Lazy<byte[]>(LoadAssetKey);
     }
 
     public string Root { get; }
@@ -143,10 +145,11 @@ internal sealed class ClientModuleCatalog
         }).ToList();
     }
 
-    private static ClientModuleDescriptor Describe(ClientModuleRecord r)
+    private ClientModuleDescriptor Describe(ClientModuleRecord r)
     {
         var v = r.Active!;
         var s = r.Settings;
+        var served = v.Assets is { Count: > 0 } && v.AssetsHash is not null;
         return new ClientModuleDescriptor(
             r.Id, s.Name ?? r.Id, v.Version,
             v.Kind == ClientModuleKind.NuPkg ? "nupkg" : "dll",
@@ -155,7 +158,123 @@ internal sealed class ClientModuleCatalog
             v.ExtraAssemblies.Select(f => f.Sha256).ToList(),
             s.LoadStrategy, s.LoadStrategy == ClientModuleLoadStrategy.Startup,
             s.Hidden, s.RequiresAuth, s.RequiredRole, s.AvailableToRoles, s.RoutePrefixes, s.Layout,
-            s.Dependencies, s.Styles, s.Scripts, s.Nav, v.Menu, v.Contributions);
+            s.Dependencies, s.Styles, s.Scripts, s.Nav, v.Menu, v.Contributions,
+            served ? AssetBase(r.Id, v) : null,
+            served ? AssetHashes(v.Assets!, s) : null);
+    }
+
+    /// <summary>
+    /// The folder URL of a version's assets, relative to the WebApi base address: files/{id}/{version}/{token}/. The
+    /// token changes with the assets (a rebuild with the same version gets new URLs) and is keyed with this catalog's
+    /// secret, so only callers who were given the manifest know it. The browser imports from it without the user's
+    /// token (import() cannot send one): module code is not a secret, the data behind its API calls is.
+    /// </summary>
+    private string AssetBase(string id, ClientModuleVersion v) =>
+        $"api/client-modules/files/{Uri.EscapeDataString(id)}/{Uri.EscapeDataString(v.Version)}/{AssetToken(id, v.Version, v.AssetsHash!)}/";
+
+    /// <summary>The hashes the client checks (integrity) for the files it activates itself: styles, scripts, the entry script.</summary>
+    private static Dictionary<string, string> AssetHashes(IReadOnlyList<ClientModuleAsset> assets, ClientModuleSettings s)
+    {
+        var wanted = s.Styles.Concat(s.Scripts).Append(EntryScript)
+            .Select(ClientModuleAssets.Normalize).OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return assets.Where(a => wanted.Contains(a.Path)).ToDictionary(a => a.Path, a => a.Sha256, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>The script the client runs when a module declares none (as ActiveModuleService does).</summary>
+    private const string EntryScript = "js/module.js";
+
+    private string AssetToken(string id, string version, string assetsHash) =>
+        Convert.ToHexStringLower(HMACSHA256.HashData(_assetKey.Value, Encoding.UTF8.GetBytes($"{id.ToLowerInvariant()}\n{version}\n{assetsHash}")))[..24];
+
+    /// <summary>
+    /// A version's asset for a URL from the manifest (<see cref="AssetBase"/> + path), or null (404). Not filtered by
+    /// the caller (scripts are imported without the user's token): the token proves the URL came from a manifest.
+    /// </summary>
+    public (string Path, ClientModuleAsset Asset, bool Public)? ResolveAsset(string id, string version, string token, string path)
+    {
+        var record = List().FirstOrDefault(r => r.Enabled && r.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+        var stored = record?.Versions.FirstOrDefault(v => v.Version == version);
+        if (record is null || stored?.Assets is null || stored.AssetsHash is null) return null;
+        var expected = Encoding.ASCII.GetBytes(AssetToken(record.Id, version, stored.AssetsHash));
+        if (!CryptographicOperations.FixedTimeEquals(expected, Encoding.ASCII.GetBytes(token))) return null;
+        if (ClientModuleAssets.Normalize(path) is not { } normalized) return null;
+        var asset = stored.Assets.FirstOrDefault(a => a.Path.Equals(normalized, StringComparison.OrdinalIgnoreCase));
+        if (asset is null) return null;
+        var file = Path.Combine(_files, record.Id, version, ClientModuleAssets.Folder, asset.Path);
+        return File.Exists(file) ? (file, asset, !record.Settings.RequiresAuth && record.Settings.AvailableToTenants.Count == 0) : null;
+    }
+
+    /// <summary>The catalog's secret for asset URLs: one random key in the catalog folder, shared by every replica.</summary>
+    private byte[] LoadAssetKey()
+    {
+        var path = Path.Combine(Root, "asset-urls.key");
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                if (File.Exists(path) && File.ReadAllBytes(path) is { Length: 32 } existing) return existing;
+                var key = RandomNumberGenerator.GetBytes(32);
+                using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None)) stream.Write(key);
+                return key;
+            }
+            catch (IOException) when (attempt < 40) // another replica is writing it
+            {
+                Thread.Sleep(25);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Takes the assets out of versions installed before assets were extracted (or whose extraction is missing), so
+    /// every module gets real URLs without being uploaded again. Runs on start; idempotent.
+    /// </summary>
+    public async Task<int> ExtractMissingAssetsAsync(CancellationToken ct)
+    {
+        if (!List().Any(r => r.Versions.Any(v => v.Assets is null))) return 0;
+        return await ChangeAsync(records =>
+        {
+            var count = 0;
+            foreach (var record in records)
+                for (var i = 0; i < record.Versions.Count; i++)
+                {
+                    var v = record.Versions[i];
+                    if (v.Assets is not null) continue;
+                    var folder = Path.Combine(_files, record.Id, v.Version);
+                    var stored = new[] { v.Primary }.Concat(v.ExtraAssemblies).Select(f => Path.Combine(folder, f.Name)).ToList();
+                    if (!stored.All(File.Exists)) continue;
+                    try
+                    {
+                        var assets = ClientModuleAssets.Extract(v.Kind, stored.Select(p => (Path.GetFileName(p), File.ReadAllBytes(p))));
+                        var described = WriteAssets(folder, assets);
+                        record.Versions[i] = v with { Assets = described, AssetsHash = ClientModuleAssets.SetHash(described) };
+                    }
+                    catch (ClientModuleException e)
+                    {
+                        _log.LogWarning("Client module {Module} {Version}: assets not served from URLs ({Reason}).", record.Id, v.Version, e.Message);
+                        record.Versions[i] = v with { Assets = [], AssetsHash = null };
+                    }
+                    count++;
+                }
+            if (count > 0) _log.LogInformation("Extracted the static files of {Count} client module versions.", count);
+            return count;
+        }, ct);
+    }
+
+    /// <summary>Writes a version's assets to {folder}/assets (replacing what is there) and describes them.</summary>
+    private static List<ClientModuleAsset> WriteAssets(string folder, IReadOnlyList<(string Path, byte[] Content)> assets)
+    {
+        var target = Path.Combine(folder, ClientModuleAssets.Folder);
+        var staging = target + ".new-" + Guid.NewGuid().ToString("N")[..8];
+        Directory.CreateDirectory(staging);
+        foreach (var (path, content) in assets)
+        {
+            var file = Path.Combine(staging, path);
+            Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+            File.WriteAllBytes(file, content);
+        }
+        DeleteFolder(target);
+        Directory.Move(staging, target);
+        return assets.Select(a => ClientModuleAssets.Describe(a.Path, a.Content)).ToList();
     }
 
     /// <summary>Relative to the WebApi base address. The hash makes the URL change whenever the content does.</summary>
@@ -517,13 +636,25 @@ internal sealed class ClientModuleCatalog
             throw new ClientModuleException(
                 $"Version {package.Version} of '{package.Id}' is installed with other files. Raise the module's version, or install with replace = true.", 409);
 
+        var (assets, assetsHash) = (existing?.Assets, existing?.AssetsHash);
         if (existing?.PackageHash != package.PackageHash)
         {
+            // The static files, served from real URLs; a package over the limits keeps the client's in-memory path.
+            IReadOnlyList<(string Path, byte[] Content)> extracted;
+            try { extracted = ClientModuleAssets.Extract(package.Kind, package.Files.Select(f => (f.Name, f.Content))); }
+            catch (ClientModuleException e)
+            {
+                _log.LogWarning("Client module {Module} {Version}: assets not served from URLs ({Reason}).", package.Id, package.Version, e.Message);
+                extracted = [];
+            }
+
             // Write the files next to the target, then swap folders: readers never see half a version.
             var target = Path.Combine(_files, package.Id, package.Version);
             var staging = target + ".new-" + Guid.NewGuid().ToString("N")[..8];
             Directory.CreateDirectory(staging);
             foreach (var file in package.Files) File.WriteAllBytes(Path.Combine(staging, file.Name), file.Content);
+            var described = WriteAssets(staging, extracted);
+            (assets, assetsHash) = (described, described.Count > 0 ? ClientModuleAssets.SetHash(described) : null);
             DeleteFolder(target);
             Directory.Move(staging, target);
         }
@@ -543,7 +674,9 @@ internal sealed class ClientModuleCatalog
             Menu = package.Menu,
             Contributions = package.Contributions,
             LayoutDetails = package.LayoutDetails,
-            PlatformVersion = package.PlatformVersion
+            PlatformVersion = package.PlatformVersion,
+            Assets = assets,
+            AssetsHash = assetsHash
         };
 
         if (record is null)

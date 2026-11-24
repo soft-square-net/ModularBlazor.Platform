@@ -1,4 +1,5 @@
 using Microsoft.JSInterop;
+using soft.square.net.ModularBlazor.BlzWebClient.Auth;
 using soft.square.net.Share.All;
 
 namespace soft.square.net.ModularBlazor.BlzWebClient.Services;
@@ -14,6 +15,10 @@ namespace soft.square.net.ModularBlazor.BlzWebClient.Services;
 ///
 /// <see cref="SyncAsync"/> diffs desired against what is applied and only activates/deactivates the difference
 /// (a reconciler, like a UI diff). Calls are serialized, so rapid navigation cannot interleave and the last request wins.
+///
+/// Where a module's files come from: the server's URLs when the manifest gives an AssetBase (real files: chunks,
+/// relative url(...) and imports work; the browser checks each file's hash), otherwise the copies inside the module's
+/// package, handed over from memory as blobs (older servers, and the cached manifest while offline).
 /// </summary>
 public sealed class ActiveModuleService
 {
@@ -22,14 +27,16 @@ public sealed class ActiveModuleService
   private readonly ModuleManager _modules;
   private readonly ModuleAssetStore _store;
   private readonly IJSRuntime _js;
+  private readonly Uri? _webApi;
   private readonly SemaphoreSlim _gate = new(1, 1);
   private readonly HashSet<string> _active = new(StringComparer.OrdinalIgnoreCase);
 
-  public ActiveModuleService(ModuleManager modules, ModuleAssetStore store, IJSRuntime js)
+  public ActiveModuleService(ModuleManager modules, ModuleAssetStore store, IJSRuntime js, IHttpClientFactory httpClients)
   {
     _modules = modules;
     _store = store;
     _js = js;
+    _webApi = httpClients.CreateClient(AuthServiceExtensions.WebApiPublicClient).BaseAddress;
 
     // A module that was unloaded, or a user's modules forgotten at logout, must also leave the page.
     _modules.Changed += () => _ = SyncAsync();
@@ -119,17 +126,20 @@ public sealed class ActiveModuleService
     {
       var path = descriptor.Styles[i];
       var specId = $"{id}#css{i}";
-      if (assets.TryGetText(path, out var css)) styles.Add(new StyleSpec(specId, css, null));
-      else styles.Add(new StyleSpec(specId, null, path)); // not packaged: a normal url
+      if (Served(descriptor, path) is { } served) styles.Add(new StyleSpec(specId, null, served.Url, served.Integrity));
+      else if (assets.TryGetText(path, out var css)) styles.Add(new StyleSpec(specId, css, null, null));
+      else styles.Add(new StyleSpec(specId, null, path, null)); // not packaged: a normal url
     }
 
-    var declared = descriptor.Scripts.Length > 0 ? descriptor.Scripts : (assets.Contains(EntryScript) ? [EntryScript] : []);
+    var hasEntry = assets.Contains(EntryScript) || Served(descriptor, EntryScript) is not null;
+    var declared = descriptor.Scripts.Length > 0 ? descriptor.Scripts : (hasEntry ? [EntryScript] : []);
     for (var i = 0; i < declared.Length; i++)
     {
       var path = declared[i];
       var specId = $"{id}#js{i}";
-      if (assets.TryGetText(path, out var code)) scripts.Add(new ScriptSpec(specId, code, null));
-      else scripts.Add(new ScriptSpec(specId, null, path));
+      if (Served(descriptor, path) is { } served) scripts.Add(new ScriptSpec(specId, null, served.Url, served.Integrity));
+      else if (assets.TryGetText(path, out var code)) scripts.Add(new ScriptSpec(specId, code, null, null));
+      else scripts.Add(new ScriptSpec(specId, null, path, null));
     }
 
     try
@@ -163,6 +173,18 @@ public sealed class ActiveModuleService
     _active.Remove(id);
   }
 
-  private sealed record StyleSpec(string Id, string? Css, string? Href);
-  private sealed record ScriptSpec(string Id, string? Code, string? Url);
+  /// <summary>A packaged file's URL on the server and its integrity ("sha256-..."), when the manifest serves it.</summary>
+  private (string Url, string Integrity)? Served(ModuleDescriptor d, string path)
+  {
+    if (d.AssetBase is null || d.AssetHashes is null || ModuleAssetSet.IsUrl(path)) return null;
+    var normalized = ModuleAssetSet.Normalize(path);
+    var hash = d.AssetHashes.FirstOrDefault(h => h.Key.Equals(normalized, StringComparison.OrdinalIgnoreCase)).Value;
+    if (hash is null) return null;
+    var relative = d.AssetBase + string.Join('/', normalized.Split('/').Select(Uri.EscapeDataString));
+    var url = _webApi is null ? relative : new Uri(_webApi, relative).ToString();
+    return (url, "sha256-" + Convert.ToBase64String(Convert.FromHexString(hash)));
+  }
+
+  private sealed record StyleSpec(string Id, string? Css, string? Href, string? Integrity);
+  private sealed record ScriptSpec(string Id, string? Code, string? Url, string? Integrity);
 }

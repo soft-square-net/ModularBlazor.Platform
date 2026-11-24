@@ -162,6 +162,15 @@ public sealed record ClientModuleVersion
 
     /// <summary>The platform contracts (ModularBlazor.Abstractions) it was built against; null: it does not reference them.</summary>
     public string? PlatformVersion { get; init; }
+
+    /// <summary>
+    /// The static files taken out of the package (wwwroot: css, js, fonts...), stored under files/{id}/{version}/assets/
+    /// and served from real URLs. Null: installed before assets were extracted (done on the next start).
+    /// </summary>
+    public IReadOnlyList<ClientModuleAsset>? Assets { get; init; }
+
+    /// <summary>Identifies <see cref="Assets"/> (paths and contents); their URLs change with it.</summary>
+    public string? AssetsHash { get; init; }
 }
 
 /// <summary>A client module in the catalog.</summary>
@@ -213,7 +222,9 @@ public sealed record ClientModuleDescriptor(
     IReadOnlyList<string> Scripts,
     IReadOnlyList<ClientModuleNavItem> Nav,
     IReadOnlyList<ClientModuleMenuItem> Menu,
-    IReadOnlyList<ClientModuleContribution> Contributions);
+    IReadOnlyList<ClientModuleContribution> Contributions,
+    string? AssetBase = null,
+    IReadOnlyDictionary<string, string>? AssetHashes = null);
 
 /// <summary>The modules the caller may use; <see cref="ETag"/> changes whenever the list does.</summary>
 public sealed record ClientModuleManifest(string ETag, IReadOnlyList<ClientModuleDescriptor> Modules);

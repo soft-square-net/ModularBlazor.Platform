@@ -76,6 +76,16 @@ internal sealed class ClientModuleSeeder(ClientModuleCatalog catalog, ILogger<Cl
 
         try
         {
+            await catalog.ExtractMissingAssetsAsync(ct);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            // Those modules keep their in-memory assets on the client.
+            log.LogError(e, "Extracting the static files of installed client modules failed");
+        }
+
+        try
+        {
             await catalog.SeedLocalAsync(ct);
         }
         catch (Exception e) when (e is not OperationCanceledException)
