@@ -25,6 +25,53 @@
             if (saved) apply(saved, null, false);
         })();
     </script>
+    <script>
+        // appBrand: the tenant's brand (Services/BrandingService.cs). The last one received is kept in localStorage
+        // ("mb.brand") and applied here before anything renders: colours, radius, font, colour mode and favicon.
+        // The user's own MudTail theme ("mud_vanilla_theme_config") keeps its colours when the brand allows them, and
+        // its light/dark choice when the brand allows that mode.
+        (function () {
+            var key = 'mb.brand', mudKey = 'mud_vanilla_theme_config', modes = ['light', 'dark', 'system'];
+            var mudDefaults = { primary: '#594ae2', secondary: '#ff4081', borderRadius: 4 };
+            function read(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+            function hex(v) { return typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v); }
+            function rgb(v) { var n = parseInt(v.slice(1), 16); return ((n >> 16) & 255) + ', ' + ((n >> 8) & 255) + ', ' + (n & 255); }
+            function get() { return read(key); }
+            function apply(brand, etag, caller) {
+                if (!brand) return;
+                var root = document.documentElement, style = root.style, user = read(mudKey) || {};
+                var own = brand.allowUserColors !== false;
+                function color(name, value, mine, fallback) {
+                    var v = own && hex(mine) && mine.toLowerCase() !== fallback ? mine : value;
+                    if (!hex(v)) return;
+                    style.setProperty('--mud-palette-' + name, v);
+                    style.setProperty('--mud-palette-' + name + '-rgb', rgb(v));
+                }
+                color('primary', brand.primary, user.primary, mudDefaults.primary);
+                color('secondary', brand.secondary, user.secondary, mudDefaults.secondary);
+                var radius = own && typeof user.borderRadius === 'number' && user.borderRadius !== mudDefaults.borderRadius ? user.borderRadius : brand.radius;
+                if (typeof radius === 'number') {
+                    style.setProperty('--mud-default-borderradius', radius + 'px');
+                    style.setProperty('--mud-input-borderradius', radius + 'px');
+                }
+                if (brand.font) style.setProperty('--mb-brand-font', brand.font); else style.removeProperty('--mb-brand-font');
+
+                var allowed = brand.allowedModes && brand.allowedModes.length ? brand.allowedModes : modes;
+                var mode = typeof user.isDark === 'boolean' ? (user.isDark ? 'dark' : 'light') : brand.defaultMode;
+                if (allowed.indexOf(mode) < 0) mode = allowed.indexOf(brand.defaultMode) >= 0 ? brand.defaultMode : allowed[0];
+                if (mode === 'system') mode = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                if (mode === 'dark') root.setAttribute('data-theme', 'dark'); else root.removeAttribute('data-theme');
+
+                var icon = document.querySelector('link[rel="icon"]');
+                if (icon) icon.href = brand.faviconUrl || 'data:,';
+
+                if (etag) { try { localStorage.setItem(key, JSON.stringify({ eTag: etag, caller: caller || '', brand: brand })); } catch (e) { /* storage blocked */ } }
+            }
+            window.appBrand = { get: get, apply: apply };
+            var saved = get();
+            if (saved) apply(saved.brand, null, null);
+        })();
+    </script>
     <link rel="stylesheet" href="css/app.css" />
     <script src="moduleHost.js"></script>
     <script src="moduleCache.js"></script>

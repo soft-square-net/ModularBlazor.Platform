@@ -64,14 +64,15 @@ builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Lookups.IL
 builder.Services.AddScoped<ModuleDialogService>();
 builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.IModuleDialogs>(sp => sp.GetRequiredService<ModuleDialogService>());
 // The layout contract (Abstractions/Shell): page context, module contributions (header actions, docks, context
-// panels), the tenant's brand and the user's permissions. Branding and permissions are placeholders until their
-// server parts exist.
+// panels), the tenant's brand (branding core module) and the user's permissions (identity core module's api/identity/me).
 builder.Services.AddScoped<PageContextService>();
 builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Shell.IPageContext>(sp => sp.GetRequiredService<PageContextService>());
 builder.Services.AddScoped<ShellContributionService>();
 builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Shell.IShellContributions>(sp => sp.GetRequiredService<ShellContributionService>());
-builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Shell.IBranding, DefaultBranding>();
-builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Shell.IUserPermissions, PendingUserPermissions>();
+builder.Services.AddScoped<BrandingService>();
+builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Shell.IBranding>(sp => sp.GetRequiredService<BrandingService>());
+builder.Services.AddScoped<UserPermissionsService>();
+builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Shell.IUserPermissions>(sp => sp.GetRequiredService<UserPermissionsService>());
 // Development only: a module repo's playground reloads a rebuilt client module in place (see DevModuleReloader).
 builder.Services.AddScoped<DevModuleReloader>();
 
@@ -88,6 +89,9 @@ await modules.LoadStartupModulesAsync();
 
 // ...and the startup modules' styles/scripts go live (they stay active for the whole session).
 await host.Services.GetRequiredService<ActiveModuleService>().SyncAsync();
+
+// The tenant's brand over MudTail's defaults (index.html already painted the cached one), then the server's.
+await host.Services.GetRequiredService<BrandingService>().InitializeAsync();
 
 // The language, before the first render: the saved choice or the default (MudTail is active by now, so it follows).
 await host.Services.GetRequiredService<LocaleService>().InitializeAsync();

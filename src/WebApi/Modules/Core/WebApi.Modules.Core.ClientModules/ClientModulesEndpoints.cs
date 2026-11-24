@@ -34,11 +34,30 @@ public sealed class ClientModulesEndpoints : ICarterModule
 
     // ---------------------------------------------------------------- the client app
 
+    /// <summary>
+    /// The caller's permissions in the request's tenant (grants and platform roles); none when anonymous, or when the
+    /// tenant's grants cannot be read (no database yet): the manifest is then served without permission-gated entries.
+    /// </summary>
+    private static async Task<IReadOnlySet<string>> PermissionsAsync(HttpContext http, IAccessScopes access, CancellationToken ct)
+    {
+        if (http.User.Identity?.IsAuthenticated != true) return new HashSet<string>();
+        try
+        {
+            return (await access.PermissionsAsync(ct)).ToHashSet(StringComparer.Ordinal);
+        }
+        catch (InvalidOperationException)
+        {
+            return new HashSet<string>();
+        }
+    }
+
     private static void MapClient(RouteGroupBuilder root)
     {
-        root.MapGet("/manifest", (HttpContext http, ClientModuleCatalog catalog, ITenantContext tenant) =>
+        root.MapGet("/manifest", async (HttpContext http, ClientModuleCatalog catalog, ITenantContext tenant, IAccessScopes access, CancellationToken ct) =>
             {
-                var manifest = catalog.Manifest(http.User, tenant.TenantId);
+                // Menu entries and shell contributions that name permissions go only to users holding one of them. The
+                // filtered list is what the ETag hashes, so a grant that starts or ends changes it.
+                var manifest = catalog.Manifest(http.User, tenant.TenantId, await PermissionsAsync(http, access, ct));
                 var etag = $"\"{manifest.ETag}\"";
                 http.Response.Headers.ETag = etag;
                 http.Response.Headers.CacheControl = "private, no-cache"; // revalidate every time: a 304 is cheap

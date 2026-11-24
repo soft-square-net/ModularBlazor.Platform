@@ -110,29 +110,3 @@ public sealed class ShellContributionService : IShellContributions, IDisposable
     _navigation.LocationChanged -= OnLocationChanged;
   }
 }
-
-/// <summary>
-/// The platform's own brand (IBranding) until the branding core module serves the tenant's: layouts can already read
-/// the name and logo from here instead of hard-coding them.
-/// </summary>
-public sealed class DefaultBranding : IBranding
-{
-  public BrandInfo Current => BrandInfo.Default;
-
-  public event Action? Changed { add { } remove { } }
-}
-
-/// <summary>
-/// IUserPermissions until the server's permissions endpoint exists: never loaded, nothing granted. Pages that hide
-/// controls with it should treat "not loaded" as unknown, not as denied.
-/// </summary>
-public sealed class PendingUserPermissions : IUserPermissions
-{
-  public bool IsLoaded => false;
-
-  public bool Has(string permission) => false;
-
-  public bool HasAny(IEnumerable<string> permissions) => !permissions.Any();
-
-  public event Action? Changed { add { } remove { } }
-}
