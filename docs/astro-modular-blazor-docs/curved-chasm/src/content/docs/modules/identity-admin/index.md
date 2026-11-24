@@ -29,27 +29,27 @@ own confidential client.
 
 ~~~mermaid
 flowchart TB
-    subgraph Browser["Blazor WASM client"]
-        UI["Module.IdentityAdmin<br/>/identity pages"]
-        API["WebApi.Modules.IdentityAdmin.Client<br/>(hidden client module, NSwag)"]
+    subgraph Browser["Blazor client"]
+        UI["Module.<br/>IdentityAdmin<br/>/identity pages"]
+        API["WebApi.Modules.<br/>IdentityAdmin.Client<br/>hidden client module"]
         UI --> API
     end
     subgraph WebApi["WebApi host"]
-        M["identity-admin runtime module<br/>/api/identity-admin"]
+        M["identity-admin<br/>runtime module<br/>/api/identity-admin"]
         G[("Grant store<br/>IGrantStore")]
-        P["IAccessScopes / IPermissionCatalog<br/>ITenantContext"]
+        P["IAccessScopes<br/>IPermissionCatalog<br/>ITenantContext"]
         M --> G
         M --> P
     end
-    subgraph Identity["Identity service (WebApi.Identity.Server)"]
-        S["/api/service/tenants/{tenant}/…<br/>members, profiles, sessions"]
-        PL["/api/service/platform/…<br/>tenants' MFA policy, accounts, clients, scopes"]
-        DB[("identity database")]
+    subgraph Identity["Identity service"]
+        S["/api/service/<br/>tenants/{tenant}/…<br/>members, profiles,<br/>sessions"]
+        PL["/api/service/<br/>platform/…<br/>MFA policy, accounts,<br/>clients, scopes"]
+        DB[("identity<br/>database")]
         S --> DB
         PL --> DB
     end
-    API -->|"user token + X-Tenant"| M
-    M -->|"client-credentials token<br/>webapi-identity-admin, scope identity.admin<br/>+ X-Acting-User"| S
+    API -->|"user token<br/>+ X-Tenant"| M
+    M -->|"client credentials<br/>scope identity.admin<br/>+ X-Acting-User"| S
     M --> PL
 ~~~
 

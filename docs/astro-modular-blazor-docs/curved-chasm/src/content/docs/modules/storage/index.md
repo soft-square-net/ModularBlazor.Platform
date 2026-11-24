@@ -29,31 +29,31 @@ The server part follows Ardalis Clean Architecture, adapted to a runtime module,
 
 ~~~mermaid
 flowchart TB
-    subgraph Browser["Blazor WASM client"]
+    subgraph Browser["Blazor client"]
         F["Module.Storage<br/>/files page"]
-        X["MudTail explorer<br/>(Layouts.Default runtime, JS)"]
-        C["WebApi.Modules.Storage.Client<br/>(hidden client module, NSwag)"]
-        F <-->|"requests and answers"| X
+        X["MudTail explorer<br/>Layouts.Default<br/>runtime (JS)"]
+        C["WebApi.Modules.<br/>Storage.Client<br/>hidden client module"]
+        F <-->|"requests<br/>and answers"| X
         F --> C
     end
     subgraph WebApi["WebApi host"]
-        W["storage runtime module<br/>/api/storage"]
-        U["UseCases<br/>Mediator + Ardalis.Result"]
+        W["storage<br/>runtime module<br/>/api/storage"]
+        U["UseCases<br/>Mediator +<br/>Ardalis.Result"]
         A["AccessEvaluator<br/>NTFS-style ACL"]
-        P["IAccessScopes<br/>storage.access / storage.admin, grants"]
+        P["IAccessScopes<br/>storage.access,<br/>storage.admin, grants"]
         W --> U --> A
         A --> P
     end
     DB[("tenant database<br/>schema storage")]
-    subgraph Blobs["Blob stores (named connections)"]
+    subgraph Blobs["Blob stores"]
         L["local disk"]
         S3["S3 / MinIO"]
     end
-    C -->|"user token + X-Tenant"| W
+    C -->|"user token<br/>+ X-Tenant"| W
     U --> DB
     U --> L
     U --> S3
-    Browser -.->|"presigned or signed link<br/>(no token)"| S3
+    Browser -.->|"presigned or<br/>signed link,<br/>no token"| S3
     Browser -.-> W
 ~~~
 
