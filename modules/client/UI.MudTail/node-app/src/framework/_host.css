@@ -1,0 +1,12 @@
+/* The host's own variables (ModularBlazor.BlzWebClient wwwroot/css/app.css) follow the MudTail tokens, so the host's
+   pages and every module pick up the same palette, dark mode included, whatever layout is active. */
+:root {
+  --bg: var(--mud-palette-background);
+  --surface: var(--mud-palette-surface);
+  --text: var(--mud-palette-text-primary);
+  --muted: var(--mud-palette-text-secondary);
+  --border: var(--mud-palette-lines-default);
+  --accent: var(--mud-palette-primary);
+  --accent-dark: var(--mud-palette-primary-hover);
+  --danger: var(--mud-palette-error);
+}

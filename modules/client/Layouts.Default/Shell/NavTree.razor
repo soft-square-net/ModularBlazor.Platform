@@ -1,0 +1,182 @@
+@implements IDisposable
+@inject IMenuService Menus
+@inject IMenuBadges Badges
+@inject NavigationManager Navigation
+
+@*
+  A menu zone as the drawer draws it: an icon and a title per entry, groups that collapse (aria-expanded), and the
+  group holding the current page opened by itself. In mini mode the titles become tooltips and an open group shows
+  its entries as a flyout next to the rail, since there is no room to expand it inline.
+*@
+@{ var nodes = Menus.Zone(Zone); }
+@if (nodes.Count > 0 || ChildContent is not null)
+{
+  <nav class="shell-nav shell-nav--@Zone" aria-label="@Label">
+    <ul class="shell-nav-list">
+      @ChildContent
+      @foreach (var node in nodes)
+      {
+        @Entry(node, 0)
+      }
+    </ul>
+  </nav>
+}
+
+@code {
+  [Parameter, EditorRequired] public string Zone { get; set; } = MenuZones.Main;
+  [Parameter] public string? Label { get; set; }
+
+  /// <summary>Entries placed before the zone's own (the layout's Home link).</summary>
+  [Parameter] public RenderFragment? ChildContent { get; set; }
+
+  /// <summary>The groups the user opened (the layout keeps and saves them).</summary>
+  [Parameter, EditorRequired] public HashSet<string> OpenGroups { get; set; } = default!;
+
+  /// <summary>Raised when the user opens or closes a group.</summary>
+  [Parameter] public EventCallback OpenGroupsChanged { get; set; }
+
+  /// <summary>Mini mode: only one group open at a time (its flyout).</summary>
+  [Parameter] public bool Mini { get; set; }
+
+  /// <summary>The flyout open in mini mode (a group id), owned by the layout so one click elsewhere closes it.</summary>
+  [Parameter] public string? Flyout { get; set; }
+  [Parameter] public EventCallback<string?> FlyoutChanged { get; set; }
+
+  private string _path = "";
+
+  protected override void OnInitialized()
+  {
+    Menus.Changed += OnChanged;
+    Badges.Changed += OnChanged;
+    Navigation.LocationChanged += OnLocationChanged;
+    _path = CurrentPath();
+  }
+
+  private string CurrentPath() => "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].Trim('/');
+
+  private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+  private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+  {
+    _path = CurrentPath();
+    _ = InvokeAsync(StateHasChanged);
+  }
+
+  private bool IsCurrent(MenuItem item) =>
+    !string.IsNullOrEmpty(item.Href) && !item.External && Matches(item.Href);
+
+  private bool Matches(string href)
+  {
+    var target = "/" + href.Split('?', '#')[0].Trim('/');
+    return target == "/" ? _path == "/" : _path.Equals(target, StringComparison.OrdinalIgnoreCase)
+      || _path.StartsWith(target + "/", StringComparison.OrdinalIgnoreCase);
+  }
+
+  private bool HoldsCurrent(MenuNode node) => node.Children.Any(c => IsCurrent(c.Item) || HoldsCurrent(c));
+
+  private bool IsOpen(MenuNode node, int depth) =>
+    Mini && depth == 0
+      ? Flyout == node.Item.Id
+      : OpenGroups.Contains(node.Item.Id) || (HoldsCurrent(node) && !_closed.Contains(node.Item.Id));
+
+  private async Task ToggleAsync(MenuNode node, int depth)
+  {
+    if (Mini && depth == 0)
+    {
+      await FlyoutChanged.InvokeAsync(Flyout == node.Item.Id ? null : node.Item.Id);
+      return;
+    }
+    var id = node.Item.Id;
+    // A group open because it holds the current page closes on a click like any other: remember it as closed.
+    if (IsOpen(node, depth)) { OpenGroups.Remove(id); _closed.Add(id); }
+    else { OpenGroups.Add(id); _closed.Remove(id); }
+    await OpenGroupsChanged.InvokeAsync();
+  }
+
+  private readonly HashSet<string> _closed = new(StringComparer.OrdinalIgnoreCase);
+
+  private RenderFragment Entry(MenuNode node, int depth) => __builder =>
+  {
+    var item = node.Item;
+    var open = node.HasChildren && IsOpen(node, depth);
+    var badge = Badges.Of(item.Id);
+    var listId = $"nav-{Zone}-{item.Id}".Replace(':', '-').Replace('.', '-');
+    <li @key="item.Id" class="shell-nav-item @(node.HasChildren ? "shell-nav-item--group" : null) @(open ? "open" : null)">
+      @if (node.HasChildren)
+      {
+        <div class="shell-nav-row">
+          @if (!string.IsNullOrEmpty(item.Href))
+          {
+            @Link(item, depth, badge)
+            <button type="button" class="shell-nav-chevron" aria-expanded="@(open ? "true" : "false")" aria-controls="@listId"
+                    aria-label="@item.LocalTitle" @onclick="() => ToggleAsync(node, depth)">
+              <ShellIcon Name="chevron-down" />
+            </button>
+          }
+          else
+          {
+            <button type="button" class="shell-nav-link shell-nav-group" aria-expanded="@(open ? "true" : "false")" aria-controls="@listId"
+                    data-tip="@item.LocalTitle" @onclick="() => ToggleAsync(node, depth)">
+              @if (depth == 0) { <ShellIcon Name="@item.Icon" Fallback="@item.LocalTitle" /> }
+              <span class="shell-nav-title">@item.LocalTitle</span>
+              @Badge(badge)
+              <ShellIcon Name="chevron-down" Class="shell-nav-caret" />
+            </button>
+          }
+        </div>
+        <ul id="@listId" class="shell-nav-list shell-nav-children" hidden="@(!open)" aria-label="@item.LocalTitle">
+          @if (Mini && depth == 0) { <li class="shell-flyout-title" aria-hidden="true">@item.LocalTitle</li> }
+          @foreach (var child in node.Children)
+          {
+            @Entry(child, depth + 1)
+          }
+        </ul>
+      }
+      else
+      {
+        @Link(item, depth, badge)
+      }
+    </li>
+  };
+
+  private RenderFragment Link(MenuItem item, int depth, MenuBadge? badge) => __builder =>
+  {
+    if (string.IsNullOrEmpty(item.Href))
+    {
+      <span class="shell-nav-link shell-nav-heading">@item.LocalTitle</span>
+    }
+    else if (item.External)
+    {
+      <a class="shell-nav-link" href="@item.Href" target="_blank" rel="noopener noreferrer" data-tip="@item.LocalTitle">
+        @if (depth == 0) { <ShellIcon Name="@item.Icon" Fallback="@item.LocalTitle" /> }
+        <span class="shell-nav-title">@item.LocalTitle</span>
+        <ShellIcon Name="external-link" Class="shell-nav-external" />
+        @Badge(badge)
+      </a>
+    }
+    else
+    {
+      <a class="shell-nav-link @(IsCurrent(item) ? "active" : null)" href="@item.Href" data-tip="@item.LocalTitle"
+         aria-current="@(IsCurrent(item) ? "page" : null)">
+        @if (depth == 0) { <ShellIcon Name="@item.Icon" Fallback="@item.LocalTitle" /> }
+        <span class="shell-nav-title">@item.LocalTitle</span>
+        @Badge(badge)
+      </a>
+    }
+  };
+
+  private static RenderFragment Badge(MenuBadge? badge) => __builder =>
+  {
+    if (badge is not null)
+    {
+      <span class="shell-badge shell-badge--@badge.Tone" title="@badge.Label" aria-label="@badge.Label">@badge.Text</span>
+    }
+  };
+
+  public void Dispose()
+  {
+    Menus.Changed -= OnChanged;
+    Badges.Changed -= OnChanged;
+    Navigation.LocationChanged -= OnLocationChanged;
+  }
+}

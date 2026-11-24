@@ -1,6 +1,7 @@
 @using System.Reflection
 @using soft.square.net.ModularBlazor.Abstractions.Auth
 @inject ModuleManager Modules
+@inject ActiveModuleService Active
 @inject ICurrentUserService CurrentUsers
 @inject NavigationManager Nav
 @inject IStringLocalizer<App> L
@@ -54,9 +55,17 @@ else if (_ready)
         // The role comes from the token's "role" claims (UserInfo.Roles).
         _forbidden = owner?.RequiredRole is { } role && !(user?.IsInRole(role) ?? false);
 
-        // Layout precedence: @layout on the page > [UseLayout] on the page > module's layout > default.
-        _layout = pageType.GetCustomAttribute<LayoutAttribute>()?.LayoutType
-                  ?? Modules.ResolveLayout(pageType.GetCustomAttribute<UseLayoutAttribute>()?.Key ?? owner?.Layout);
+        // Layout precedence: @layout on the page > [UseLayout] on the page > module's layout > default. A layout key no
+        // loaded module registered loads the module that provides it first (Layouts.Public for "public", say); its
+        // styles are applied before the page renders.
+        _layout = pageType.GetCustomAttribute<LayoutAttribute>()?.LayoutType;
+        if (_layout is null)
+        {
+            var key = pageType.GetCustomAttribute<UseLayoutAttribute>()?.Key ?? owner?.Layout;
+            await Modules.EnsureLayoutAsync(key);
+            _layout = Modules.ResolveLayout(key);
+        }
+        await Active.UseLayoutAsync(Modules.LayoutModule(_layout));
 
         _parameters = RouteData.RouteValues.ToDictionary(kv => kv.Key, kv => kv.Value);
         _ready = true;

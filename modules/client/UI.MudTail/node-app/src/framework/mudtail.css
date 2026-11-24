@@ -1,0 +1,29 @@
+/*
+ * UI.MudTail stylesheet -> wwwroot/css/mudtail.min.css
+ *
+ * The one token set every layout and module uses: every colour, radius and z-index comes from MudTail's
+ * --mud-palette-* tokens (light and [data-theme="dark"]). Layouts add only their own shell on top.
+ *
+ * Tailwind's preflight reset is deliberately left out: this sheet is loaded into a page that every module shares,
+ * and preflight would strip their headings, lists and buttons.
+ */
+@layer theme, base, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* MudTail tokens -> Tailwind utilities (bg-primary, text-ink-muted, border-line, rounded-mud, dark: on [data-theme]) */
+@import "mudtail/tailwind.css";
+
+/* MudTail tokens, components, editorial / sports / gallery / site styles, grid and RTL support.
+   Unlayered on purpose: the host's app.css is unlayered, and unlayered rules always beat layered ones, so a layered
+   MudTail would lose to plain host rules such as `a { color }` and `h1 { margin }`.
+   (Tailwind utilities stay layered, so a utility on a mud-* element loses to the component's own rule.) */
+@import "mudtail/mudtail.css";
+
+/* The host app's own variables follow the MudTail tokens. */
+@import "./_host.css";
+
+/* Utilities used by the host app's pages and the shared components in ModularBlazor.Abstractions. */
+@source "../../../../../src/apps/blazor/ModularBlazor.BlzWebClient/**/*.razor";
+@source "../../../../../src/ModularBlazor.Abstractions/**/*.razor";

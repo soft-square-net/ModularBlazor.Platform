@@ -1,0 +1,64 @@
+@using System.Reflection
+@inject IShellContributions Contributions
+@inject IStringLocalizer<DefaultLayout> L
+
+@*
+  One module's contribution (a header action, a dock, a context panel), loaded on first use: its module is downloaded
+  then, and its component rendered here inside an ErrorBoundary, so a failing contribution never takes the shell down.
+*@
+@if (_type is not null)
+{
+  <ErrorBoundary @ref="_boundary">
+    <ChildContent><DynamicComponent Type="_type" Parameters="_parameters" /></ChildContent>
+    <ErrorContent><p class="shell-unavailable">@L["{0} is unavailable.", Contribution.LocalTitle]</p></ErrorContent>
+  </ErrorBoundary>
+}
+else if (_failed)
+{
+  <p class="shell-unavailable">@L["{0} is unavailable.", Contribution.LocalTitle]</p>
+}
+else if (ShowLoading)
+{
+  <div class="shell-loading" role="status" aria-label="@L["Loading"]"></div>
+}
+
+@code {
+  [Parameter, EditorRequired] public ShellContribution Contribution { get; set; } = default!;
+
+  /// <summary>Context panels: the page-context key and value the panel was opened for.</summary>
+  [Parameter] public string? ContextKey { get; set; }
+  [Parameter] public string? ContextValue { get; set; }
+
+  [Parameter] public bool ShowLoading { get; set; } = true;
+
+  private Type? _type;
+  private bool _failed;
+  private string? _resolved;
+  private ErrorBoundary? _boundary;
+  private Dictionary<string, object?>? _parameters;
+
+  protected override async Task OnParametersSetAsync()
+  {
+    if (_resolved != Contribution.Id)
+    {
+      _resolved = Contribution.Id;
+      _type = null;
+      _failed = false;
+      var type = await Contributions.ResolveAsync(Contribution);
+      if (_resolved != Contribution.Id) return; // changed while loading
+      _type = type;
+      _failed = type is null;
+    }
+    _parameters = TakesContext(_type)
+      ? new() { ["Context"] = new ContributionContext(Contribution.Id, ContextKey, ContextValue) }
+      : null;
+    _boundary?.Recover();
+  }
+
+  // A contribution may take the context ([Parameter] public ContributionContext Context); DynamicComponent throws on
+  // a parameter the component does not have, so it gets one only when it asks for it.
+  private static bool TakesContext(Type? type) =>
+    type?.GetProperty("Context", BindingFlags.Public | BindingFlags.Instance) is { } p
+    && p.PropertyType == typeof(ContributionContext)
+    && p.GetCustomAttribute<ParameterAttribute>() is not null;
+}

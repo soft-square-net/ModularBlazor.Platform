@@ -8,10 +8,8 @@ const scssInputs = globSync(['src/framework/**/*.{css,scss}'], {
   cwd: import.meta.dirname // Scope safely to current directory
 });
 
-const inputs = {
-  // 2. Treat your Blazor JS Interop module as the primary entry point
-  'module': resolve(import.meta.dirname, 'src/js/module.ts')
-};
+// 2. Styles only: MudTail's runtime (js/module.js) is the UI.MudTail module's.
+const inputs = {};
 
 scssInputs.forEach(file => {
   const absolutePath = resolve(import.meta.dirname, file);

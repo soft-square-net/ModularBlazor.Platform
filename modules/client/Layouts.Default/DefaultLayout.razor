@@ -1,64 +1,265 @@
 @inherits LayoutComponentBase
 @attribute [LayoutKey("default")]
-@implements IDisposable
-@inject IModuleNavigation Navigation
-@inject ICurrentUserService Users
-@inject IAuthenticationService Auth
+@implements IAsyncDisposable
+@inject IBranding Branding
+@inject IShellContributions Contributions
+@inject MudTailRuntime MudTail
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
 @inject IStringLocalizer<DefaultLayout> L
 
-<div class="shell-default">
-  <aside class="shell-sidebar">
-    <a class="brand" href="">Modular Blazor</a>
+@*
+  The application shell (Layouts.Default 2.0):
 
-    @* The three menus the modules fill (MenuLink / MenuGroup): main, secondary under it, user next to the account. *@
-    <nav class="shell-nav" aria-label="@L["Main"]">
-      <NavLink href="" Match="NavLinkMatch.All">@L["Home"]</NavLink>
-      <MenuZone Zone="@MenuZones.Main" Landmark="false" />
-    </nav>
+    ┌────────┬──────────────────────────────────────────────────────────┐
+    │  nav   │ toolbar: toggle · breadcrumbs/title · page actions ·     │
+    │ drawer │          header actions · context · theme · user         │
+    │        ├───────────────────────────────────────────┬──────────────┤
+    │ main   │ page (@Body)                              │ context      │
+    │ ...    │                                           │ panel        │
+    │ second.├───────────────────────────────────────────┴──────────────┤
+    │        │ dock bar                                                 │
+    └────────┴──────────────────────────────────────────────────────────┘
 
-    <MenuZone Zone="@MenuZones.Secondary" Class="shell-secondary" Label="@L["More"]" />
+  Inline-start and inline-end, so it mirrors in RTL. Below 1024px the drawer is an overlay; from 1024 to 1279px it
+  starts as an icon rail (mini); from 1280px it is expanded unless the user minimised it. The context panel is inline
+  from 1280px and a sheet below. The theme drawer slides over everything from the inline end.
 
-    <LocaleSwitcher Class="shell-locale" />
+  Modules fill it through metadata only: menus (MenuLink / MenuGroup), [HeaderAction], [Dock], [ContextPanel], and the
+  page through LayoutSections (<PageHeader>). This instance stays while the user moves between pages of this layout,
+  so the docks keep their state.
+*@
+<div class="shell" data-nav="@NavMode" data-density="@_state.Density" data-nav-open="@(_navOpen ? "true" : "false")"
+     data-context="@(ContextOpen ? "open" : "closed")" data-float="@Float" @onkeydown="OnKeyDown">
+  <a class="shell-skip" href="@SkipHref">@L["Skip to content"]</a>
 
-    <div class="shell-user">
-      @if (_user is not null)
+  @if (Transient)
+  {
+    @* One click anywhere else closes what floats: the overlay drawer, a flyout, the account menu, a dock, the sheet. *@
+    <div class="shell-scrim @(_navOpen || (!_wide && ContextOpen) ? "shell-scrim--dim" : null)" @onclick="CloseTransient"></div>
+  }
+
+  <aside class="shell-drawer" aria-label="@L["Menu"]">
+    <a class="shell-brand" href="" title="@Branding.Current.Name">
+      @if (!string.IsNullOrEmpty(Branding.Current.LogoUrl))
       {
-        <div>@_user.Name <small>(@string.Join(", ", _user.Roles))</small></div>
-        <MenuZone Zone="@MenuZones.User" Class="shell-user-menu" Label="@L["Account"]" />
-        <a href="login" @onclick="SignOutAsync" @onclick:preventDefault>@L["Sign out"]</a>
+        <img class="shell-logo shell-logo--light" src="@Branding.Current.LogoUrl" alt="" />
+        <img class="shell-logo shell-logo--dark" src="@(Branding.Current.LogoDarkUrl ?? Branding.Current.LogoUrl)" alt="" />
       }
       else
       {
-        <a href="login">@L["Sign in"]</a>
+        <span class="shell-logo shell-logo--letter" aria-hidden="true">@Branding.Current.DisplayShortName[..1]</span>
       }
+      <span class="shell-brand-name">@Branding.Current.DisplayShortName</span>
+    </a>
+
+    <div class="shell-drawer-scroll">
+      <NavTree Zone="@MenuZones.Main" Label="@L["Main"]" Mini="Mini" @bind-Flyout="_flyout"
+               OpenGroups="_state.OpenGroups" OpenGroupsChanged="SaveAsync">
+        <li class="shell-nav-item">
+          <NavLink class="shell-nav-link" href="" Match="NavLinkMatch.All" data-tip="@L["Home"]">
+            <ShellIcon Name="house" /><span class="shell-nav-title">@L["Home"]</span>
+          </NavLink>
+        </li>
+      </NavTree>
     </div>
+
+    <NavTree Zone="@MenuZones.Secondary" Label="@L["More"]" Mini="Mini" @bind-Flyout="_flyout"
+             OpenGroups="_state.OpenGroups" OpenGroupsChanged="SaveAsync" />
   </aside>
 
-  <main class="shell-main">@Body</main>
+  <header class="shell-toolbar">
+    <button type="button" class="shell-icon-button" aria-label="@NavToggleLabel" title="@NavToggleLabel"
+            aria-expanded="@(_desktop ? (Mini ? "false" : "true") : (_navOpen ? "true" : "false"))" @onclick="ToggleNavAsync">
+      <ShellIcon Name="@(_desktop ? (Mini ? "panel-left-open" : "panel-left-close") : "menu")" Class="shell-flip" />
+    </button>
+
+    <div class="shell-heading">
+      <div class="shell-breadcrumbs"><SectionOutlet SectionName="@LayoutSections.Breadcrumbs" /></div>
+      <div class="shell-title"><SectionOutlet SectionName="@LayoutSections.Title" /></div>
+    </div>
+
+    <div class="shell-page-actions"><SectionOutlet SectionName="@LayoutSections.PageActions" /></div>
+
+    <div class="shell-header-actions"><HeaderActions /></div>
+
+    @if (Contributions.Of(ShellContributionKinds.ContextPanel).Count > 0)
+    {
+      <button type="button" class="shell-icon-button" aria-pressed="@(ContextOpen ? "true" : "false")"
+              title="@L["Details"]" aria-label="@L["Details"]" @onclick="ToggleContextAsync">
+        <ShellIcon Name="panel-right" Class="shell-flip" />
+      </button>
+    }
+
+    <button type="button" class="shell-icon-button" title="@L["Theme"]" aria-label="@L["Theme"]"
+            aria-expanded="@(_themeOpen ? "true" : "false")" @onclick="() => _themeOpen = true">
+      <ShellIcon Name="palette" />
+    </button>
+
+    <UserMenu @bind-Open="_userOpen" />
+  </header>
+
+  <main id="shell-main" class="shell-main" tabindex="-1">@Body</main>
+
+  <ContextPanel Open="ContextOpen" OpenChanged="SetContextAsync" />
+
+  <DockBar @bind-Open="_dock" Pinned="@_state.PinnedDock" PinnedChanged="PinDockAsync" />
+
+  <ThemeDrawer @bind-Open="_themeOpen" Density="@_state.Density" DensityChanged="SetDensityAsync" />
 </div>
 
 @code {
-  private UserInfo? _user;
+  private static readonly string[] Media = ["(min-width: 1024px)", "(min-width: 1280px)"];
+
+  private ShellState _state = new();
+  private bool _desktop = true, _wide = true; // until the runtime reports the width
+  private bool _navOpen, _userOpen, _themeOpen, _contextSheet;
+  private string? _flyout, _dock;
+  private DotNetObjectReference<DefaultLayout>? _self;
+  private IJSObjectReference? _media;
+
+  /// <summary>The drawer is an icon rail: from 1024px when the user chose it, or by default from 1024 to 1279px.</summary>
+  private bool Mini => _desktop && (_state.Nav == "mini" || (_state.Nav == "auto" && !_wide));
+
+  private string NavMode => !_desktop ? "overlay" : Mini ? "mini" : "full";
+
+  private bool ContextOpen => _wide ? _state.ContextOpen : _contextSheet;
+
+  private bool Transient => _navOpen || _flyout is not null || _userOpen || (_dock is not null && _dock != _state.PinnedDock)
+                            || (!_wide && _contextSheet);
+
+  // What floats over the page now: the stylesheet lifts that part of the shell above the click-catching scrim.
+  private string? Float => _navOpen ? "nav" : _flyout is not null ? "flyout" : _userOpen ? "user"
+    : _dock is not null && _dock != _state.PinnedDock ? "dock" : !_wide && _contextSheet ? "context" : null;
+
+  private string NavToggleLabel => _desktop ? (Mini ? L["Expand the menu"] : L["Collapse the menu"]) : L["Menu"];
+
+  private string SkipHref => Navigation.ToBaseRelativePath(Navigation.Uri).Split('#')[0] + "#shell-main";
 
   protected override async Task OnInitializedAsync()
   {
-    Navigation.Changed += OnChanged;
-    Users.Changed += OnChanged;
-    _user = await Users.GetUserInfoAsync();
+    Branding.Changed += OnChanged;
+    Contributions.Changed += OnChanged;
+    Navigation.LocationChanged += OnLocationChanged;
+    _state = await ShellState.LoadAsync(JS);
+    _dock = _state.PinnedDock;
   }
 
-  // Never block on the async user lookup (.Result freezes WebAssembly): hop onto the renderer and await it there.
-  private void OnChanged() => _ = InvokeAsync(async () =>
+  protected override async Task OnAfterRenderAsync(bool firstRender)
   {
-    _user = await Users.GetUserInfoAsync();
+    if (!firstRender || await MudTail.GetAsync() is not { } runtime) return;
+    try
+    {
+      ShellIcon.Names = (await runtime.InvokeAsync<string[]>("iconNames")).ToHashSet(StringComparer.Ordinal);
+      _self = DotNetObjectReference.Create(this);
+      _media = await runtime.InvokeAsync<IJSObjectReference>("watchMedia", Media, _self);
+      StateHasChanged();
+    }
+    catch (JSException ex)
+    {
+      // An older UI.MudTail without the shell helpers: the shell still works, wide and with letters for icons.
+      Console.Error.WriteLine($"[Layouts.Default] UI.MudTail: {ex.Message}");
+    }
+  }
+
+  [JSInvokable]
+  public Task OnMedia(bool[] matches) => InvokeAsync(() =>
+  {
+    _desktop = matches.ElementAtOrDefault(0);
+    _wide = matches.ElementAtOrDefault(1);
+    if (_desktop) _navOpen = false;
+    if (_wide) _contextSheet = false;
+    if (!Mini) _flyout = null;
     StateHasChanged();
   });
 
-  private Task SignOutAsync() => Auth.LogoutAsync(); // clears the session and goes to the login page
-
-  public void Dispose()
+  private async Task ToggleNavAsync()
   {
-    Navigation.Changed -= OnChanged;
-    Users.Changed -= OnChanged;
+    if (!_desktop)
+    {
+      _navOpen = !_navOpen;
+      return;
+    }
+    _flyout = null;
+    _state.Nav = Mini ? "full" : "mini";
+    await SaveAsync();
+  }
+
+  private async Task ToggleContextAsync()
+  {
+    if (_wide) await SetContextAsync(!_state.ContextOpen);
+    else _contextSheet = !_contextSheet;
+  }
+
+  private async Task SetContextAsync(bool open)
+  {
+    if (!_wide)
+    {
+      _contextSheet = open;
+      return;
+    }
+    _state.ContextOpen = open;
+    await SaveAsync();
+  }
+
+  private async Task PinDockAsync(string? dock)
+  {
+    _state.PinnedDock = dock;
+    if (dock is not null) _dock = dock;
+    await SaveAsync();
+  }
+
+  private async Task SetDensityAsync(string density)
+  {
+    _state.Density = density;
+    await SaveAsync();
+  }
+
+  private Task SaveAsync() => _state.SaveAsync(JS);
+
+  private void CloseTransient()
+  {
+    _navOpen = false;
+    _flyout = null;
+    _userOpen = false;
+    _contextSheet = false;
+    if (_dock != _state.PinnedDock) _dock = _state.PinnedDock;
+  }
+
+  private void OnKeyDown(KeyboardEventArgs e)
+  {
+    if (e.Key == "Escape" && Transient) CloseTransient();
+  }
+
+  private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => _ = InvokeAsync(() =>
+  {
+    CloseTransient();
+    StateHasChanged();
+  });
+
+  private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+  public async ValueTask DisposeAsync()
+  {
+    Branding.Changed -= OnChanged;
+    Contributions.Changed -= OnChanged;
+    Navigation.LocationChanged -= OnLocationChanged;
+    try
+    {
+      if (_media is not null)
+      {
+        await _media.InvokeVoidAsync("dispose");
+        await _media.DisposeAsync();
+      }
+    }
+    catch (JSDisconnectedException)
+    {
+      // the page is going away
+    }
+    catch (JSException)
+    {
+      // UI.MudTail was unloaded first; its dispose() already stopped the watcher
+    }
+    _self?.Dispose();
   }
 }

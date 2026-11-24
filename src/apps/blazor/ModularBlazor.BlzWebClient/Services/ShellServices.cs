@@ -51,13 +51,16 @@ public sealed class ShellContributionService : IShellContributions, IDisposable
   private readonly ModuleManager _modules;
   private readonly NavigationManager _navigation;
   private readonly PageContextService _page;
+  private readonly MenuBadgeService _badges;
 
-  public ShellContributionService(ModuleManager modules, NavigationManager navigation, PageContextService page)
+  public ShellContributionService(ModuleManager modules, NavigationManager navigation, PageContextService page, MenuBadgeService badges)
   {
     _modules = modules;
     _navigation = navigation;
     _page = page;
-    _modules.Changed += OnChanged;
+    _badges = badges;
+    _modules.Changed += OnModulesChanged;
+    TrackBadges();
     _page.Changed += OnChanged;
     _navigation.LocationChanged += OnLocationChanged;
   }
@@ -101,11 +104,20 @@ public sealed class ShellContributionService : IShellContributions, IDisposable
 
   private void OnChanged() => Changed?.Invoke();
 
+  private void OnModulesChanged()
+  {
+    TrackBadges();
+    Changed?.Invoke();
+  }
+
+  // Badges (IMenuBadges, by "{moduleId}:{id}") for every entry with a Badge url, whatever page is shown.
+  private void TrackBadges() => _badges.TrackContributions(_modules.Catalog.SelectMany(m => m.Contributions));
+
   private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => Changed?.Invoke();
 
   public void Dispose()
   {
-    _modules.Changed -= OnChanged;
+    _modules.Changed -= OnModulesChanged;
     _page.Changed -= OnChanged;
     _navigation.LocationChanged -= OnLocationChanged;
   }

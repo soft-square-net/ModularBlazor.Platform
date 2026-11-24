@@ -27,6 +27,8 @@ public sealed class MenuBadgeService : IMenuBadges, IDisposable
   private readonly Timer _timer;
 
   private Dictionary<string, (string Url, int Seconds)> _sources = new(StringComparer.OrdinalIgnoreCase); // entry → its url
+  private Dictionary<string, (string Url, int Seconds)> _menuSources = new(StringComparer.OrdinalIgnoreCase);
+  private Dictionary<string, (string Url, int Seconds)> _shellSources = new(StringComparer.OrdinalIgnoreCase);
   private readonly Dictionary<string, MenuBadge?> _answers = new(StringComparer.OrdinalIgnoreCase);       // url → badge
   private readonly Dictionary<string, DateTimeOffset> _due = new(StringComparer.OrdinalIgnoreCase);        // url → next ask
   private readonly Dictionary<string, MenuBadge?> _set = new(StringComparer.OrdinalIgnoreCase);           // entry → set by code
@@ -64,8 +66,26 @@ public sealed class MenuBadgeService : IMenuBadges, IDisposable
   /// <summary>The entries of the menus as they are now built (MenuService calls it on every rebuild).</summary>
   public void Track(IEnumerable<MenuItem> items)
   {
-    var sources = items.Where(i => !string.IsNullOrWhiteSpace(i.Badge))
-        .ToDictionary(i => i.Id, i => (Url: i.Badge!, Seconds: i.BadgeRefresh > 0 ? i.BadgeRefresh : DefaultSeconds), StringComparer.OrdinalIgnoreCase);
+    _menuSources = Sources(items.Select(i => (i.Id, i.Badge, i.BadgeRefresh)));
+    Apply();
+  }
+
+  /// <summary>The shell contributions (docks, header actions, context panels) with a Badge url (ShellContributionService).</summary>
+  public void TrackContributions(IEnumerable<ShellContribution> contributions)
+  {
+    _shellSources = Sources(contributions.Select(c => (c.Id, c.Badge, c.BadgeRefresh)));
+    Apply();
+  }
+
+  private static Dictionary<string, (string Url, int Seconds)> Sources(IEnumerable<(string Id, string? Badge, int Refresh)> entries) =>
+    entries.Where(e => !string.IsNullOrWhiteSpace(e.Badge))
+      .GroupBy(e => e.Id, StringComparer.OrdinalIgnoreCase)
+      .ToDictionary(g => g.Key, g => (Url: g.First().Badge!, Seconds: g.First().Refresh > 0 ? g.First().Refresh : DefaultSeconds), StringComparer.OrdinalIgnoreCase);
+
+  private void Apply()
+  {
+    var sources = new Dictionary<string, (string Url, int Seconds)>(_menuSources, StringComparer.OrdinalIgnoreCase);
+    foreach (var (id, source) in _shellSources) sources.TryAdd(id, source);
     var changed = sources.Count != _sources.Count || sources.Any(s => !_sources.TryGetValue(s.Key, out var old) || old != s.Value);
     _sources = sources;
     if (!changed) return;

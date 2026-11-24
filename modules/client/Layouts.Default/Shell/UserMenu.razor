@@ -1,0 +1,90 @@
+@implements IDisposable
+@inject ICurrentUserService Users
+@inject IAuthenticationService Auth
+@inject IStringLocalizer<DefaultLayout> L
+
+@*
+  The toolbar's last entry: the avatar, opening the account menu (the "user" menu zone, the language and sign out).
+  Signed out: a Sign in link.
+*@
+@if (_user is null)
+{
+  <a class="shell-button" href="login">@L["Sign in"]</a>
+}
+else
+{
+  <div class="shell-dropdown @(Open ? "open" : null)" @onkeydown="OnKeyDown">
+    <button type="button" class="shell-avatar-button" aria-haspopup="true" aria-expanded="@(Open ? "true" : "false")"
+            aria-controls="shell-user-menu" @onclick="() => OpenChanged.InvokeAsync(!Open)" title="@_user.Name">
+      <span class="shell-avatar" aria-hidden="true">@Initials(_user.Name)</span>
+      <span class="sr-only">@L["Account"]</span>
+    </button>
+    @if (Open)
+    {
+      <div id="shell-user-menu" class="shell-menu shell-menu--end" aria-label="@L["Account"]">
+        <div class="shell-menu-header">
+          <span class="shell-avatar" aria-hidden="true">@Initials(_user.Name)</span>
+          <div>
+            <div class="shell-menu-name">@_user.Name</div>
+            @if (_user.Roles.Count > 0)
+            {
+              <div class="shell-menu-meta">@string.Join(", ", _user.Roles)</div>
+            }
+          </div>
+        </div>
+        <MenuZone Zone="@MenuZones.User" Class="shell-menu-zone" Label="@L["Account"]" />
+        <div class="shell-menu-row">
+          <ShellIcon Name="languages" />
+          <LocaleSwitcher Class="shell-locale" />
+        </div>
+        <button type="button" class="shell-menu-item" @onclick="SignOutAsync">
+          <ShellIcon Name="log-out" /> @L["Sign out"]
+        </button>
+      </div>
+    }
+  </div>
+}
+
+@code {
+  [Parameter] public bool Open { get; set; }
+  [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+
+  private UserInfo? _user;
+
+  protected override async Task OnInitializedAsync()
+  {
+    Users.Changed += OnChanged;
+    _user = await Users.GetUserInfoAsync();
+  }
+
+  // Never block on the async user lookup (.Result freezes WebAssembly): hop onto the renderer and await it there.
+  private void OnChanged() => _ = InvokeAsync(async () =>
+  {
+    _user = await Users.GetUserInfoAsync();
+    StateHasChanged();
+  });
+
+  private async Task OnKeyDown(KeyboardEventArgs e)
+  {
+    if (e.Key == "Escape" && Open) await OpenChanged.InvokeAsync(false);
+  }
+
+  private async Task SignOutAsync()
+  {
+    await OpenChanged.InvokeAsync(false);
+    await Auth.LogoutAsync(); // clears the session and goes to the login page
+  }
+
+  private static string Initials(string name)
+  {
+    var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+    return parts.Length switch
+    {
+      0 => "?",
+      1 => parts[0][..1].ToUpperInvariant(),
+      _ => (parts[0][..1] + parts[^1][..1]).ToUpperInvariant(),
+    };
+  }
+
+  public void Dispose() => Users.Changed -= OnChanged;
+}

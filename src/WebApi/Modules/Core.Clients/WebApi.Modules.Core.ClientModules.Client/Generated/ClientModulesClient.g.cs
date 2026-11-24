@@ -1663,6 +1663,9 @@ namespace soft.square.net.WebApi.Modules.Core.ClientModules.Client
         [System.Text.Json.Serialization.JsonPropertyName("assetHashes")]
         public System.Collections.Generic.IDictionary<string, string>? AssetHashes { get; set; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("providesLayouts")]
+        public System.Collections.Generic.IReadOnlyList<string>? ProvidesLayouts { get; set; } = default!;
+
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
         [System.Text.Json.Serialization.JsonExtensionData]

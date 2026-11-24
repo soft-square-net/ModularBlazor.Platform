@@ -67,6 +67,17 @@ public sealed class ActiveModuleService
     return SyncAsync();
   }
 
+  /// <summary>The module of the layout the current page is shown in (its styles stay while that layout does).</summary>
+  public string? LayoutModuleId { get; private set; }
+
+  /// <summary>Called by the route view once it knows the page's layout: keeps that layout's module active.</summary>
+  public Task UseLayoutAsync(string? moduleId)
+  {
+    if (string.Equals(LayoutModuleId, moduleId, StringComparison.OrdinalIgnoreCase)) return Task.CompletedTask;
+    LayoutModuleId = moduleId;
+    return SyncAsync();
+  }
+
   /// <summary>Called by the router before it resolves a URL: make the page's modules the active ones.</summary>
   public Task NavigateAsync(ModuleDescriptor? module)
   {
@@ -108,6 +119,7 @@ public sealed class ActiveModuleService
     }
 
     foreach (var d in _modules.Catalog.Where(d => d.LoadOnStartup)) Add(d.Id);
+    if (LayoutModuleId is { } layout) Add(layout);
     if (CurrentModuleId is { } current) Add(current);
     foreach (var held in _held.Keys) Add(held);
     return ordered;

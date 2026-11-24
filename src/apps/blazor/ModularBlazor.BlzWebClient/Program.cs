@@ -30,7 +30,7 @@ if (string.IsNullOrWhiteSpace(gateway)) gateway = "http://localhost:5080/";
 builder.Services.AddWebApiClient(gateway);
 builder.Services.AddScoped<HostModulesApi>();
 
-// MudTail's runtime, shared through the Layouts.Default module (tables, toasts, behaviours on this app's pages).
+// MudTail's runtime, shared through the UI.MudTail module (tables, toasts, behaviours on this app's pages).
 builder.Services.AddScoped<MudTailRuntime>();
 
 // Languages (Arabic by default, see wwwroot/appsettings.json "Localization"). Texts: IStringLocalizer<T>, read from the

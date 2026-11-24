@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <!-- UI.MudTail: no components, only MudTail's runtime and CSS (wwwroot, built by node-app and embedded). -->
+  <ItemGroup>
+    <Compile Remove="node-app\**" />
+    <Content Remove="node-app\**" />
+    <EmbeddedResource Remove="node-app\**" />
+    <None Remove="node-app\**" />
+  </ItemGroup>
+</Project>
