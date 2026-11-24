@@ -10,13 +10,15 @@ sidebar:
 | Astro | Blazor (هذا المشروع) | MudTail |
 | --- | --- | --- |
 | مكون `.astro` | مكون `.razor` | أصناف CSS و`data-mud` |
-| القالب (`<slot />`) | `LayoutComponentBase` مع `[LayoutKey]` (`@Body`) | `mud-site`، `mud-site-header`، `mud-site-footer` |
+| القالب (`<slot />`) | `LayoutComponentBase` مع `[LayoutKey]` (`@Body`)؛ وتختاره الصفحة بـ `[UseLayout]` ([التخطيطات](/ar/guides/layouts/)) | `mud-site`، `mud-site-header`، `mud-site-footer` |
 | صفحة في `src/pages/` | `@page` داخل وحدة | — |
 | جزيرة مع `client:*` | `RegisterForJavaScript` مع `<BlazorIsland load=…>` | `autoInit(root)` |
 | `<script>` داخل مكون | `js/module.js` في الوحدة (`moduleHost`) | `registerBehavior(name, factory)` |
 | مجموعات المحتوى | الواجهة البرمجية وبيانات الوحدات | — |
 | توجيه اللغات (`/ar/…`) | `CultureInfo`، `IStringLocalizer`، `i18n/{culture}.json`، `ILocaleService` ([اللغات](/ar/guides/i18n/)) | `setLocale`، `t`، `translateElement` |
 | إعداد الشريط الجانبي والتنقل | `[MenuLink]`، `[MenuGroup]`، `<MenuZone>`، `IMenuBadges` ([القوائم](/ar/guides/menus/)) | — |
+| فتحات مسماة في القالب | `<PageHeader>`، `<SectionContent SectionName="@LayoutSections.…">` ([التخطيطات](/ar/guides/layouts/)) | — |
+| — | `[HeaderAction]`، `[Dock]`، `[ContextPanel]`، `IPageContext`، `IBranding`، `IUserPermissions` ([التخطيطات](/ar/guides/layouts/)) | — |
 | `dir="rtl"` على `<html>` | كذلك | يتبع `dir`، بخصائص منطقية |
 | — | `[ClientDialog("Module.X/name")]`، `IModuleDialogs.ShowAsync` ([نوافذ الحوار](/ar/guides/module-dialogs/)) | إطار `mud-dialog-*` |
 

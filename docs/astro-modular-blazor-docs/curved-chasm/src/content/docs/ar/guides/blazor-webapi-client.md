@@ -15,7 +15,7 @@ sidebar:
 | تسجيل الدخول | نموذج كلمة مرور (Module.Auth) يرسل إلى Host؛ ويحفظ JWT في التخزين المحلي | OpenID Connect مع خدمة الهوية OpenIddict: Authorization Code مع PKCE |
 | كتالوج وحدات العميل | وحدة Catalog في Host (`/api/modules/core` و`/api/me/modules`) | الوحدة الأساسية client-modules في WebApi (‏`/api/client-modules/manifest`)، مرشحة لكل مستخدم على الخادم |
 | إدارة وحدات المضيف | Module.Admin عبر `IModuleAdminApi` (‏`/api/v1/modules` في Host) | صفحة خاصة به عبر `WebApi.Client` (‏`/api/admin/modules` خلف البوابة) |
-| الجداول والنماذج | HTML عادي | MudTail، من الوحدة Layouts.Default |
+| الجداول والنماذج | HTML عادي | MudTail، من الوحدة UI.MudTail |
 
 ## التشغيل
 
@@ -146,7 +146,7 @@ sequenceDiagram
 
 | الوحدة | تشحن كـ | تحمل |
 | --- | --- | --- |
-| `Layouts.Default` | `.dll` | Startup، للجميع: التخطيط الافتراضي والسمة ووقت تشغيل MudTail |
+| `Layouts.Default` | `.dll` | Startup، للجميع: التخطيط الافتراضي (وقت تشغيل MudTail وسمته لـ UI.MudTail منذ 2.0؛ انظر [التخطيطات](/ar/guides/layouts/)) |
 | `Module.Tenants` | مجلد: `.dll` + `soft.square.net.WebApi.Modules.Core.Tenancy.Client.dll` | Lazy، ‏`/tenants`، للدور `platform-admin` فقط |
 | `Module.Admin` | `.dll` | Lazy، ‏`/admin`، للدور `platform-admin` فقط؛ وتجلب معها `Layouts.Admin` |
 | `Layouts.Admin` | `.dll` | مع `Module.Admin` (اعتماديتها): التخطيط `admin` |
@@ -214,7 +214,8 @@ sequenceDiagram
 
 ## صفحات MudTail
 
-تضم `Layouts.Default` تكامل MudTail مع Blazor في ملفها `js/module.js`، ويسلمه `moduleHost.get('Layouts.Default')`.
+تضم `UI.MudTail` تكامل MudTail مع Blazor في ملفها `js/module.js`، ويسلمه `moduleHost.get('UI.MudTail')`
+(وما زال `moduleHost.get('Layouts.Default')` يجيب، للوحدات المكتوبة لـ Layouts.Default 1.x).
 ولأن هذه الوحدة تحمل عند البدء وتبقى نشطة، تستخدم صفحات التطبيق نفسه وقت التشغيل والسمة نفسيهما مع الوحدات:
 
 - يحصل `MudTailRuntime` على وقت التشغيل ويقدم `ToastAsync` و`BehaviorAsync`، ويسجله المضيف (scoped).

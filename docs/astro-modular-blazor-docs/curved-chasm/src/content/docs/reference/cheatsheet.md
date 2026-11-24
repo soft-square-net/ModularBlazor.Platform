@@ -10,13 +10,15 @@ sidebar:
 | Astro | Blazor (this project) | MudTail |
 | --- | --- | --- |
 | `.astro` component | `.razor` component | CSS classes + `data-mud` |
-| Layout (`<slot />`) | `LayoutComponentBase` + `[LayoutKey]` (`@Body`) | `mud-site`, `mud-site-header`, `mud-site-footer` |
+| Layout (`<slot />`) | `LayoutComponentBase` + `[LayoutKey]` (`@Body`); a page picks one with `[UseLayout]` ([layouts](/guides/layouts/)) | `mud-site`, `mud-site-header`, `mud-site-footer` |
 | Page in `src/pages/` | `@page` in a module | — |
 | Island + `client:*` | `RegisterForJavaScript` + `<BlazorIsland load=…>` | `autoInit(root)` |
 | `<script>` in a component | `js/module.js` of a module (`moduleHost`) | `registerBehavior(name, factory)` |
 | Content collections | API + module data | — |
 | i18n routing (`/ar/…`) | `CultureInfo`, `IStringLocalizer`, `i18n/{culture}.json`, `ILocaleService` ([languages](/guides/i18n/)) | `setLocale`, `t`, `translateElement` |
 | Sidebar / nav config | `[MenuLink]`, `[MenuGroup]`, `<MenuZone>`, `IMenuBadges` ([menus](/guides/menus/)) | — |
+| Named slots in a layout | `<PageHeader>`, `<SectionContent SectionName="@LayoutSections.…">` ([layouts](/guides/layouts/#the-pages-own-header)) | — |
+| — | `[HeaderAction]`, `[Dock]`, `[ContextPanel]`, `IPageContext`, `IBranding`, `IUserPermissions` ([layouts](/guides/layouts/#what-modules-add-to-the-shell)) | — |
 | `dir="rtl"` on `<html>` | same | follows `dir`, logical properties |
 | — | `[ClientDialog("Module.X/name")]`, `IModuleDialogs.ShowAsync` ([dialogs](/guides/module-dialogs/)) | `mud-dialog-*` frame |
 

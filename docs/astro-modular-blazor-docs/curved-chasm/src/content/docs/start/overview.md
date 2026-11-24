@@ -31,7 +31,7 @@ added as **islands**: small components that hydrate on their own, when you ask t
 | --- | --- | --- | --- |
 | Public pages (news, sport, culture) | renders them at build time | — | provides data at build time, if any |
 | Signed-in app, admin, modules | links to it | renders it, loads modules on navigation | catalog, auth, tenants |
-| Look and feel | MudTail CSS + `data-mud` behaviours | MudTail through `Layouts.Default` | — |
+| Look and feel | MudTail CSS + `data-mud` behaviours | MudTail through `UI.MudTail` | — |
 | Interactive widget on a public page | hosts a **Blazor island** or a small JS island | provides the component | serves its data |
 | Sign-in | link to `/app/login` | OpenID Connect (code + PKCE), user in `sessionStorage` | the identity service issues the tokens; the WebApi checks them |
 

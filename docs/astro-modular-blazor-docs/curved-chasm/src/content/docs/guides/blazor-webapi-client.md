@@ -15,7 +15,7 @@ layouts, router), and changed four things:
 | Sign-in | Password form (Module.Auth) posting to the Host; JWT kept in local storage | OpenID Connect against the OpenIddict identity service: Authorization Code with PKCE |
 | Client module catalog | The Host's Catalog module (`/api/modules/core`, `/api/me/modules`) | The WebApi's client-modules core module (`/api/client-modules/manifest`), filtered per user on the server |
 | Host module management | Module.Admin over `IModuleAdminApi` (the Host's `/api/v1/modules`) | Its own page over `WebApi.Client` (`/api/admin/modules` behind the gateway) |
-| Tables and forms | Plain HTML | MudTail, from the Layouts.Default module |
+| Tables and forms | Plain HTML | MudTail, from the UI.MudTail module |
 
 ## Run it
 
@@ -152,7 +152,7 @@ build and publish output (`BuildCoreClientModules` in `src/WebApi/WebApi/WebApi.
 
 | Module | Shipped as | Loaded |
 | --- | --- | --- |
-| `Layouts.Default` | `.dll` | Startup, for everyone: the default layout, the theme and the MudTail runtime |
+| `Layouts.Default` | `.dll` | Startup, for everyone: the default layout (the MudTail runtime and theme are UI.MudTail's since 2.0; see [Layouts](/guides/layouts/)) |
 | `Module.Tenants` | folder: `.dll` + `soft.square.net.WebApi.Modules.Core.Tenancy.Client.dll` | Lazy, `/tenants`, `platform-admin` only |
 | `Module.Admin` | `.dll` | Lazy, `/admin`, `platform-admin` only; pulls in `Layouts.Admin` |
 | `Layouts.Admin` | `.dll` | With `Module.Admin` (its dependency): the `admin` layout |
@@ -227,8 +227,8 @@ playgrounds use it, so their UI loads without an upload. Outside Development the
 
 ## MudTail pages
 
-`Layouts.Default` bundles MudTail's Blazor interop into its `js/module.js`, and `moduleHost.get('Layouts.Default')`
-hands it out. Because that module loads at startup and stays active, the app's own pages use the same runtime and
+`UI.MudTail` bundles MudTail's Blazor interop into its `js/module.js`, and `moduleHost.get('UI.MudTail')` hands it
+out (`moduleHost.get('Layouts.Default')` still answers, for modules written against Layouts.Default 1.x). Because that module loads at startup and stays active, the app's own pages use the same runtime and
 theme as the modules:
 
 - `MudTailRuntime` gets the runtime and offers `ToastAsync` and `BehaviorAsync`. The host registers it (scoped).
