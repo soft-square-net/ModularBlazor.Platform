@@ -1,4 +1,4 @@
-/* Module.Admin: layout around MudTail's components. Colours come from the --mud-palette-* tokens of Layouts.Default. */
+/* Module.Admin: layout around MudTail's components. Colours come from the --mud-palette-* tokens of UI.MudTail. */
 .adm-page { padding-block: 0 32px; }
 .adm-header { margin-bottom: 16px; }
 .adm-header h1 { margin: 0 0 4px; }

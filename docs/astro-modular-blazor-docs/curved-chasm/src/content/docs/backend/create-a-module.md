@@ -483,11 +483,12 @@ A page calls the API through the host's `WebApi` HttpClient, which goes to the g
 ```razor title="src/Module.Notes/Pages/Notes.razor"
 @page "/notes"
 @using soft.square.net.ModularBlazor.Abstractions
+@using soft.square.net.ModularBlazor.Abstractions.Shell
 @using soft.square.net.WebApi.Modules.Notes.Client
 @inject IHttpClientFactory HttpClients
 
-<PageTitle>Notes</PageTitle>
-<h1 class="mud-typography mud-typography-h4">Notes</h1>
+@* The layout shows the title in its top bar, and it is the browser tab's title (see Layouts). *@
+<PageHeader Title="Notes" />
 
 @if (error is not null) { <p role="alert">@error</p> }
 @foreach (var note in notes) { <p><strong>@note.Title</strong> @note.Text</p> }

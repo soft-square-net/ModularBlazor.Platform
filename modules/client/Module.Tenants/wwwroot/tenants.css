@@ -1,4 +1,4 @@
-/* Module.Tenants: layout around MudTail's components. Colours come from the --mud-palette-* tokens of Layouts.Default. */
+/* Module.Tenants: layout around MudTail's components. Colours come from the --mud-palette-* tokens of UI.MudTail. */
 .tn-page { padding-block: 8px 32px; }
 .tn-header { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; justify-content: space-between; margin-bottom: 16px; }
 .tn-header h1 { margin: 0 0 4px; }
