@@ -18,6 +18,7 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\..\src\WebApi\Modules\Core\WebApi.Modules.Core.ClientModules\WebApi.Modules.Core.ClientModules.csproj" />
+    <ProjectReference Include="..\..\src\WebApi\Modules\Core\WebApi.Modules.Core.Branding\WebApi.Modules.Core.Branding.csproj" />
     <ProjectReference Include="..\..\src\WebApi\WebApi.Contracts\WebApi.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Share.All\Share.All.csproj" />
     <!-- Test input only: its DLL is read as metadata, never loaded. -->

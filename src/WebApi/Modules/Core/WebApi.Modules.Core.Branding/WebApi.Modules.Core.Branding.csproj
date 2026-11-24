@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Core module "branding": the brand the Blazor client's layouts show (name, logos, favicon, colours, font, colour
+    modes), per platform and per tenant, and the small image files it uses. Served anonymously (the sign-in page is
+    branded too); changed by platform admins (the platform's layer) and tenant admins (their tenant's layer).
+    Shared setup in ../Directory.Build.props.
+  -->
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="soft.square.net.ClientModules.Tests" />
+  </ItemGroup>
+
+</Project>

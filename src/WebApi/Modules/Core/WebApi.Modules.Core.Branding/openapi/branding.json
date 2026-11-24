@@ -1,0 +1,650 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Branding",
+    "description": "Core module: the brand the client shows (name, logos, favicon, colours, font, colour modes), per platform and per tenant.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "paths": {
+    "/api/branding": {
+      "get": {
+        "tags": [
+          "Branding"
+        ],
+        "summary": "The brand of the caller's tenant (the platform's layer, then the tenant's, over the built-in brand). Anyone may read it. Sends an ETag; If-None-Match answers 304 when nothing changed.",
+        "operationId": "Branding_Get",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EffectiveBrand"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified"
+          }
+        }
+      }
+    },
+    "/api/branding/assets/{folder}/{name}": {
+      "get": {
+        "tags": [
+          "Branding"
+        ],
+        "summary": "A brand image (logo, dark logo, favicon) by the url its upload answered.",
+        "operationId": "Branding_GetAsset",
+        "parameters": [
+          {
+            "name": "folder",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/branding/admin": {
+      "get": {
+        "tags": [
+          "Branding"
+        ],
+        "summary": "The layer this request changes, with what it is applied on: the tenant's (send the tenant) on top of the platform's, or the platform's (no tenant; platform.modules.manage).",
+        "operationId": "Branding_GetLayer",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrandAdminView"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Branding"
+        ],
+        "summary": "Replaces the layer (send the version it was read at). Empty fields come from the layer below.",
+        "operationId": "Branding_Save",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveBrandLayer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrandAdminView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/branding/admin/assets/{kind}": {
+      "post": {
+        "tags": [
+          "Branding"
+        ],
+        "summary": "Keeps an image (kind: logo, logo-dark or favicon; .png, .jpg, .webp, .svg or .ico, at most 512 KB) for this layer and answers its url; save the layer with that url to use it.",
+        "operationId": "Branding_UploadAsset",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "image"
+                ],
+                "type": "object",
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrandAsset"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BrandAdminView": {
+        "required": [
+          "scope",
+          "layer",
+          "inherited",
+          "effective"
+        ],
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string"
+          },
+          "layer": {
+            "$ref": "#/components/schemas/BrandLayer"
+          },
+          "inherited": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BrandLayer"
+              }
+            ]
+          },
+          "effective": {
+            "$ref": "#/components/schemas/EffectiveBrand"
+          }
+        }
+      },
+      "BrandAsset": {
+        "required": [
+          "url",
+          "contentType",
+          "size"
+        ],
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "BrandLayer": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "shortName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "logoUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "logoDarkUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "faviconUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "primary": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "secondary": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "radius": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "font": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "defaultMode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "allowedModes": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "allowUserColors": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "updatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "updatedBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "EffectiveBrand": {
+        "required": [
+          "eTag",
+          "name",
+          "shortName",
+          "logoUrl",
+          "logoDarkUrl",
+          "faviconUrl",
+          "primary",
+          "secondary",
+          "radius",
+          "font",
+          "defaultMode",
+          "allowedModes",
+          "allowUserColors"
+        ],
+        "type": "object",
+        "properties": {
+          "eTag": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "shortName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "logoUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "logoDarkUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "faviconUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "primary": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "secondary": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "radius": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "font": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "defaultMode": {
+            "type": "string"
+          },
+          "allowedModes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "allowUserColors": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SaveBrandLayer": {
+        "required": [
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "shortName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "logoUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "logoDarkUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "faviconUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "primary": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "secondary": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "radius": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "font": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "defaultMode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "allowedModes": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "allowUserColors": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "OAuth2": {
+        "type": "oauth2",
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "http://localhost:5090/connect/authorize",
+            "tokenUrl": "http://localhost:5090/connect/token",
+            "scopes": {
+              "openid": "User identity",
+              "profile": "User profile",
+              "email": "User email",
+              "api": "Access to Modular WebApi",
+              "offline_access": "Refresh token"
+            }
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "OAuth2": [
+        "openid",
+        "profile",
+        "email",
+        "api"
+      ]
+    }
+  ],
+  "tags": [
+    {
+      "name": "Branding"
+    }
+  ]
+}

@@ -104,11 +104,43 @@ internal sealed class ClientModuleCatalog
         return visible.Values.OrderBy(r => r.Settings.LoadStrategy != ClientModuleLoadStrategy.Startup).ThenBy(r => r.Id, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
-    public ClientModuleManifest Manifest(ClaimsPrincipal user, string? tenant)
+    /// <summary>
+    /// The modules the caller may use, with only the menu entries and shell contributions their <paramref name="permissions"/>
+    /// allow (an entry that names permissions needs one of them). The ETag hashes the filtered list, so it changes when
+    /// the caller's permissions do.
+    /// </summary>
+    public ClientModuleManifest Manifest(ClaimsPrincipal user, string? tenant, IReadOnlySet<string> permissions)
     {
-        var modules = Visible(user, tenant).Select(Describe).ToList();
+        var modules = FilterByPermissions(Visible(user, tenant).Select(Describe).ToList(), permissions);
         var etag = Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(modules, Json)))[..32];
         return new ClientModuleManifest(etag, modules);
+    }
+
+    /// <summary>
+    /// Leaves out the menu entries and contributions whose permissions the caller holds none of, and every menu entry
+    /// inside a left-out group (of any module), so a hidden group's links do not surface at the top of the menu.
+    /// </summary>
+    internal static List<ClientModuleDescriptor> FilterByPermissions(List<ClientModuleDescriptor> modules, IReadOnlySet<string> permissions)
+    {
+        bool Allowed(IReadOnlyList<string>? needed) => needed is not { Count: > 0 } || needed.Any(permissions.Contains);
+
+        var hidden = modules.SelectMany(m => m.Menu).Where(i => !Allowed(i.Permissions)).Select(i => i.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        bool grew;
+        do
+        {
+            grew = false;
+            foreach (var item in modules.SelectMany(m => m.Menu))
+                if (item.Parent is { } parent && hidden.Contains(parent) && hidden.Add(item.Id)) grew = true;
+        } while (grew);
+
+        return modules.Select(m =>
+        {
+            var menu = m.Menu.Where(i => !hidden.Contains(i.Id)).ToList();
+            var contributions = m.Contributions.Where(c => Allowed(c.Permissions)).ToList();
+            return menu.Count == m.Menu.Count && contributions.Count == m.Contributions.Count
+                ? m
+                : m with { Menu = menu, Contributions = contributions };
+        }).ToList();
     }
 
     private static ClientModuleDescriptor Describe(ClientModuleRecord r)
