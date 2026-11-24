@@ -1,0 +1,12 @@
+{
+  "$comment": "Layouts.Public (the public site's layout). Common words (Home, Sign in, ...) come from ModularBlazor.Abstractions.",
+  "Skip to content": "تخطَّ إلى المحتوى",
+  "Menu": "القائمة",
+  "Dark mode": "الوضع الداكن",
+  "Main": "القائمة الرئيسية",
+  "{0} sections": "أقسام {0}",
+  "News, sport and culture.": "أخبار ورياضة وثقافة.",
+  "Sections": "الأقسام",
+  "Account": "الحساب",
+  "Built with MudTail": "صُمّم باستخدام MudTail"
+}

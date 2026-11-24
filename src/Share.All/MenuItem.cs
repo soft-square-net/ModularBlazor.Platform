@@ -12,7 +12,13 @@ public static class MenuZones
     /// <summary>The signed-in user's menu: profile, preferences, sign out.</summary>
     public const string User = "user";
 
-    public static readonly IReadOnlyList<string> All = [Main, Secondary, User];
+    /// <summary>
+    /// The public site's sections (the public layout's mega-nav and footer): a group is a section, its links the
+    /// section's panel. When no module fills it, the public layout shows <see cref="Main"/>.
+    /// </summary>
+    public const string Public = "public";
+
+    public static readonly IReadOnlyList<string> All = [Main, Secondary, User, Public];
 }
 
 /// <summary>The kinds of <see cref="MenuItem"/>.</summary>

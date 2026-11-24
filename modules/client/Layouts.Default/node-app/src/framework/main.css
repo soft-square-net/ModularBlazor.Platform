@@ -15,8 +15,7 @@
 /* MudTail tokens -> Tailwind utilities (bg-primary, text-ink-muted, border-line, rounded-mud, dark: on [data-theme]) */
 @import "mudtail/tailwind.css";
 
-/* The admin-style shell (DefaultLayout.razor), unlayered like MudTail's own CSS so plain host rules cannot beat it.
-   PublicLayout.razor uses MudTail's .mud-site classes directly. */
+/* The application shell (DefaultLayout.razor), unlayered like MudTail's own CSS so plain host rules cannot beat it. */
 @import "./_shell.css";
 
 /* Let Tailwind find the utilities used in this module's Razor markup */
