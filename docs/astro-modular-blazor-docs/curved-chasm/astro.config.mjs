@@ -134,6 +134,11 @@ export default defineConfig({
 					items: [{ autogenerate: { directory: 'guides' } }],
 				},
 				{
+					label: 'Developer guide',
+					translations: { ar: 'دليل المطوّر' },
+					items: [{ autogenerate: { directory: 'developer' } }],
+				},
+				{
 					label: 'Backend architecture',
 					translations: { ar: 'البنية الخلفية' },
 					items: [{ autogenerate: { directory: 'backend' } }],

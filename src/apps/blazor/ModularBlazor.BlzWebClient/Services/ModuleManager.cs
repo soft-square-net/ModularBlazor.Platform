@@ -451,7 +451,7 @@ public sealed class ModuleManager : IModuleNavigation
     }
 
     Changed?.Invoke();
-    if (updated.Count > 0)
+    if (updated.Count > 0 && !AutoReloadUpdates)
       _ = _mudTail.ToastAsync(_texts["New version of {0}: reload the page (or the module) to use it.", string.Join(", ", updated)], "info");
   }
 
@@ -586,6 +586,52 @@ public sealed class ModuleManager : IModuleNavigation
   {
     Unload(id);
     return EnsureLoadedAsync(id, cancellationToken);
+  }
+
+  /// <summary>
+  /// Development (DevModuleReloader): the loaded modules with a newer build in the catalog reload on their own instead of
+  /// asking the user to (no "new version" toast).
+  /// </summary>
+  public bool AutoReloadUpdates { get; set; }
+
+  /// <summary>
+  /// Reloads the loaded ones of <paramref name="ids"/> together with every loaded module that depends on them (they were
+  /// bound to the old assemblies): dependents out first, then everything back in, dependencies first. Returns the ids
+  /// reloaded. Modules that are not loaded are left alone (they load the new build when first used).
+  /// </summary>
+  public async Task<IReadOnlyList<string>> ReloadWithDependentsAsync(IEnumerable<string> ids)
+  {
+    var set = new HashSet<string>(ids.Where(IsLoaded), StringComparer.OrdinalIgnoreCase);
+    bool grew;
+    do
+    {
+      grew = false;
+      foreach (var module in _loaded.Values)
+        if (!set.Contains(module.Descriptor.Id) && module.Descriptor.Dependencies.Any(set.Contains))
+          grew |= set.Add(module.Descriptor.Id);
+    } while (grew);
+
+    var unloaded = new List<string>();
+    var remaining = new HashSet<string>(set, StringComparer.OrdinalIgnoreCase);
+    while (remaining.Count > 0)
+    {
+      // A module none of the remaining ones depends on.
+      var leaf = remaining.FirstOrDefault(id => !_loaded.Values.Any(m =>
+          remaining.Contains(m.Descriptor.Id) && !m.Descriptor.Id.Equals(id, StringComparison.OrdinalIgnoreCase)
+          && m.Descriptor.Dependencies.Contains(id, StringComparer.OrdinalIgnoreCase)));
+      if (leaf is null) break; // a cycle: leave the rest as they are
+      Unload(leaf);
+      unloaded.Add(leaf);
+      remaining.Remove(leaf);
+    }
+
+    for (var i = unloaded.Count - 1; i >= 0; i--)
+    {
+      _updates.Remove(unloaded[i]);
+      try { await EnsureLoadedAsync(unloaded[i]); }
+      catch (Exception ex) { Console.Error.WriteLine($"[module {unloaded[i]}] reload failed: {ex.Message}"); }
+    }
+    return unloaded;
   }
 
   // ---------------------------------------------------------------- helpers

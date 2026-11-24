@@ -36,6 +36,9 @@ public sealed class ClientModulesModule : IRuntimeModule
         services.Configure<ClientModulesOptions>(settings.GetSection("ClientModules"));
         services.AddSingleton<ClientModuleCatalog>();
         services.AddSingleton<IModuleActivation, ClientModuleSeeder>();
+        // Development only (ClientModules:Local): a rebuild of a local client module reloads it in open browsers.
+        services.AddSingleton<LocalClientModuleChanges>();
+        services.AddHostedService<LocalClientModuleWatcher>();
     }
 }
 

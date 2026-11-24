@@ -55,4 +55,17 @@
   <!-- Every layer: i18n/{culture}.json translations (texts of pages, messages of use cases). -->
   <Import Project="$(MSBuildThisFileDirectory)ModuleTranslations.targets" />
 
+  <!--
+    Dev reload: a Debug build of an entry assembly (server) or a client module ends by touching an empty
+    .module-built in its output folder. A playground's WebApi (Modules:Local, ClientModules:Local) watches for it and
+    swaps the module in as soon as the build is complete, never halfway. Turn it off with ModuleBuildStamp=false.
+  -->
+  <PropertyGroup>
+    <ModuleBuildStamp Condition="'$(ModuleBuildStamp)' == '' And '$(Configuration)' == 'Debug' And ('$(ModuleLayer)' == 'Module' Or '$(ModuleLayer)' == 'Client')">true</ModuleBuildStamp>
+  </PropertyGroup>
+
+  <Target Name="WriteModuleBuildStamp" AfterTargets="Build" Condition="'$(ModuleBuildStamp)' == 'true'">
+    <Touch Files="$(OutDir).module-built" AlwaysCreate="true" ContinueOnError="true" />
+  </Target>
+
 </Project>

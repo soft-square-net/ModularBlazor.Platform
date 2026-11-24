@@ -585,7 +585,7 @@ It has two launch profiles, one per loop:
 
 | Profile | The WebApi gets | Use it for |
 | --- | --- | --- |
-| `dev` (default) | The server part: `Modules__Local__notes=<Infrastructure bin folder>`. The client parts: `ClientModules:Local:{id}=<the DLL>`, a setting of the client-modules module given as a host override. In Development, every start installs what changed from the build output and activates it: the server part, then the API client, then the UI | Daily work: change code, build, restart the `webapi` resource in the Aspire dashboard (or F5 again), and reload the browser |
+| `dev` (default) | The server part: `Modules__Local__notes=<Infrastructure bin folder>`. The client parts: `ClientModules:Local:{id}=<the DLL>`, a setting of the client-modules module given as a host override. In Development, every start installs what changed from the build output and activates it: the server part, then the API client, then the UI. While it runs, every rebuild swaps the server part in and reloads the client parts in the open page | Daily work: change code and save. The playground rebuilds, and the change is live in a few seconds without a restart. See [The module dev loop and hot reload](/developer/dev-loop-hot-reload/) |
 | `install` | Nothing: it starts without the module, as in production | Before a release: upload `out/notes.zip` on `http://localhost:5070/host-modules` and activate it, then the two DLLs from `out/client/` on `/client-modules`, the API client first. This runs the real install path |
 
 The AppHost keeps the playground's data in the repo, and away from the platform checkout and the Hybird lab:
