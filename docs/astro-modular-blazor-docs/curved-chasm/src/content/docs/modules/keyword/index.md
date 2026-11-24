@@ -3,7 +3,48 @@ title: Keyword
 description: Draft strategy for a multilingual, tenant-aware Keyword module that manages concepts, aliases, relationships, tags, and text analysis.
 ---
 
-> **Draft strategy:** this page proposes the future module boundaries and behavior. It is not a claim that a Keyword service is implemented.
+> **Status: the first slice is implemented** as the Keywords module, in the repository
+> [`ModularBlazor.Module.Keywords`](https://github.com/soft-square-net/ModularBlazor.Module.Keywords) (branch `master`).
+> [What exists](#what-exists) describes it. The rest of the page is the strategy it grows toward: relationships beyond
+> `related`, tag assignments, the backlink index and text analysis are not built yet. Taxonomy schemes are their own
+> module: [Taxonomies](/modules/taxonomies/).
+
+## What exists
+
+The module's id, route prefix and database schema are `keywords`; its permissions are `keywords.read` and
+`keywords.manage`. It has the [Clean Architecture layers](/backend/module-template-clean-architecture/) (Core,
+UseCases, Infrastructure, Web), a generated API client and the `Module.Keywords` client module, in Arabic and English.
+
+- **A concept** has a schema.org **type** (Thing, Person, Organization, Place, Country, City, Event, DefinedTerm, ...,
+  27 in all), a unique **slug** (any script; made from the name when not given: `cairo`, `cairo-2`), **labels**, an
+  optional description, `sameAs` URLs (Wikidata, Wikipedia) and related concepts.
+- **Labels** are per language: at most one *preferred* label per language (at least one overall), any number of
+  *alternate* names (shown) and *hidden* ones (misspellings, old names: found by search, never shown).
+- **Search** ignores case, accents, Arabic harakat, tatweel, alef and ya forms, and Arabic-Indic digits.
+- **Never deleted, only retired:** a retired concept stays resolvable for content that points at it, but leaves the
+  lists and the picker.
+
+| Route (under `/api/keywords`) | Permission | Does |
+| --- | --- | --- |
+| `GET /concepts?search=&type=&language=&includeRetired=` | `keywords.read` | One page by name |
+| `GET /concepts/lookup?ids=&language=` | `keywords.read` | Concepts by id, in the order asked (retired too) |
+| `GET /concepts/types` | `keywords.read` | The schema.org types, each with its parent |
+| `GET /concepts/{id}`, `GET /concepts/{id}/jsonld` | `keywords.read` | A concept with every label; as JSON-LD for a page's `about` or `mentions` |
+| `POST /concepts`, `PUT /concepts/{id}` | `keywords.manage` | Create (a taken slug is a 409); edit with the `version` read (409 when changed) |
+| `POST /concepts/{id}/retire`, `.../restore` | `keywords.manage` | Retire it, or bring it back |
+
+Other client modules choose concepts with the `Module.Keywords/pick-concepts` dialog, through
+[module dialogs](/guides/module-dialogs/):
+
+```text
+parameters  { multiple?: bool, selected?: ["1"], type?: "Place", language?: "ar", exclude?: ["7"] }
+result      { ids: ["1", "4"], concepts: [{ id, name, type, slug }] }
+```
+
+It searches in any language and lets a `keywords.manage` user add a missing name as a new concept on the spot. Keep
+the id and the name: the name is a snapshot for display, the id is the link.
+
+## Strategy
 
 The **Keyword** module manages canonical terms for things and ideas described across the platform: companies and establishments, people, products, places, events, animals, and topics. A keyword is a stable concept with language-specific names, synonyms, relationships, and optional typed facts. Contents, Shifts, and other optional modules can use its concepts as tags.
 

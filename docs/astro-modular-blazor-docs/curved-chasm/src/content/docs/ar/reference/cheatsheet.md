@@ -15,7 +15,8 @@ sidebar:
 | جزيرة مع `client:*` | `RegisterForJavaScript` مع `<BlazorIsland load=…>` | `autoInit(root)` |
 | `<script>` داخل مكون | `js/module.js` في الوحدة (`moduleHost`) | `registerBehavior(name, factory)` |
 | مجموعات المحتوى | الواجهة البرمجية وبيانات الوحدات | — |
-| توجيه اللغات (`/ar/…`) | `CultureInfo`، `IStringLocalizer` | `setLocale`، `t`، `translateElement` |
+| توجيه اللغات (`/ar/…`) | `CultureInfo`، `IStringLocalizer`، `i18n/{culture}.json`، `ILocaleService` ([اللغات](/ar/guides/i18n/)) | `setLocale`، `t`، `translateElement` |
+| إعداد الشريط الجانبي والتنقل | `[MenuLink]`، `[MenuGroup]`، `<MenuZone>`، `IMenuBadges` ([القوائم](/ar/guides/menus/)) | — |
 | `dir="rtl"` على `<html>` | كذلك | يتبع `dir`، بخصائص منطقية |
 | — | `[ClientDialog("Module.X/name")]`، `IModuleDialogs.ShowAsync` ([نوافذ الحوار](/ar/guides/module-dialogs/)) | إطار `mud-dialog-*` |
 

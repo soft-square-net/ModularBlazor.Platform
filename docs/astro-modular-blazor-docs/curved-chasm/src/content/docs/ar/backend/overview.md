@@ -41,7 +41,7 @@ Edge load balancer + YARP gateway        TLS, JWT, rate limit, tenant resolution
 | `src/WebApi/WebApi.Data` | طبقة بيانات يشحنها المضيف: `TenantDbContext`، ومخزن المستأجرين، وأربعة مزودين لـ EF Core |
 | `src/WebApi/WebApi.SharedKernel` | أنواع نطاق أساسية وواجهات مستودعات يشحنها المضيف (دون EF) |
 | `src/WebApi/Identity/WebApi.Identity.Server` | خدمة الهوية OpenIddict (المنفذ 5090 في المختبر) |
-| `src/WebApi/Modules/Core/` | **الوحدات الأساسية** (`identity` و`tenancy` و`client-modules`): تبنى مع كل إصدار من WebApi وتفعل افتراضيا |
+| `src/WebApi/Modules/Core/` | **الوحدات الأساسية** (`identity` و`tenancy` و`client-modules` و`menus`): تبنى مع كل إصدار من WebApi وتفعل افتراضيا |
 | `src/ModularBlazor.Module.Sdk` | حزمة Module SDK التي تبنى بها الوحدات المخصصة، وتنشر مع حزم العقود |
 | `src/Aspire/Hybird` | مختبر Aspire: بوابة، وأربع مجموعات، وخدمة الهوية، وRabbitMQ وRedis وPostgreSQL |
 | `ModularBlazor.Samples` (مستودع) | وحدات مخصصة نموذجية: Greeting وInventory (بطبقات) وPulse، ووحدتا العميل Dashboard وReports |

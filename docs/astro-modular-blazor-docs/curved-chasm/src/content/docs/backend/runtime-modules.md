@@ -13,7 +13,7 @@ and measures its limits.
 | --- | --- |
 | `WebApi` | The host. `Modularity/` holds the runtime. The same image runs as every pool. |
 | `WebApi.Contracts` | `IRuntimeModule`, `ModuleManifest` and `IModulePipeline`. The host references it, so it is always shared. |
-| `Modules/Core/*` | Core modules (`identity`, `tenancy`, `client-modules`), shipped with every WebApi release. |
+| `Modules/Core/*` | Core modules (`identity`, `tenancy`, `client-modules`, `menus`), shipped with every WebApi release. |
 | `ModularBlazor.Samples`: `samples/Greeting` | A sample custom module (one project). The host does **not** reference it: its build output is zipped and uploaded. |
 | `ModularBlazor.Samples`: `samples/Inventory` | A sample custom module split into Domain, Application and Infrastructure projects. |
 | `ModularBlazor.Samples`: `samples/Pulse` | A sample module with a private pipeline and a hosted service. |
@@ -46,6 +46,8 @@ container, swap and broadcast); they differ in how they arrive:
 | --- | --- | --- |
 | `identity` 1.1.0 | `WebApi.Modules.Core.Identity` | `GET /api/identity/me` (with permissions), `/users`, `/users/{userName}`; grant admin `GET`/`POST /grants`, `DELETE /grants/{id}`; `GET /permissions` (the permission catalog). See [Authentication: implementation](/backend/auth-implementation/) |
 | `tenancy` 2.2.0 | `WebApi.Modules.Core.Tenancy` | `GET /api/tenancy/tenants`, `/tenants/{id}`, `/current`; `POST /tenants` (provisions the database), `PATCH /tenants/{id}` (rename, hosts, suspend), `POST /tenants/{id}/activate`, `/suspend`, `/provision` (repair); subscriptions (`GET /subscriptions` report, `/tenants/{id}/subscriptions` add, extend, cancel; informational only). See [Tenancy and tenant data](/backend/tenancy-data/) |
+| `client-modules` 1.0.0 | `WebApi.Modules.Core.ClientModules` | The Blazor client's module catalog: `GET /api/client-modules/manifest`, files, uploads, install, settings, versions. See [The Blazor client for WebApi](/guides/blazor-webapi-client/#client-module-management) |
+| `menus` 1.0.0 | `WebApi.Modules.Core.Menus` | Administrators' changes to the menus, per platform and per tenant: `GET /api/menus` (anyone, with an ETag), `GET`/`PUT /api/menus/admin` (`menus.manage` in the tenant, or `platform.modules.manage`). See [Menus](/guides/menus/) |
 
 **Seeding.** On startup, before the first sync, each replica registers every shipped core package under the catalog
 lock, so concurrent replicas seed once:

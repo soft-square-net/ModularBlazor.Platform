@@ -29,13 +29,19 @@ Modules communicate through contracts and HTTP APIs. They do not share a `DbCont
 
 Contents selects the published form version for each post kind and persists that version reference with its payload. The optional [Dynamic Fields module](/modules/dynamic-fields/) owns the definitions and validation; Contents owns the post values and lifecycle.
 
-For canonical topics/entities, multilingual aliases, and tag resolution, see the draft [Keyword module strategy](/modules/keyword/). Contents remains the authority for tags assigned to each Post.
+For canonical topics/entities, multilingual aliases, and tag resolution, see the [Keywords module](/modules/keyword/) and the [Taxonomies module](/modules/taxonomies/). Contents remains the authority for tags assigned to each Post.
 
 The existing [authentication and authorization design](/backend/auth-design/) records the agreed identity, grant, and shift workflow decisions. This section focuses on the Content module's own domain and its contracts with those modules.
 
 ## What exists versus what is planned
 
-The starter code (repository `ModularBlazor.Module.Content`, module `content` 0.1.0) already has:
+The code (repository `ModularBlazor.Module.Content`, module `content`) already has:
+
+- **Clean Architecture layers** (see the [template](/backend/module-template-clean-architecture/)):
+  `WebApi.Modules.Content.Core` (the `PostAggregate`, `PressAggregate` and `CategoryAggregate`),
+  `WebApi.Modules.Content.UseCases` (Mediator commands and queries returning an Ardalis `Result`),
+  `WebApi.Modules.Content.Infrastructure` (`ContentDbContext`, tenant migrations) and `WebApi.Modules.Content.Web`
+  (the entry assembly, one REPR endpoint per route). Its build output is what you upload.
 
 - **The `Post` aggregate** with `PostKind` (`Article`, `News`, `Video`, `Reportage`, `PhotoStory`, `Other`). The database still uses the deployed names: table `articles`, the kind in column `Type`, history in `article_history`.
 - **A stable public ID.** Every new Post gets a random `PublicId`. Rows that existed before migration `AddPostDocumentAndPublicId` were backfilled with `legacy-{Id}`, the permalink they already had.
@@ -49,9 +55,31 @@ The starter code (repository `ModularBlazor.Module.Content`, module `content` 0.
     - a post page with the workflow actions (submit, accept, assign, approve, return, schedule, publish), editing and history;
     - presses and categories.
 
-  It needs a tenant sign-in and the `content.*` permissions in that tenant.
-- **A playground** (`playground/`) that runs the platform with the module for development. How to build both parts
-  and the playground for a module of your own: [Create a module, A to Z](/backend/create-a-module/).
+  It needs a tenant sign-in and the `content.*` permissions in that tenant. The UI is in Arabic and English (see
+  [Languages](/guides/i18n/)).
+- **Translations** of a post's document, described [below](#translations).
+- **A playground** (`playground/`) that runs the platform with the module for development. It grants the dev accounts
+  their `content.*` permissions through `Access:DevGrants`, and `--Playground:DynamicFields=<path>` loads the
+  DynamicFields module beside it. How to build both parts and the playground for a module of your own:
+  [Create a module, A to Z](/backend/create-a-module/).
+
+### Translations
+
+A post's document is written in one language. Each other language is a **translation overlay** kept with the post, in
+the format the [DynamicFields module](/modules/dynamic-fields/) defines: per node id and value key, the translated
+text and a hash of the source it was made from. Only textual values are translated; ids, numbers, choices, style and
+the tree's shape always come from the source.
+
+| Route (under `/api/content`) | Does |
+| --- | --- |
+| `PUT /posts/{id}/translations/{language}` `{ version, nodes }` | Adds or replaces one language. Whoever may edit the post now may translate it; the workflow state does not change |
+| `DELETE /posts/{id}/translations/{language}?version=` | Removes one language |
+| `GET /public/{publicId}?culture=ar-EG` | The published document with its text from the `ar-EG` translation, then `ar`, then its own; `languages` lists what it is translated into, `servedLanguages` what this answer used |
+
+The translations are published with the document: on a post whose live version is the current one, a translation
+change is live at once; otherwise it goes live with the next publication. When the source text changes, a translation
+is kept and shown as stale. The post page lists the translations and opens `Module.DynamicFields/translate-content`
+to add or edit one, when that module is installed.
 
 Still planned:
 
