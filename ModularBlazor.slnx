@@ -26,6 +26,8 @@
   <Folder Name="/modules/client/">
     <Project Path="modules/client/Layouts.Admin/Layouts.Admin.csproj" />
     <Project Path="modules/client/Layouts.Default/Layouts.Default.csproj" />
+    <Project Path="modules/client/Layouts.Public/Layouts.Public.csproj" />
+    <Project Path="modules/client/UI.MudTail/UI.MudTail.csproj" />
     <Project Path="modules/client/Module.Admin/Module.Admin.csproj" />
     <Project Path="modules/client/Module.Tenants/Module.Tenants.csproj" />
   </Folder>

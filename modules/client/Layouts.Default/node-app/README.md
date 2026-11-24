@@ -1,17 +1,12 @@
 # Layouts.Default assets
 
-This folder builds the Default layout module's `wwwroot`. The `.csproj` embeds that `wwwroot` into the module DLL. The module provides two layouts:
-
-| Layout key | Component | For |
-| --- | --- | --- |
-| `default` | `DefaultLayout.razor` | the application shell (2.0): nav drawer, toolbar, context panel, dock bar and theme drawer (`Shell/`, `_shell.css`) |
-| `public` | `PublicLayout.razor` | the public site (news, sport, culture): masthead, mega-nav and footer, built entirely from MudTail's `mud-site` classes |
-
-A module's pages use the public layout when its settings say `Layout = "public"`.
+This folder builds the Default layout module's `wwwroot`. The `.csproj` embeds that `wwwroot` into the module DLL. The
+module provides the `default` layout (`DefaultLayout.razor`), the application shell described below. The public site's
+layout (`public`) has been its own module since 2.0, **Layouts.Public**, which the host loads only when a page asks for it.
 
 | Source | Output | What it is |
 | --- | --- | --- |
-| `src/framework/main.css` | `../wwwroot/css/main.min.css` | The layouts' own shell (`_shell.css`), on top of UI.MudTail's stylesheet |
+| `src/framework/main.css` | `../wwwroot/css/main.min.css` | The shell (`_shell.css`), on top of UI.MudTail's stylesheet |
 
 The MudTail runtime, its stylesheet and the `autoInit` behaviours live in the **UI.MudTail** module, which this module
 depends on (`Dependencies` in `ModuleInfo.cs`). The host activates UI.MudTail first, so its stylesheet comes before
@@ -44,10 +39,6 @@ learns the width through UI.MudTail's `watchMedia`; the stylesheet's media queri
 The user's choices (drawer size, open groups, context panel, density, pinned dock) are kept in localStorage
 (`mb.shell`); colours and mode are MudTail's theme (`mud_vanilla_theme_config`, `mode` included).
 
-## Public layout navigation
-
-The mega-nav is built from the module menu (`IModuleNavigation.Items`) by URL, in `PublicNavigation.cs`. An item whose href is `sports/football` goes into the panel of the item whose href is `sports`. Items without such a parent stay at the top level.
-
 ## One token set
 
 Every colour, radius and z-index comes from MudTail's `--mud-palette-*` tokens, loaded by UI.MudTail. This folder
@@ -56,7 +47,7 @@ is imported **unlayered**, like MudTail's CSS, so plain host rules don't overrid
 
 ## RTL
 
-Both layouts use logical properties only. With `dir="rtl"` on `<html>`, everything mirrors. MudTail's `setDirection()` switches it at runtime.
+The shell uses logical properties only. With `dir="rtl"` on `<html>`, everything mirrors. MudTail's `setDirection()` switches it at runtime.
 
 ## Build
 

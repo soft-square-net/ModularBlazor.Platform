@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <!-- Layouts.Public: the public site's layout (layout key "public"). It has no assets of its own: the site styles
+       (MudTail's mud-site classes) come with UI.MudTail. Loaded on demand, the first time a page asks for "public". -->
+</Project>

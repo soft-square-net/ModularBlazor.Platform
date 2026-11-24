@@ -1,0 +1,216 @@
+@inherits LayoutComponentBase
+@attribute [LayoutKey("public")]
+@implements IDisposable
+@inject IMenuService Menus
+@inject IBranding Branding
+@inject ICurrentUserService Users
+@inject IAuthenticationService Auth
+@inject IStringLocalizer<PublicLayout> L
+
+@*
+  Public-site layout (news, sport, culture): masthead, mega-nav, footer, all from MudTail's mud-site classes, which
+  UI.MudTail loads. Behaviour comes from data-mud attributes that UI.MudTail's autoInit wires up, so there is no JS
+  interop here. MudTail owns aria-expanded and data-open on the nav: don't render them.
+
+  The sections are the "public" menu zone (a MenuGroup is a section, its MenuLinks the section's panel), or the "main"
+  zone when no module fills "public". Pages pick this layout with [UseLayout("public")] or Layout = "public" in their
+  module's settings; the host then loads this module first.
+*@
+
+<div class="mud-site">
+  <a class="mud-skip-link" href="#main">@L["Skip to content"]</a>
+  <div class="mud-reading-progress" data-mud="reading-progress" aria-hidden="true"></div>
+
+  <header class="mud-site-header">
+    <div class="mud-masthead mud-container">
+      <button type="button" class="mud-icon-btn mud-nav-toggle" data-mud-nav-toggle aria-controls="site-nav" aria-label="@L["Menu"]">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+      </button>
+
+      @Logo()
+
+      <div class="mud-masthead__actions">
+        <LocaleSwitcher />
+        <button type="button" class="mud-icon-btn mud-theme-toggle" data-mud="theme-toggle" aria-label="@L["Dark mode"]">
+          <svg class="mud-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>
+          <svg class="mud-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
+        </button>
+        @if (_user is not null)
+        {
+          <span class="mud-masthead__user">@_user.Name</span>
+          <a href="login" @onclick="SignOutAsync" @onclick:preventDefault>@L["Sign out"]</a>
+        }
+        else
+        {
+          <a href="login">@L["Sign in"]</a>
+        }
+      </div>
+    </div>
+
+    <nav class="mud-mega-nav" id="site-nav" data-mud="mega-nav" aria-label="@L["Main"]">
+      <ul class="mud-mega-nav__list mud-container">
+        <li class="mud-mega-nav__item">
+          <NavLink class="mud-mega-nav__link" href="" Match="NavLinkMatch.All">@L["Home"]</NavLink>
+        </li>
+        @foreach (var section in _sections)
+        {
+          var item = section.Item;
+          var panelId = $"nav-{PanelId(item.Id)}";
+          <li class="mud-mega-nav__item" @key="item.Id">
+            @if (!string.IsNullOrEmpty(item.Href))
+            {
+              <NavLink class="mud-mega-nav__link" href="@item.Href">@item.LocalTitle</NavLink>
+            }
+            else
+            {
+              <span class="mud-mega-nav__link">@item.LocalTitle</span>
+            }
+            @if (HasLinks(section))
+            {
+              <button type="button" class="mud-mega-nav__expander" aria-controls="@panelId" aria-label="@L["{0} sections", item.LocalTitle]"></button>
+              <div class="mud-mega-nav__panel" id="@panelId">
+                <div class="mud-mega-nav__columns">
+                  @* The section's own links under its title, then a column per group inside it. *@
+                  @foreach (var column in Columns(section))
+                  {
+                    <div @key="column.Item.Id">
+                      <h3 class="mud-mega-nav__heading">@column.Item.LocalTitle</h3>
+                      <ul>
+                        @foreach (var link in column.Children.Where(c => !string.IsNullOrEmpty(c.Item.Href)))
+                        {
+                          <li @key="link.Item.Id">@Link(link.Item)</li>
+                        }
+                      </ul>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          </li>
+        }
+      </ul>
+    </nav>
+  </header>
+
+  <main id="main" class="mud-site-main mud-container" tabindex="-1">@Body</main>
+
+  <footer class="mud-site-footer">
+    <div class="mud-container mud-site-footer__columns">
+      <div>
+        @Logo()
+        <p>@L["News, sport and culture."]</p>
+      </div>
+      @if (_sections.Any(s => !string.IsNullOrEmpty(s.Item.Href)))
+      {
+        <div>
+          <h2>@L["Sections"]</h2>
+          <ul>
+            @foreach (var section in _sections.Where(s => !string.IsNullOrEmpty(s.Item.Href)))
+            {
+              <li @key="section.Item.Id">@Link(section.Item)</li>
+            }
+          </ul>
+        </div>
+      }
+      <div>
+        <h2>@L["Account"]</h2>
+        <ul>
+          @if (_user is not null)
+          {
+            <li><a href="login" @onclick="SignOutAsync" @onclick:preventDefault>@L["Sign out"]</a></li>
+          }
+          else
+          {
+            <li><a href="login">@L["Sign in"]</a></li>
+          }
+        </ul>
+      </div>
+    </div>
+    <div class="mud-container mud-site-footer__bottom">
+      <span>© @DateTime.Now.Year @Branding.Current.Name</span>
+      <span>@L["Built with MudTail"]</span>
+    </div>
+  </footer>
+</div>
+
+@code {
+  private UserInfo? _user;
+  private IReadOnlyList<MenuNode> _sections = [];
+
+  protected override async Task OnInitializedAsync()
+  {
+    Menus.Changed += OnMenusChanged;
+    Branding.Changed += OnMenusChanged;
+    Users.Changed += OnUserChanged;
+    _sections = Sections();
+    _user = await Users.GetUserInfoAsync();
+  }
+
+  private IReadOnlyList<MenuNode> Sections()
+  {
+    var sections = Menus.Zone(MenuZones.Public);
+    return sections.Count > 0 ? sections : Menus.Zone(MenuZones.Main);
+  }
+
+  private static bool HasLinks(MenuNode section) => Columns(section).Any(c => c.Children.Any(l => !string.IsNullOrEmpty(l.Item.Href)));
+
+  // The panel's columns: the section's own links under its title, then one column per group inside it.
+  private static IEnumerable<MenuNode> Columns(MenuNode section)
+  {
+    var own = section.Children.Where(c => !c.HasChildren).ToList();
+    if (own.Count > 0) yield return section with { Children = own };
+    foreach (var group in section.Children.Where(c => c.HasChildren)) yield return group;
+  }
+
+  private RenderFragment Logo() => __builder =>
+  {
+    var brand = Branding.Current;
+    <a class="mud-logo" href="">
+      @if (!string.IsNullOrEmpty(brand.LogoUrl))
+      {
+        <img src="@brand.LogoUrl" alt="@brand.Name" height="32" />
+      }
+      else
+      {
+        @brand.Name
+      }
+    </a>
+  };
+
+  private static RenderFragment Link(MenuItem item) => __builder =>
+  {
+    if (item.External)
+    {
+      <a href="@item.Href" target="_blank" rel="noopener noreferrer">@item.LocalTitle</a>
+    }
+    else
+    {
+      <NavLink href="@item.Href">@item.LocalTitle</NavLink>
+    }
+  };
+
+  private void OnMenusChanged() => _ = InvokeAsync(() =>
+  {
+    _sections = Sections();
+    StateHasChanged();
+  });
+
+  // Never block on the async user lookup (.Result freezes WebAssembly).
+  private void OnUserChanged() => _ = InvokeAsync(async () =>
+  {
+    _user = await Users.GetUserInfoAsync();
+    StateHasChanged();
+  });
+
+  private static string PanelId(string id) =>
+    string.Concat(id.Select(c => char.IsLetterOrDigit(c) ? char.ToLowerInvariant(c) : '-'));
+
+  private Task SignOutAsync() => Auth.LogoutAsync();
+
+  public void Dispose()
+  {
+    Menus.Changed -= OnMenusChanged;
+    Branding.Changed -= OnMenusChanged;
+    Users.Changed -= OnUserChanged;
+  }
+}
