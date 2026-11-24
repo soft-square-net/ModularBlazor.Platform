@@ -596,6 +596,26 @@
   },
   "components": {
     "schemas": {
+      "ClientModuleAsset": {
+        "required": [
+          "path",
+          "sha256",
+          "size"
+        ],
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "ClientModuleContribution": {
         "required": [
           "id",
@@ -804,6 +824,21 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ClientModuleContribution"
+            }
+          },
+          "assetBase": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "assetHashes": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "additionalProperties": {
+              "type": "string"
             }
           }
         }
@@ -1315,6 +1350,21 @@
             }
           },
           "platformVersion": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "assets": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ClientModuleAsset"
+            }
+          },
+          "assetsHash": {
             "type": [
               "null",
               "string"

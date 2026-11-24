@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Components;
 using soft.square.net.ModularBlazor.Abstractions;
 using soft.square.net.ModularBlazor.Abstractions.Shell;
 
-[assembly: ClientModule(Id = "Module.Fixture", Name = "Fixture", RoutePrefixes = new[] { "fixture" })]
+[assembly: ClientModule(Id = "Module.Fixture", Name = "Fixture", RoutePrefixes = new[] { "fixture" }, Styles = new[] { "css/fixture.css" })]
 
 [assembly: MenuLink("posts", "Posts", "fixture/posts", Permissions = new[] { "fixture.posts.read", "bad name!" })]
 [assembly: MenuLink("all-bad", "Hidden", "fixture/hidden", Permissions = new[] { "no spaces allowed" })]

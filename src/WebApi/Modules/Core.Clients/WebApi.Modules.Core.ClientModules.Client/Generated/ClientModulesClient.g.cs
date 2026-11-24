@@ -1489,6 +1489,32 @@ namespace soft.square.net.WebApi.Modules.Core.ClientModules.Client
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ClientModuleAsset
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("path")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Path { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("sha256")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Sha256 { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("size")]
+        public long Size { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class ClientModuleContribution
     {
 
@@ -1630,6 +1656,12 @@ namespace soft.square.net.WebApi.Modules.Core.ClientModules.Client
         [System.Text.Json.Serialization.JsonPropertyName("contributions")]
         [System.ComponentModel.DataAnnotations.Required]
         public System.Collections.Generic.IReadOnlyList<ClientModuleContribution> Contributions { get; set; } = new System.Collections.Generic.List<ClientModuleContribution>();
+
+        [System.Text.Json.Serialization.JsonPropertyName("assetBase")]
+        public string? AssetBase { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("assetHashes")]
+        public System.Collections.Generic.IDictionary<string, string>? AssetHashes { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -2077,6 +2109,12 @@ namespace soft.square.net.WebApi.Modules.Core.ClientModules.Client
 
         [System.Text.Json.Serialization.JsonPropertyName("platformVersion")]
         public string? PlatformVersion { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("assets")]
+        public System.Collections.Generic.IReadOnlyList<ClientModuleAsset>? Assets { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("assetsHash")]
+        public string? AssetsHash { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
