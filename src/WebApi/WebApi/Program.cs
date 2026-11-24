@@ -3,6 +3,7 @@ using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 using soft.square.net.WebApi.Localization;
+using soft.square.net.WebApi.Lookups;
 using soft.square.net.WebApi.Modularity;
 using soft.square.net.WebApi.OpenApi;
 using soft.square.net.WebApi.Security;
@@ -24,6 +25,9 @@ builder.AddPlatformTenancy("broker");
 builder.Services.AddRuntimeModules(builder.Configuration);
 // Several replicas: broadcast lifecycle changes over the broker so every replica converges (needs ConnectionStrings:broker).
 builder.AddRuntimeModuleBroadcast("broker");
+// Lookups: key/text lists over modules' entities, served under each module's prefix; the catalog at /api/lookups and
+// ILookupClient for server-side checks by other modules (in process, or over Lookups:RemoteBaseUrl).
+builder.Services.AddPlatformLookups();
 // Authentication (JWT from the identity service; dev tokens via dotnet user-jwts), a fallback policy that requires a
 // signed-in caller, and permissions evaluated against per-tenant grants (IAccessScopes / IGrantStore for modules).
 builder.AddPlatformSecurity("broker");

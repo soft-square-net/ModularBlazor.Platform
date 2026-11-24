@@ -19,6 +19,11 @@ export default {
   'autocomplete.label': 'اختر الدولة / المنطقة',
   'autocomplete.placeholder': 'اكتب للبحث…',
   'autocomplete.noMatches': 'لا توجد نتائج مطابقة',
+  'autocomplete.loading': 'جار التحميل…',
+  'autocomplete.more': 'تحميل المزيد',
+  'autocomplete.error': 'تعذر تحميل القائمة',
+  'autocomplete.clear': 'مسح',
+  'autocomplete.remove': 'إزالة',
 
   'lightbox.label': 'عارض الصور',
   'lightbox.previous': 'الصورة السابقة',

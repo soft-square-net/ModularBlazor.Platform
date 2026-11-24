@@ -1,0 +1,136 @@
+@namespace soft.square.net.ModularBlazor.Abstractions.Lookups
+@using System.Text.Json
+@using Microsoft.JSInterop
+@using soft.square.net.ModularBlazor.Abstractions.MudTail
+@implements IAsyncDisposable
+@inject MudTailRuntime MudTail
+@inject ILookupService Lookups
+
+@*
+  MudTail's autocomplete over a lookup: the items come from the module that owns it, a page at a time, while typing.
+    <LookupAutocomplete Lookup="inventory.stock-items" @bind-Value="model.Item" />                  one value
+    <LookupAutocomplete Lookup="inventory.stock-items" Multiple @bind-Values="model.Items" />       several (chips)
+    <LookupAutocomplete Lookup="geo.cities" Parent="@model.Country?.Key" @bind-Value="model.City" /> dependent
+  The value is a LookupItem (key and text), so a saved value shows without a request. Free text is never a value.
+*@
+
+<div @ref="_host" class="mud-lookup-autocomplete"></div>
+@if (_unavailable)
+{
+  <p class="mud-typography mud-typography-body2" style="color: var(--mud-palette-error)">
+    The lookup needs MudTail from the Layouts.Default module, which is not active.
+  </p>
+}
+
+@code {
+  /// <summary>The lookup's key: "{prefix}.{name}".</summary>
+  [Parameter, EditorRequired] public string Lookup { get; set; } = "";
+
+  [Parameter] public string? Label { get; set; }
+  [Parameter] public string? Placeholder { get; set; }
+
+  /// <summary>Narrows the search fields (a subset of the lookup's own).</summary>
+  [Parameter] public IReadOnlyList<string>? Fields { get; set; }
+
+  /// <summary>For a dependent or tree lookup: the parent key. Changing it empties the list.</summary>
+  [Parameter] public string? Parent { get; set; }
+
+  /// <summary>Filters every search applies (e.g. an author's preset filters).</summary>
+  [Parameter] public IReadOnlyList<LookupFilter>? Filters { get; set; }
+
+  [Parameter] public int MinChars { get; set; }
+  [Parameter] public int PageSize { get; set; } = 20;
+  [Parameter] public bool Multiple { get; set; }
+  [Parameter] public bool Disabled { get; set; }
+
+  [Parameter] public LookupItem? Value { get; set; }
+  [Parameter] public EventCallback<LookupItem?> ValueChanged { get; set; }
+
+  [Parameter] public IReadOnlyList<LookupItem> Values { get; set; } = [];
+  [Parameter] public EventCallback<IReadOnlyList<LookupItem>> ValuesChanged { get; set; }
+
+  private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
+  private ElementReference _host;
+  private IJSObjectReference? _control;
+  private DotNetObjectReference<LookupAutocomplete>? _self;
+  private bool _unavailable;
+  private string? _parent;
+  private bool _disabled;
+  private LookupItem? _value;
+  private IReadOnlyList<LookupItem> _values = [];
+
+  protected override async Task OnAfterRenderAsync(bool firstRender)
+  {
+    if (firstRender)
+    {
+      var runtime = await MudTail.GetAsync();
+      if (runtime is null) { _unavailable = true; StateHasChanged(); return; }
+      _self = DotNetObjectReference.Create(this);
+      (_parent, _disabled, _value, _values) = (Parent, Disabled, Value, Values);
+      _control = await runtime.InvokeAsync<IJSObjectReference>("create", "autocomplete", _host, new Dictionary<string, object?>
+      {
+        ["remote"] = true,
+        ["label"] = Label ?? "",
+        ["placeholder"] = Placeholder,
+        ["multiple"] = Multiple,
+        ["minChars"] = MinChars,
+        ["pageSize"] = PageSize,
+        ["disabled"] = Disabled,
+        ["value"] = Value,
+        ["values"] = Values,
+      }, _self);
+      return;
+    }
+    if (_control is null) return;
+
+    if (_parent != Parent) { _parent = Parent; await _control.InvokeVoidAsync("reset"); }
+    if (_disabled != Disabled) { _disabled = Disabled; await _control.InvokeVoidAsync("setDisabled", Disabled); }
+    if (!Equals(_value?.Key, Value?.Key) || _value?.Text != Value?.Text) { _value = Value; await _control.InvokeVoidAsync("setValue", Value); }
+    if (!ReferenceEquals(_values, Values)) { _values = Values; await _control.InvokeVoidAsync("setValues", Values); }
+  }
+
+  /// <summary>Called by MudTail while the user types or scrolls.</summary>
+  [JSInvokable]
+  public async Task<LookupPage> Search(string? q, int skip, int take)
+  {
+    try
+    {
+      return await Lookups.SearchAsync(Lookup, new LookupQuery { Q = q, Fields = Fields, Parent = Parent, Filters = Filters, Skip = skip, Take = take });
+    }
+    catch (Exception e) when (e is HttpRequestException or InvalidOperationException)
+    {
+      throw new JSException(e.Message); // MudTail shows "Could not load the list"
+    }
+  }
+
+  [JSInvokable]
+  public async Task OnMudEvent(string name, JsonElement payload)
+  {
+    if (name == "select")
+    {
+      _value = payload.ValueKind == JsonValueKind.Object ? payload.Deserialize<LookupItem>(Json) : null;
+      await ValueChanged.InvokeAsync(_value);
+    }
+    else if (name == "change" && payload.ValueKind == JsonValueKind.Array)
+    {
+      _values = payload.Deserialize<List<LookupItem>>(Json) ?? [];
+      await ValuesChanged.InvokeAsync(_values);
+    }
+  }
+
+  public async ValueTask DisposeAsync()
+  {
+    try
+    {
+      if (_control is not null)
+      {
+        await _control.InvokeVoidAsync("dispose");
+        await _control.DisposeAsync();
+      }
+    }
+    catch (JSDisconnectedException) { }
+    catch (JSException) { }
+    _self?.Dispose();
+  }
+}

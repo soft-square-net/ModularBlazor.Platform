@@ -120,6 +120,12 @@ internal sealed class ModuleScope : IServiceProvider, IServiceScope, IServiceSco
 
     public IServiceProvider ServiceProvider => this;
 
+    /// <summary>The host scope this module scope falls back to (the request scope, for a request).</summary>
+    internal IServiceProvider Host => _host;
+
+    /// <summary>A scope of this module layered over <paramref name="hostScope"/> (e.g. another request's scope).</summary>
+    internal ModuleScope CreateScopeOver(IServiceProvider hostScope) => _container.CreateScope(hostScope);
+
     public object? GetService(Type type)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

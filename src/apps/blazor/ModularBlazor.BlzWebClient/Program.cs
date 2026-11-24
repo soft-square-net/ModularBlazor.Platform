@@ -60,6 +60,7 @@ builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Menus.IMen
 builder.Services.AddScoped<MenuService>();
 builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Menus.IMenuService>(sp => sp.GetRequiredService<MenuService>());
 // Dialogs one module opens in another by id (IModuleDialogs), shown by Components/ModuleDialogHost in App.razor.
+builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Lookups.ILookupService, soft.square.net.ModularBlazor.BlzWebClient.Services.LookupService>();
 builder.Services.AddScoped<ModuleDialogService>();
 builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.IModuleDialogs>(sp => sp.GetRequiredService<ModuleDialogService>());
 

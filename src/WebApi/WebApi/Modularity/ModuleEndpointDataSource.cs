@@ -26,6 +26,9 @@ internal sealed class ModuleEndpointDataSource : EndpointDataSource, IActionDesc
 
     public void Remove(string moduleId) => Update(modules => modules.Remove(moduleId));
 
+    /// <summary>Whether the module has routes on this replica (it is active here). Safe from any thread.</summary>
+    public bool IsRouted(string moduleId) => Volatile.Read(ref _modules).ContainsKey(moduleId);
+
     public IReadOnlyList<string> Describe(string moduleId) =>
         _modules.TryGetValue(moduleId, out var endpoints)
             ? endpoints.OfType<RouteEndpoint>()

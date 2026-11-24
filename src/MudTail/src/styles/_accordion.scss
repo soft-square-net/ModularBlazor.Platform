@@ -92,3 +92,53 @@
     color: var(--mud-palette-primary);
   }
 }
+
+// Remote autocomplete (lookups): selected rows, status lines, "load more" and chips for multiple values.
+.mud-autocomplete-item.selected { font-weight: 600; }
+
+.mud-autocomplete-status,
+.mud-autocomplete-more {
+  padding: 10px 14px;
+  font-size: 0.8125rem;
+  color: var(--mud-palette-text-secondary);
+}
+
+.mud-autocomplete-more {
+  cursor: pointer;
+  text-align: center;
+  border-top: 1px solid var(--mud-palette-lines-default);
+  &:hover { color: var(--mud-palette-primary); }
+}
+
+.mud-autocomplete-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-block-end: 6px;
+}
+
+.mud-autocomplete-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-block: 2px;
+  padding-inline: 10px 4px;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  background-color: rgba(var(--mud-palette-primary-rgb), 0.12);
+  color: var(--mud-palette-primary);
+
+  button {
+    display: inline-flex;
+    border: 0;
+    padding: 2px;
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    &:hover { background-color: rgba(var(--mud-palette-primary-rgb), 0.16); }
+    &:disabled { cursor: default; opacity: 0.5; }
+  }
+}
+
+.mud-autocomplete-wrapper.mud-disabled { opacity: 0.6; }

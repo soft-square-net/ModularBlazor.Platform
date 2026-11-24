@@ -431,13 +431,28 @@ const factories = {
     return { element: el, dispose: () => el.remove() };
   },
 
-  autocomplete(host, options, emit) {
+  autocomplete(host, options, emit, dotNetRef) {
     const abort = new AbortController();
-    const el = createAutocomplete({ ...options, signal: abort.signal, onSelect: (value) => emit('select', value) });
+    // options.remote: the items come from .NET, [JSInvokable] Search(q, skip, take) -> { items: [{ key, text }], hasMore }.
+    const search = options.remote && dotNetRef
+      ? (q, { skip, take }) => dotNetRef.invokeMethodAsync('Search', q, skip, take)
+      : undefined;
+    const el = createAutocomplete({
+      ...options,
+      search,
+      signal: abort.signal,
+      onSelect: (value) => emit('select', value),
+      onChange: (values) => emit('change', values),
+    });
     mountInto(host, el);
+    const api = el.mudAutocomplete;
     return {
       element: el,
-      setValue: (value) => { el.querySelector('input').value = value ?? ''; },
+      setValue: (value) => { if (api) api.setValue(value); else el.querySelector('input').value = value ?? ''; },
+      setValues: (values) => api?.setValues(values),
+      setDisabled: (value) => api?.setDisabled(value),
+      reset: () => api?.reset(),
+      focus: () => api?.focus(),
       dispose: () => { abort.abort(); el.remove(); },
     };
   },
@@ -668,7 +683,7 @@ export function pageLoading(state = true) {
  */
 export function create(name, host, options = {}, dotNetRef = null) {
   const factory = factories[name];
-  if (factory) return track(factory(host, options || {}, emitter(dotNetRef)));
+  if (factory) return track(factory(host, options || {}, emitter(dotNetRef), dotNetRef));
   if (hasComponent(name)) return track(buildComponent(name, host, options || {}, emitter(dotNetRef))); // from a plugin
   throw new Error(`MudTail: unknown component "${name}". Known: ${componentNames().join(', ')}`);
 }
