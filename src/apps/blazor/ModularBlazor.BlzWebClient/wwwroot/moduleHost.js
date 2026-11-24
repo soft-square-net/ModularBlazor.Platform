@@ -36,11 +36,54 @@ window.moduleHost = (() => {
     entry.styles.push(link); // removed with the module
   });
 
-  // spec = { styles: [{ id, css?, href?, integrity? }], scripts: [{ id, code?, url?, integrity? }] } -> string[] of errors
+  // A script handed over as code (offline, from the cached package) whose package has other scripts (chunks): a blob
+  // has no neighbouring files, so "./chunks/x.js" would not resolve. Each file it imports, statically or with
+  // import(), becomes a blob too, leaves first, and the specifiers are rewritten to those blob urls. The urls stay
+  // until the module is deactivated, since a chunk imported on first use needs its blob then.
+  const RELATIVE_IMPORT = /(\bfrom\s*|\bimport\s*\(\s*|\bimport\s*)(["'`])(\.{1,2}\/[^"'`\s]+)\2/g;
+
+  function resolvePath(from, spec) {
+    const out = [];
+    for (const part of (from.slice(0, from.lastIndexOf('/') + 1) + spec).split('/')) {
+      if (part === '.' || part === '') continue;
+      if (part === '..') out.pop(); else out.push(part);
+    }
+    return out.join('/');
+  }
+
+  function linkBlobs(moduleId, entryPath, entryCode, files, keep) {
+    const lookup = new Map(Object.keys(files).map(p => [p.toLowerCase(), p]));
+    const urls = new Map();
+    const visiting = new Set();
+
+    const rewrite = (path, code) => code.replace(RELATIVE_IMPORT, (match, before, quote, spec) => {
+      const url = urlOf(resolvePath(path, spec));
+      return url ? before + quote + url + quote : match;
+    });
+
+    function urlOf(path) {
+      const key = lookup.get(path.toLowerCase());
+      if (!key) return null;
+      if (urls.has(key)) return urls.get(key);
+      if (visiting.has(key)) throw new Error(`${key} is part of an import cycle; it cannot be loaded from memory`);
+      visiting.add(key);
+      const code = `${rewrite(key, files[key])}\n//# sourceURL=module://${moduleId}/${key}`;
+      const url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+      visiting.delete(key);
+      urls.set(key, url);
+      keep.push(url);
+      return url;
+    }
+
+    return rewrite(entryPath, entryCode);
+  }
+
+  // spec = { styles: [{ id, css?, href?, integrity? }], scripts: [{ id, code?, url?, integrity?, path?, files? }] }
+  //   -> string[] of errors. path and files come with code: the script's path in the package and its other scripts.
   async function activate(moduleId, spec) {
     deactivate(moduleId); // activating twice must not leave two copies behind
 
-    const entry = { styles: [], scripts: [] };
+    const entry = { styles: [], scripts: [], blobs: [] };
     registry.set(moduleId, entry);
 
     for (const s of spec?.styles ?? []) {
@@ -75,8 +118,17 @@ window.moduleHost = (() => {
       let url = s.url;
       let blobUrl = null;
       if (s.code != null) {
+        let source = s.code;
+        if (s.files && s.path) {
+          try {
+            source = linkBlobs(moduleId, s.path, s.code, s.files, entry.blobs);
+          } catch (e) {
+            errors.push(`${s.id}: ${e?.message ?? e}`);
+            continue;
+          }
+        }
         // sourceURL makes the script show up as a named file in the browser dev tools.
-        const code = `${s.code}\n//# sourceURL=module://${moduleId}/${s.id}.js`;
+        const code = `${source}\n//# sourceURL=module://${moduleId}/${s.id}.js`;
         blobUrl = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
         url = blobUrl;
       }
@@ -111,6 +163,7 @@ window.moduleHost = (() => {
       if (s.api !== s.mod) safeDispose(s.mod, moduleId);
     }
     for (const el of entry.styles) el.remove();
+    for (const url of entry.blobs) URL.revokeObjectURL(url);
 
     registry.delete(moduleId);
   }

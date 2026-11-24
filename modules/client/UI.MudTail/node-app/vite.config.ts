@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { resolve, relative } from 'path';
+import { rmSync } from 'fs';
 import { globSync } from 'glob';
 
 // 1. Grab style entries: every src/framework/*.css or *.scss that is not a partial (_name)
@@ -20,14 +21,35 @@ scssInputs.forEach(file => {
   inputs[relativePath] = absolutePath;
 });
 
+const outDir = resolve(import.meta.dirname, '../wwwroot');
+
+// The wwwroot also holds files this build does not make (emptyOutDir is off), so the chunks are cleared here: their
+// names carry hashes, and old ones left behind would be embedded in the module's package. The stylesheet entries
+// (src/framework/*.css) make empty JS entry files as well; those are dropped.
+const tidy = {
+  name: 'ui-mudtail-tidy',
+  buildStart() {
+    rmSync(resolve(outDir, 'js/chunks'), { recursive: true, force: true });
+  },
+  generateBundle(_options, bundle) {
+    for (const [file, output] of Object.entries(bundle)) {
+      if (output.type === 'chunk' && output.isEntry && output.name !== 'module' && !output.code.trim()) delete bundle[file];
+    }
+  },
+};
+
 export default defineConfig({
+  plugins: [tidy],
   build: {
     // 3. The module's wwwroot (embedded in the DLL by the Module SDK; the WebApi serves each file from its own URL)
-    outDir: resolve(import.meta.dirname, '../wwwroot'),
+    outDir,
     emptyOutDir: false, // Set to false if Blazor holds other static assets here to prevent deletion
 
     cssMinify: 'lightningcss', 
     sourcemap: true,
+    // No preload helper for the chunks: it builds absolute urls from the page, which neither the WebApi's urls nor
+    // the offline blobs (moduleHost links those itself) match. The chunks are small and load on first use.
+    modulePreload: false,
     
     rollupOptions: {
       input: inputs,
@@ -45,6 +67,9 @@ export default defineConfig({
           }
           return 'js/chunks/[name].js';
         },
+
+        // Code loaded on first use (MudTail's large components: dock, tree, image editor, explorer), next to module.js.
+        chunkFileNames: 'js/chunks/[name]-[hash].js',
         
         // Directs your custom Material SCSS styles safely to your CSS directory
         assetFileNames: (assetInfo) => {

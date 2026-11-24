@@ -150,7 +150,7 @@ public sealed class ActiveModuleService
       var path = declared[i];
       var specId = $"{id}#js{i}";
       if (Served(descriptor, path) is { } served) scripts.Add(new ScriptSpec(specId, null, served.Url, served.Integrity));
-      else if (assets.TryGetText(path, out var code)) scripts.Add(new ScriptSpec(specId, code, null, null));
+      else if (assets.TryGetText(path, out var code)) scripts.Add(new ScriptSpec(specId, code, null, null, ModuleAssetSet.Normalize(path), OtherScripts(assets, path)));
       else scripts.Add(new ScriptSpec(specId, null, path, null));
     }
 
@@ -198,5 +198,21 @@ public sealed class ActiveModuleService
   }
 
   private sealed record StyleSpec(string Id, string? Css, string? Href, string? Integrity);
-  private sealed record ScriptSpec(string Id, string? Code, string? Url, string? Integrity);
+  /// <param name="Path">The script's path in the package (blob mode), so its relative imports can be resolved.</param>
+  /// <param name="Files">Blob mode: the package's other scripts (chunks) by path; moduleHost turns the ones the script
+  /// imports into blobs too, since a blob has no neighbouring files to import from.</param>
+  private sealed record ScriptSpec(string Id, string? Code, string? Url, string? Integrity, string? Path = null,
+    Dictionary<string, string>? Files = null);
+
+  private static Dictionary<string, string>? OtherScripts(ModuleAssetSet assets, string entry)
+  {
+    var self = ModuleAssetSet.Normalize(entry);
+    Dictionary<string, string>? files = null;
+    foreach (var path in assets.Paths)
+    {
+      if (!path.EndsWith(".js", StringComparison.OrdinalIgnoreCase) || path.Equals(self, StringComparison.OrdinalIgnoreCase)) continue;
+      if (assets.TryGetText(path, out var code)) (files ??= new(StringComparer.Ordinal))[path] = code;
+    }
+    return files;
+  }
 }

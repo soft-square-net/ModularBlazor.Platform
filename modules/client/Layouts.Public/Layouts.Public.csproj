@@ -1,4 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
-  <!-- Layouts.Public: the public site's layout (layout key "public"). It has no assets of its own: the site styles
-       (MudTail's mud-site classes) come with UI.MudTail. Loaded on demand, the first time a page asks for "public". -->
+  <!-- Layouts.Public: the public site's layout (layout key "public"). css/site.min.css is MudTail's site pack
+       (editorial, sports, gallery, the mud-site shell), copied by node-app; the core stylesheet and the runtime come
+       with UI.MudTail. Loaded on demand, the first time a page asks for "public". -->
+  <ItemGroup>
+    <Compile Remove="node-app\**" />
+    <Content Remove="node-app\**" />
+    <EmbeddedResource Remove="node-app\**" />
+    <None Remove="node-app\**" />
+  </ItemGroup>
 </Project>

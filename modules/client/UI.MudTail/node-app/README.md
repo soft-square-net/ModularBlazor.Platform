@@ -8,8 +8,20 @@ every layout and module shares, so a layout only adds its own shell on top.
 
 | Source | Output | What it is |
 | --- | --- | --- |
-| `src/framework/mudtail.css` | `../wwwroot/css/mudtail.min.css` | Tailwind utilities (no preflight), the MudTail preset, all MudTail CSS (components, editorial, sport, gallery, site shell) and `_host.css` |
-| `src/js/module.ts` | `../wwwroot/js/module.js` | On activation: applies the saved MudTail theme and starts `MudTail.autoInit(document.body)`. Returns the MudTail API |
+| `src/framework/mudtail.css` | `../wwwroot/css/mudtail.min.css` | Tailwind utilities (no preflight), the MudTail preset, MudTail's core CSS and `_host.css`. The site pack (editorial, sport, gallery, the `mud-site` shell) is Layouts.Public's |
+| `src/framework/packs/*.css` | `../wwwroot/css/packs/*.min.css` | The stylesheets of `dock`, `tree`, `image-editor` and `explorer`, added when the component is first used |
+| `src/js/module.ts` | `../wwwroot/js/module.js` + `js/chunks/` | On activation: applies the saved MudTail theme and starts `MudTail.autoInit(document.body)`. Returns the MudTail API. The four large components are chunks it imports on first use; a few chunks (`i18n`, `icons`, …) it shares with them and imports up front |
+
+The build empties `wwwroot/js/chunks` first, since the chunk names carry hashes and old ones would be embedded in the
+package.
+
+## Code loaded on first use
+
+`create('dock' | 'tree' | 'image-editor' | 'explorer', …)` and `load(area)` import the chunk and add the pack's
+`<link>` from `css/packs/` next to the module's stylesheet. Offline, when the host runs the package from memory,
+moduleHost turns the chunks into blob urls as well and rewrites the imports to them (the host passes the package's
+other scripts with `module.js`). The packs are not loaded then: a component used for the first time offline has its
+code but not its stylesheet.
 
 ## Shell helpers
 
