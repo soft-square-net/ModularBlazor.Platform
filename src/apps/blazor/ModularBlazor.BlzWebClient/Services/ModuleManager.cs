@@ -195,6 +195,18 @@ public sealed class ModuleManager : IModuleNavigation
 
   public ModuleDescriptor? GetOwner(Assembly assembly) => _owners.GetValueOrDefault(assembly);
 
+  /// <summary>
+  /// A type of a loaded module by its full name ("Ns.Type", nested "Ns.Outer+Inner"), looked up in the module's own
+  /// assemblies only; null when the module is not loaded or has no such type.
+  /// </summary>
+  public Type? FindModuleType(string moduleId, string typeName)
+  {
+    if (!_loaded.TryGetValue(moduleId, out var module)) return null;
+    foreach (var assembly in module.Assemblies)
+      if (assembly.GetType(typeName, throwOnError: false) is { } type) return type;
+    return null;
+  }
+
   /// <summary>The module whose route prefix best matches a base-relative path, or null.</summary>
   public ModuleDescriptor? FindByPath(string path)
   {

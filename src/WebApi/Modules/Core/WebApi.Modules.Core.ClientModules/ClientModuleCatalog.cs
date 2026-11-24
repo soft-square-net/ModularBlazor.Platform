@@ -123,7 +123,7 @@ internal sealed class ClientModuleCatalog
             v.ExtraAssemblies.Select(f => f.Sha256).ToList(),
             s.LoadStrategy, s.LoadStrategy == ClientModuleLoadStrategy.Startup,
             s.Hidden, s.RequiresAuth, s.RequiredRole, s.AvailableToRoles, s.RoutePrefixes, s.Layout,
-            s.Dependencies, s.Styles, s.Scripts, s.Nav, v.Menu);
+            s.Dependencies, s.Styles, s.Scripts, s.Nav, v.Menu, v.Contributions);
     }
 
     /// <summary>Relative to the WebApi base address. The hash makes the URL change whenever the content does.</summary>
@@ -177,7 +177,12 @@ internal sealed class ClientModuleCatalog
         var files = new List<PackageFile>();
         foreach (var f in staged.Upload.Files) files.Add(new PackageFile(f.Name, await File.ReadAllBytesAsync(Path.Combine(folder, f.Name), ct)));
         var u = staged.Upload;
-        var package = new InspectedPackage(u.Kind, u.Id, u.Version, u.Detected, files, u.Routes, u.Layouts, u.Menu, u.Warnings);
+        var package = new InspectedPackage(u.Kind, u.Id, u.Version, u.Detected, files, u.Routes, u.Layouts, u.Menu, u.Warnings)
+        {
+            Contributions = u.Contributions,
+            LayoutDetails = u.LayoutDetails,
+            PlatformVersion = u.PlatformVersion
+        };
         if (package.PackageHash != staged.PackageHash) throw new ClientModuleException("The upload's files changed; upload the package again.", 409);
 
         var record = await ChangeAsync(records =>
@@ -208,6 +213,9 @@ internal sealed class ClientModuleCatalog
             Routes = package.Routes,
             Layouts = package.Layouts,
             Menu = package.Menu,
+            Contributions = package.Contributions,
+            LayoutDetails = package.LayoutDetails,
+            PlatformVersion = package.PlatformVersion,
             Warnings = package.Warnings,
             ExpiresAt = DateTimeOffset.UtcNow + UploadLifetime
         };
@@ -500,7 +508,10 @@ internal sealed class ClientModuleCatalog
             UploadedBy = existing?.PackageHash == package.PackageHash ? existing.UploadedBy : user,
             Routes = package.Routes,
             Layouts = package.Layouts,
-            Menu = package.Menu
+            Menu = package.Menu,
+            Contributions = package.Contributions,
+            LayoutDetails = package.LayoutDetails,
+            PlatformVersion = package.PlatformVersion
         };
 
         if (record is null)

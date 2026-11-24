@@ -1,0 +1,31 @@
+@namespace soft.square.net.ModularBlazor.Abstractions.Shell
+@using Microsoft.AspNetCore.Components.Sections
+@using Microsoft.AspNetCore.Components.Web
+
+@*
+  A page's title, breadcrumbs and actions, placed by the layout (LayoutSections):
+    <PageHeader Title="@L["Posts"]">
+      <Breadcrumbs><a href="content">@L["Content"]</a></Breadcrumbs>
+      <Actions><button @onclick="New">@L["New post"]</button></Actions>
+    </PageHeader>
+  The title is also the browser tab's title. A layout without one of the outlets just leaves that part out.
+*@
+@if (!string.IsNullOrEmpty(Title))
+{
+  <PageTitle>@Title</PageTitle>
+  <SectionContent SectionName="@LayoutSections.Title">@Title</SectionContent>
+}
+@if (Breadcrumbs is not null)
+{
+  <SectionContent SectionName="@LayoutSections.Breadcrumbs">@Breadcrumbs</SectionContent>
+}
+@if (Actions is not null)
+{
+  <SectionContent SectionName="@LayoutSections.PageActions">@Actions</SectionContent>
+}
+
+@code {
+  [Parameter] public string? Title { get; set; }
+  [Parameter] public RenderFragment? Breadcrumbs { get; set; }
+  [Parameter] public RenderFragment? Actions { get; set; }
+}

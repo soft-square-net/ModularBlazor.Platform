@@ -6,4 +6,8 @@
     downloads the files from it. Shared setup in ../Directory.Build.props.
   -->
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="soft.square.net.ClientModules.Tests" />
+  </ItemGroup>
+
 </Project>

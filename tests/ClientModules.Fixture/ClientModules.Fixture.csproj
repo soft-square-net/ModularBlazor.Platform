@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!-- A client module used only as test input: ClientModules.Tests reads this assembly's metadata like an upload. -->
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.*" />
+    <ProjectReference Include="..\..\src\ModularBlazor.Abstractions\ModularBlazor.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -37,6 +37,7 @@ public static class MenuItemKinds
 /// <param name="Icon">An icon name for layouts that show icons.</param>
 /// <param name="Badge">An API url ("api/...") the host asks for the entry's badge (see <see cref="MenuBadge"/>).</param>
 /// <param name="BadgeRefresh">Seconds between two asks; 0: the default (60).</param>
+/// <param name="Permissions">The user needs any one of them to see the entry (none: everyone who gets the module).</param>
 public sealed record MenuItem(
     string Id,
     string Kind,
@@ -49,7 +50,8 @@ public sealed record MenuItem(
     IReadOnlyDictionary<string, string>? Titles = null,
     bool External = false,
     string? Badge = null,
-    int BadgeRefresh = 0)
+    int BadgeRefresh = 0,
+    IReadOnlyList<string>? Permissions = null)
 {
     [System.Text.Json.Serialization.JsonIgnore]
     public bool IsGroup => Kind == MenuItemKinds.Group;
