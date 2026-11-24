@@ -16,6 +16,8 @@ public static class RuntimeModulesExtensions
         services.TryAddSingleton<IModuleStateBus, NullModuleStateBus>();
         services.AddSingleton<ModuleRuntime>();
         services.AddHostedService<ModuleReconciler>();
+        // Development only, and only with Modules:Local: a rebuild of a local module swaps it in (after the reconciler).
+        services.AddHostedService<LocalModuleWatcher>();
         return services;
     }
 

@@ -35,8 +35,9 @@ public sealed class ModuleRuntimeOptions
     /// <summary>
     /// Development only (ignored in other environments): modules loaded from a build output folder, by module id, e.g.
     /// <c>Modules:Local:content = ../Module.Content/src/.../bin/Debug/net10.0</c>. On every start the folder is installed
-    /// like an upload (and activated the first time) when its files changed, so rebuilding the module and restarting the
-    /// WebApi shows the change without packing or uploading. Used by the module repos' playgrounds.
+    /// like an upload (and activated the first time) when its files changed, and while the WebApi runs every rebuild of
+    /// the folder swaps the module for the new build (<see cref="LocalModuleWatcher"/>): no packing, uploading or restart.
+    /// Used by the module repos' playgrounds.
     /// </summary>
     public Dictionary<string, string> Local { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
@@ -313,6 +314,25 @@ internal sealed partial class ModuleRuntime
             if (await SeedFolderAsync(folder, core: false, ct) is { } id) changed.Add(id);
         }
         return changed;
+    }
+
+    /// <summary>The <see cref="ModuleRuntimeOptions.Local"/> build output folders, as full paths (Development only).</summary>
+    public IReadOnlyList<string> LocalFolders() =>
+        !_environment.IsDevelopment() ? []
+        : _options.Local.Values.Where(p => !string.IsNullOrWhiteSpace(p))
+            .Select(p => Path.GetFullPath(p, _environment.ContentRootPath))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+    /// <summary>
+    /// Development only: after a rebuild of a <see cref="ModuleRuntimeOptions.Local"/> folder, installs it again when its
+    /// files changed and converges, so the running copy is swapped (blue/green) for the new build; other replicas are
+    /// told too. Returns the module id and the sync result, or null when nothing changed (or the folder is invalid).
+    /// </summary>
+    public async Task<(string Id, SyncResult Result)?> ReinstallLocalAsync(string folder, CancellationToken ct)
+    {
+        if (!_environment.IsDevelopment() || !Directory.Exists(folder)) return null;
+        if (await SeedFolderAsync(folder, core: false, ct) is not { } id) return null;
+        return (id, await ApplyAndPublishAsync(id, "local-reload", ct));
     }
 
     /// <summary>

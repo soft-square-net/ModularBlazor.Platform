@@ -63,6 +63,8 @@ builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Menus.IMen
 builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Lookups.ILookupService, soft.square.net.ModularBlazor.BlzWebClient.Services.LookupService>();
 builder.Services.AddScoped<ModuleDialogService>();
 builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.IModuleDialogs>(sp => sp.GetRequiredService<ModuleDialogService>());
+// Development only: a module repo's playground reloads a rebuilt client module in place (see DevModuleReloader).
+builder.Services.AddScoped<DevModuleReloader>();
 
 var host = builder.Build();
 
@@ -80,5 +82,8 @@ await host.Services.GetRequiredService<ActiveModuleService>().SyncAsync();
 
 // The language, before the first render: the saved choice or the default (MudTail is active by now, so it follows).
 await host.Services.GetRequiredService<LocaleService>().InitializeAsync();
+
+// Development: listen for rebuilt local client modules (the WebApi answers 404 when it has none, and this stops).
+if (builder.HostEnvironment.IsDevelopment()) host.Services.GetRequiredService<DevModuleReloader>().Start();
 
 await host.RunAsync();

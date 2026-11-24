@@ -373,15 +373,17 @@ internal sealed class ClientModuleCatalog
     /// file, or a folder whose assemblies form one module) from a build output, like an upload, so a module repo's
     /// playground shows its UI without uploading it. Installed again when the files change, as the active version
     /// (same version: replaced); the admin's settings are kept. Dependencies among them are installed first.
+    /// Runs on activation and, while the WebApi runs, after every rebuild (<see cref="LocalClientModuleWatcher"/>).
+    /// Returns the ids of the modules installed again (their files changed).
     /// </summary>
-    public async Task SeedLocalAsync(CancellationToken ct)
+    public async Task<IReadOnlyList<string>> SeedLocalAsync(CancellationToken ct)
     {
         if (!_environment.IsDevelopment())
         {
             if (_options.Local.Count > 0) _log.LogWarning("ClientModules:Local is ignored outside Development.");
-            return;
+            return [];
         }
-        if (_options.Local.Count == 0) return;
+        if (_options.Local.Count == 0) return [];
 
         var packages = new List<InspectedPackage>();
         foreach (var (id, configured) in _options.Local)
@@ -407,7 +409,7 @@ internal sealed class ClientModuleCatalog
                 _log.LogWarning("Local client module {Module} skipped: {Reason}", id, e.Message);
             }
         }
-        if (packages.Count == 0) return;
+        if (packages.Count == 0) return [];
 
         // Dependencies first, so each module finds what it lists (a cycle keeps the configured order).
         var ordered = new List<InspectedPackage>();
@@ -420,6 +422,7 @@ internal sealed class ClientModuleCatalog
         }
         foreach (var package in packages) Visit(package, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
 
+        var installed = new List<string>();
         await ChangeAsync(records =>
         {
             foreach (var package in ordered)
@@ -437,10 +440,22 @@ internal sealed class ClientModuleCatalog
                 if (missing.Count > 0)
                     _log.LogWarning("Local client module {Module} depends on {Missing}, which is not installed.", record.Id, string.Join(", ", missing));
                 _log.LogInformation("Installed local client module {Module} {Version}", record.Id, record.ActiveVersion);
+                installed.Add(record.Id);
             }
             return true;
         }, ct);
+        return installed;
     }
+
+    /// <summary>Development with <see cref="ClientModulesOptions.Local"/> set: rebuilds reload in the browsers.</summary>
+    public bool LocalReloadEnabled => _environment.IsDevelopment() && _options.Local.Count > 0;
+
+    /// <summary>The <see cref="ClientModulesOptions.Local"/> paths (files or folders), as full paths (Development only).</summary>
+    public IReadOnlyList<string> LocalPaths() =>
+        !_environment.IsDevelopment() ? []
+        : _options.Local.Values.Where(p => !string.IsNullOrWhiteSpace(p))
+            .Select(p => Path.GetFullPath(p, _environment.ContentRootPath))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
     // ================================================================ helpers
 

@@ -1,3 +1,5 @@
+using System.Net.ServerSentEvents;
+using System.Runtime.CompilerServices;
 using Carter;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -65,6 +67,31 @@ public sealed class ClientModulesEndpoints : ICarterModule
             // Not in the document: clients download the URLs the manifest lists (they carry the hash), not a generated call.
             .ExcludeFromDescription()
             .WithName("ClientModules_GetFile");
+
+        // Development only, with ClientModules:Local (404 otherwise): Server-Sent Events for the client app's dev reload.
+        // "hello" on connect (the client checks the manifest: it may have missed a change), then "changed" with the ids of
+        // the local client modules installed again after a rebuild. The stream ends after a few minutes; the client
+        // reconnects, so a long-lived request never pins this module's code.
+        root.MapGet("/dev/events", (ClientModuleCatalog catalog, LocalClientModuleChanges changes, CancellationToken ct) =>
+                catalog.LocalReloadEnabled ? Results.ServerSentEvents(DevEvents(changes, ct)) : Results.NotFound())
+            .AllowAnonymous()
+            .ExcludeFromDescription()
+            .WithName("ClientModules_DevEvents");
+    }
+
+    private static async IAsyncEnumerable<SseItem<string>> DevEvents(LocalClientModuleChanges changes,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        lifetime.CancelAfter(TimeSpan.FromMinutes(5));
+        yield return new SseItem<string>("", "hello");
+        while (true)
+        {
+            string[] ids;
+            try { ids = await changes.NextAsync(lifetime.Token); }
+            catch (OperationCanceledException) { yield break; }
+            yield return new SseItem<string>(string.Join(',', ids), "changed");
+        }
     }
 
     // ---------------------------------------------------------------- admin
