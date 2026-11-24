@@ -52,4 +52,7 @@
     <Project Path="src/WebApi/Modules/Core/WebApi.Modules.Core.Menus/WebApi.Modules.Core.Menus.csproj" />
     <Project Path="src/WebApi/Modules/Core/WebApi.Modules.Core.Tenancy/WebApi.Modules.Core.Tenancy.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/WebApi.Tests/WebApi.Tests.csproj" />
+  </Folder>
 </Solution>

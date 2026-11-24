@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Http.Json;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.Extensions.Options;
 using soft.square.net.WebApi.Contracts;
+using soft.square.net.WebApi.Contracts.Lookups;
+using soft.square.net.WebApi.Lookups;
 
 namespace soft.square.net.WebApi.Modularity;
 
@@ -120,7 +122,7 @@ internal sealed partial class ModuleRuntime
         try
         {
             await ExtractAsync(content, fileName, staging, ct);
-            var (entry, manifest) = Inspect(staging);
+            var (entry, manifest, lookups) = Inspect(staging);
             Validate(manifest);
 
             await _gate.WaitAsync(ct);
@@ -161,6 +163,7 @@ internal sealed partial class ModuleRuntime
                         Settings = settings,
                         DesiredState = previous?.DesiredState ?? ModuleState.Installed, // an upgrade keeps the module's state
                         Permissions = manifest.Permissions.ToList(),
+                        Lookups = lookups,
                         InstalledAt = DateTimeOffset.UtcNow
                     };
                     _records[record.Id] = record;
@@ -321,9 +324,10 @@ internal sealed partial class ModuleRuntime
         var kind = core ? "Core" : "Local";
         string entry;
         ModuleManifest manifest;
+        List<LookupDescriptor> lookups;
         try
         {
-            (entry, manifest) = Inspect(folder);
+            (entry, manifest, lookups) = Inspect(folder);
             Validate(manifest);
         }
         catch (Exception e) when (e is ModuleException or IOException or BadImageFormatException or TypeLoadException)
@@ -386,7 +390,8 @@ internal sealed partial class ModuleRuntime
                     InstalledAt = DateTimeOffset.UtcNow,
                     Core = core,
                     PackageHash = hash,
-                    Permissions = manifest.Permissions.ToList()
+                    Permissions = manifest.Permissions.ToList(),
+                    Lookups = lookups
                 };
                 _store.Save(_records.Values);
                 _log.LogInformation("Installed {Kind} module {Id} {Version} ({Mode})", kind.ToLowerInvariant(), manifest.Id, manifest.Version,
@@ -758,6 +763,10 @@ internal sealed partial class ModuleRuntime
             module.ConfigureServices(services, settings);
             if (module is IModulePipeline) ModulePipelines.AddPipelineServices(services, _hostRoot, _log);
 
+            // The module's lookups live in its own container, so they are disposed with this copy (see Lookups/).
+            var declared = module.Manifest.Permissions.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
+            if (LookupSet.Discover(assembly, record.Id, record.RoutePrefix, declared) is { } lookupSet) services.AddSingleton(lookupSet);
+
             // The module's own JsonOptions, configured exactly like the host's. Minimal API caches JSON metadata for
             // the module's request/response types inside these options; in the host's singleton they would pin the
             // module's assemblies forever.
@@ -799,6 +808,8 @@ internal sealed partial class ModuleRuntime
 
         foreach (var type in module.RouteModules)
             ((ICarterModule)ActivatorUtilities.CreateInstance(module.Container.Root, type)).AddRoutes(group);
+        if (module.Container.Root.GetService(typeof(LookupSet)) is LookupSet lookups) // /api/{prefix}/lookups/{name}
+            LookupEndpoints.Map(group, lookups);
         if (module.Pipeline is { } pipeline) // catch-all /api/{prefix}/{**path}, validated like any module endpoint
             ModulePipelines.Map(group, pipeline, module.Container.Root, $"{_routeBase}/{record.RoutePrefix}", record.Id);
 
@@ -836,7 +847,7 @@ internal sealed partial class ModuleRuntime
 
     /// <summary>Reads the manifest in a throw-away load context, so nothing stays loaded after install.</summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static (string Entry, ModuleManifest Manifest) Inspect(string folder)
+    private static (string Entry, ModuleManifest Manifest, List<LookupDescriptor> Lookups) Inspect(string folder)
     {
         foreach (var dll in Directory.EnumerateFiles(folder, "*.dll"))
         {
@@ -844,10 +855,16 @@ internal sealed partial class ModuleRuntime
             var context = new ModuleLoadContext("inspect:" + Path.GetFileName(dll), dll);
             try
             {
-                var type = FindModuleType(context.LoadWithoutLock(dll));
+                var assembly = context.LoadWithoutLock(dll);
+                var type = FindModuleType(assembly);
                 if (type is null) continue;
                 var manifest = ((IRuntimeModule)Activator.CreateInstance(type)!).Manifest;
-                return (Path.GetFileName(dll), manifest with { DefaultSettings = new Dictionary<string, string?>(manifest.DefaultSettings) });
+                // The lookup catalog: strings only, recorded now so every pool can list them without loading the module.
+                var prefix = manifest.RoutePrefix.Trim('/');
+                var declared = manifest.Permissions.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
+                var lookups = LookupSet.Discover(assembly, manifest.Id, prefix, declared)?.Lookups.Values
+                    .Select(l => l.Describe(prefix, manifest.Id)).OrderBy(l => l.Name).ToList() ?? [];
+                return (Path.GetFileName(dll), manifest with { DefaultSettings = new Dictionary<string, string?>(manifest.DefaultSettings) }, lookups);
             }
             catch (BadImageFormatException) { } // native or non-.NET file
             finally { context.Unload(); }

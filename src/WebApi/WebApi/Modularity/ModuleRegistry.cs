@@ -44,6 +44,9 @@ public sealed class ModuleRecord
 
     /// <summary>From the manifest: false refuses unload/uninstall (409) and defers swaps to the next restart.</summary>
     public bool HotUnload { get; init; } = true;
+
+    /// <summary>The module's lookups (metadata only), read when it was installed: the lookup catalog.</summary>
+    public List<Contracts.Lookups.LookupDescriptor> Lookups { get; init; } = [];
 }
 
 /// <summary>A module as seen by the replica that answered.</summary>
