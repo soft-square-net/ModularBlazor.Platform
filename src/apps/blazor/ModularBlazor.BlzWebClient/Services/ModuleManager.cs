@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
 using Microsoft.Extensions.DependencyInjection;
 using soft.square.net.ModularBlazor.Abstractions;
+using soft.square.net.ModularBlazor.Abstractions.Auth;
 using soft.square.net.ModularBlazor.Abstractions.MudTail;
 using soft.square.net.ModularBlazor.BlzWebClient.Auth;
 using soft.square.net.Share.All;
@@ -87,6 +88,7 @@ public sealed class ModuleManager : IModuleNavigation
   private string? _etag;            // of the last manifest applied, for If-None-Match
   private bool _etagSignedIn;       // ...and whether it was the signed-in one
   private DateTimeOffset _lastCheck;
+  private string? _catalogUser;     // whose manifest the catalog holds (UserKey); null before the first one is applied
 
   private sealed record LoadedModule(ModuleDescriptor Descriptor, IReadOnlyList<Assembly> Assemblies, ModuleLoadContext Context);
 
@@ -271,13 +273,28 @@ public sealed class ModuleManager : IModuleNavigation
   public Task RestoreUserModulesAsync() => RefreshAsync();
 
   /// <summary>
+  /// Makes sure the catalog is the current user's before a URL is resolved. Signing in (the OIDC callback) refreshes
+  /// the catalog in the background, and the callback then navigates straight to the return URL: without waiting here
+  /// that navigation would still see the anonymous catalog, find no module for the URL and render the 404 page.
+  /// Waits for a refresh already in flight; fetches only when the catalog belongs to someone else (or nobody).
+  /// </summary>
+  public Task EnsureCatalogForCurrentUserAsync() => RefreshAsync(onlyIfStale: true);
+
+  /// <summary>Who a manifest is for: "" signed out, otherwise the user and the tenant the token is bound to.</summary>
+  private static string UserKey(ClaimsPrincipal user) =>
+      user.Identity?.IsAuthenticated is true
+          ? $"{user.FindFirst(UserInfo.UserIdClaimType)?.Value}|{user.FindFirst(UserInfo.TenantClaimType)?.Value}"
+          : "";
+
+  /// <summary>
   /// Fetches the manifest for whoever is signed in (or anonymously) and applies it: new modules appear, removed or
   /// disabled ones are unloaded and disappear, a loaded module with a newer version is reported. No module code is
   /// downloaded here, except startup modules not loaded yet and "preload" modules (in the background). Never throws:
   /// on failure the current catalog stays, and the first call falls back to the cached anonymous manifest.
   /// </summary>
   /// <param name="force">Ignore the ETag (sign-in, sign-out, an admin change).</param>
-  public async Task RefreshAsync(bool force = false)
+  /// <param name="onlyIfStale">Do nothing when the catalog already is the current user's.</param>
+  public async Task RefreshAsync(bool force = false, bool onlyIfStale = false)
   {
     await _refreshLock.WaitAsync();
     try
@@ -285,12 +302,14 @@ public sealed class ModuleManager : IModuleNavigation
       _lastCheck = DateTimeOffset.UtcNow;
       var user = (await _auth.GetAuthenticationStateAsync()).User;
       var signedIn = user.Identity?.IsAuthenticated is true;
+      var userKey = UserKey(user);
+      if (onlyIfStale && _catalogUser == userKey) return;
 
       List<Entry>? entries;
       try
       {
         entries = await FetchManifestAsync(signedIn, force);
-        if (entries is null) return; // 304: nothing changed
+        if (entries is null) { _catalogUser = userKey; return; } // 304: nothing changed
         Source = ModuleCatalogSource.Api;
         ManifestError = null;
       }
@@ -305,6 +324,7 @@ public sealed class ModuleManager : IModuleNavigation
       }
 
       Apply(entries, user);
+      if (Source == ModuleCatalogSource.Api) _catalogUser = userKey; // a cached fallback is not this user's: try again
     }
     catch (Exception ex)
     {

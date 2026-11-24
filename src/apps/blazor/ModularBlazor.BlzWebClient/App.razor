@@ -66,6 +66,14 @@
 
     var module = Modules.FindByPath(path);
 
+    // Right after sign-in the catalog may still be the anonymous one (its refresh runs in the background while the
+    // login callback navigates to the return URL): wait for this user's catalog before calling the address unknown.
+    if (module is null && (usr?.IsAuthenticated ?? false))
+    {
+      await Modules.EnsureCatalogForCurrentUserAsync();
+      module = Modules.FindByPath(path);
+    }
+
     if (module is null)
     {
       // Signed out and the address is unknown: it may be a deep link into a module the
