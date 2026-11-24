@@ -15,7 +15,8 @@ sidebar:
 | Island + `client:*` | `RegisterForJavaScript` + `<BlazorIsland load=…>` | `autoInit(root)` |
 | `<script>` in a component | `js/module.js` of a module (`moduleHost`) | `registerBehavior(name, factory)` |
 | Content collections | API + module data | — |
-| i18n routing (`/ar/…`) | `CultureInfo`, `IStringLocalizer` | `setLocale`, `t`, `translateElement` |
+| i18n routing (`/ar/…`) | `CultureInfo`, `IStringLocalizer`, `i18n/{culture}.json`, `ILocaleService` ([languages](/guides/i18n/)) | `setLocale`, `t`, `translateElement` |
+| Sidebar / nav config | `[MenuLink]`, `[MenuGroup]`, `<MenuZone>`, `IMenuBadges` ([menus](/guides/menus/)) | — |
 | `dir="rtl"` on `<html>` | same | follows `dir`, logical properties |
 | — | `[ClientDialog("Module.X/name")]`, `IModuleDialogs.ShowAsync` ([dialogs](/guides/module-dialogs/)) | `mud-dialog-*` frame |
 

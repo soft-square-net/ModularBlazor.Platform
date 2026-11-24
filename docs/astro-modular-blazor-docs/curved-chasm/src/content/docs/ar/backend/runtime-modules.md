@@ -12,7 +12,7 @@ sidebar:
 | --- | --- |
 | `WebApi` | المضيف. يحمل مجلد `Modularity/` بيئة التشغيل. والصورة نفسها تعمل في كل مجموعة. |
 | `WebApi.Contracts` | `IRuntimeModule` و`ModuleManifest`. يشير إليه المضيف، فهو مشترك دائما. |
-| `Modules/Core/*` | الوحدات الأساسية (`identity` و`tenancy` و`client-modules`)، تشحن مع كل إصدار من WebApi. |
+| `Modules/Core/*` | الوحدات الأساسية (`identity` و`tenancy` و`client-modules` و`menus`)، تشحن مع كل إصدار من WebApi. |
 | `ModularBlazor.Samples`: ‏`samples/Greeting` | وحدة مخصصة نموذجية (مشروع واحد). **لا** يشير إليها المضيف: تضغط مخرجات بنائها وترفع. |
 | `ModularBlazor.Samples`: ‏`samples/Inventory` | وحدة مخصصة نموذجية مقسمة إلى مشاريع Domain وApplication وInfrastructure. |
 | `ModularBlazor.Samples`: ‏`samples/Pulse` | وحدة نموذجية لها خط معالجة خاص وخدمة مستضافة. |
@@ -44,6 +44,8 @@ sidebar:
 | --- | --- | --- |
 | `identity` 1.1.0 | `WebApi.Modules.Core.Identity` | `GET /api/identity/me` (مع الصلاحيات)، و`/users`، و`/users/{userName}`؛ وإدارة المنح `GET`/`POST /grants` و`DELETE /grants/{id}`؛ و`GET /permissions` (فهرس الصلاحيات). انظر [المصادقة: التنفيذ](/ar/backend/auth-implementation/) |
 | `tenancy` 2.2.0 | `WebApi.Modules.Core.Tenancy` | `GET /api/tenancy/tenants`، و`/tenants/{id}`، و`/current`؛ و`POST /tenants` (يجهز قاعدة البيانات)، و`PATCH /tenants/{id}` (إعادة التسمية، والمضيفون، والتعليق)، و`POST /tenants/{id}/activate` و`/suspend` و`/provision` (إصلاح)؛ والاشتراكات (`GET /subscriptions` تقرير، و`/tenants/{id}/subscriptions` إضافة وتمديد وإلغاء؛ للعلم فقط). انظر [المستأجرون وبياناتهم](/ar/backend/tenancy-data/) |
+| `client-modules` 1.0.0 | `WebApi.Modules.Core.ClientModules` | كتالوج وحدات عميل Blazor: ‏`GET /api/client-modules/manifest`، والملفات، والرفع، والتثبيت، والإعدادات، والإصدارات. انظر [عميل Blazor لـ WebApi](/ar/guides/blazor-webapi-client/) |
+| `menus` 1.0.0 | `WebApi.Modules.Core.Menus` | تغييرات المسؤولين على القوائم، للمنصة ولكل مستأجر: ‏`GET /api/menus` (لأي أحد، مع ETag)، و`GET`/`PUT /api/menus/admin` (‏`menus.manage` في المستأجر، أو `platform.modules.manage`). انظر [القوائم](/ar/guides/menus/) |
 
 **البذر.** عند البدء، وقبل أول مزامنة، تسجل كل نسخة كل حزمة أساسية مشحونة تحت قفل الفهرس، فتبذر النسخ المتزامنة مرة واحدة:
 

@@ -15,7 +15,7 @@ Use [JSON Schema Draft 2020-12](https://json-schema.org/specification) as the da
 | --- | --- | --- |
 | Field/component definitions, form schema versions, schema composition, publishing, import/export, and validation results | Domain records, domain lifecycle, persistence of submitted values, and policy for when values are required | UI components, layout/rendering, client-side convenience validation, accessibility, and interaction design |
 
-Dynamic Fields can be disabled or absent in an ERP deployment. A module may use only its static domain fields, or declare an optional capability dependency when it needs dynamic values. In the newsroom profile, published forms will define the `content` of a Post document and of each nested node (article/news, video, document, image, album and mixed posts). Contents already stores that document with a `schemaId`/`schemaVersion` per node, which is the form key/version pair here. Contents still owns the Post envelope, submitted payload values, revisions, authorization, and editorial lifecycle; Dynamic Fields owns only reusable form definitions, immutable schema versions, and validation. This is a planned integration, not an implemented capability: no Dynamic Fields module exists yet, and Contents performs only structural checks. See [Post document](/modules/contents/posts/#post-document-implemented).
+Dynamic Fields can be disabled or absent in an ERP deployment. A module may use only its static domain fields, or declare an optional capability dependency when it needs dynamic values. In the newsroom profile, published forms will define the `content` of a Post document and of each nested node (article/news, video, document, image, album and mixed posts). Contents already stores that document with a `schemaId`/`schemaVersion` per node, which is the form key/version pair here. Contents still owns the Post envelope, submitted payload values, revisions, authorization, and editorial lifecycle; Dynamic Fields owns only reusable form definitions, immutable schema versions, and validation. The module now exists (see [Status](#status)), but Contents does not call it to validate a post yet: Contents still performs only structural checks. It already uses DynamicFields for [translations](/modules/contents/#translations). See [Post document](/modules/contents/posts/#post-document-implemented).
 
 :::note[Content versus style]
 A Post node carries separate `content` and `style` objects. Dynamic Fields validates `content` only. `style` holds responsive presentation values that Contents keeps as opaque JSON. This does not conflict with the rule that form `presentation` metadata never contains CSS or component names: `style` is Post data, not part of a form definition. Whether `style` gets its own schema (for example a theme-token allowlist) is still an open decision.
@@ -43,4 +43,40 @@ flowchart LR
 
 ## Status
 
-This section is a **prototype strategy**, not a claim that a Dynamic Fields module is implemented. The recommended first slice is: create draft definition → validate definition → publish immutable version → validate JSON values → export/import the versioned package.
+> **Implemented** in the repository
+> [`ModularBlazor.Module.DynamicFields`](https://github.com/soft-square-net/ModularBlazor.Module.DynamicFields)
+> (branch `master`), in the [Clean Architecture layers](/backend/module-template-clean-architecture/), with a client
+> module in Arabic and English. It took a simpler shape than the strategy pages below, which stay as the design
+> background: export/import packages and conditional visibility are not built.
+
+The module's id, route prefix and database schema are `dynamicfields`; its permissions are `dynamicfields.read` and
+`dynamicfields.manage`.
+
+**A field** is one kind of content (a news post, a paragraph, an image, an album) as one schema.org type, with:
+
+- its **values**: key, label, kind (Text, RichText, Integer, Decimal, Boolean, Date, DateTime, Url, Choice, Asset,
+  Keyword, Term), required, list or single, limits, and the schema.org property it is published as;
+- its **style** choices: theme tokens, optionally per breakpoint (`{ "base": "full", "md": "half" }`), never free CSS
+  (this settles the open question in the note above);
+- the fields it may contain as **children**, with counts. Fields are reusable;
+- optionally another client module's **editor dialog** for it.
+
+Publishing a draft freezes it as the next numbered version and pins each child to its newest published version. A post
+is a tree of content nodes; each names a field version and holds its `content` and `style`. Contents stores the tree;
+this module checks it (at most 500 nodes and 12 levels).
+
+| Route (under `/api/dynamicfields`) | Does |
+| --- | --- |
+| `GET /fields`, `POST /fields`, `GET /fields/{key}`, `DELETE /fields/{key}` | List, create, read and delete (until published) fields |
+| `PUT /fields/{key}/draft`, `POST /fields/{key}/publish` | Edit the draft (with its `version`; 409 when changed); publish the next version |
+| `GET /fields/{key}/versions/{number}` | A published version, with its content and style as JSON Schema 2020-12 |
+| `POST /content/validate`, `POST /content/validate-node` | Validate a content tree, or one node: `{ valid, issues: [{ path, message }] }` |
+| `POST /content/translations/check`, `.../apply` | Check a translation overlay; serve the tree in a culture (see [Languages](/guides/i18n/#translating-content)) |
+| `GET /catalog/schema-org` | The curated schema.org types and properties, and the style presets |
+| `GET /catalog/starter-fields`, `POST .../install` | The starter library (`block.heading`, `block.image`, `post.article`, ...) and installing it |
+
+The client module has the **Fields** page (`/dynamicfields`), the **field builder** with a live preview and JSON-LD,
+and two dialogs other modules open through [module dialogs](/guides/module-dialogs/):
+`Module.DynamicFields/edit-content` (the one generic editor for a node's values and style) and
+`Module.DynamicFields/translate-content`. Asset, Keyword and Term values get a Pick button when
+`Module.Keywords/pick-concepts` or `Module.Taxonomies/pick-terms` is installed.

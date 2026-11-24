@@ -44,7 +44,7 @@ Edge load balancer + YARP gateway        TLS, JWT, rate limit, tenant resolution
 | `src/WebApi/WebApi.Data` | Host-shipped data layer: `TenantDbContext`, the tenant store, four EF Core providers |
 | `src/WebApi/WebApi.SharedKernel` | Host-shipped domain base types and repository interfaces (no EF) |
 | `src/WebApi/Identity/WebApi.Identity.Server` | OpenIddict identity service (port 5090 in the lab) |
-| `src/WebApi/Modules/Core/` | **Core modules** (`identity`, `tenancy`, `client-modules`): built with every WebApi release and enabled by default |
+| `src/WebApi/Modules/Core/` | **Core modules** (`identity`, `tenancy`, `client-modules`, `menus`): built with every WebApi release and enabled by default |
 | `src/ModularBlazor.Module.Sdk` | The Module SDK that custom modules build with, published with the contract packages |
 | `src/Aspire/Hybird` | Aspire lab: gateway, four pools, identity service, RabbitMQ, Redis, PostgreSQL |
 | `ModularBlazor.Samples` (repo) | Sample custom modules: Greeting, Inventory (layered), Pulse, and the client modules Dashboard and Reports |

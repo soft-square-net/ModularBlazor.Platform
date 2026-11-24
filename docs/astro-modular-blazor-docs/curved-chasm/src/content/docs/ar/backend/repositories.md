@@ -79,11 +79,16 @@ flowchart LR
 
 | الطبقة | تعرف بـ | تأخذ |
 | --- | --- | --- |
-| `Domain` | `*.Domain` | SharedKernel |
-| `Application` | `*.Application` | SharedKernel وContracts وASP.NET Core |
+| `Domain` | `*.Domain`، أو `*.Core` (المعمارية النظيفة) | SharedKernel |
+| `Application` | `*.Application`، أو `*.UseCases` | SharedKernel وContracts وASP.NET Core |
 | `Infrastructure` | `*.Infrastructure` | Data (‏EF Core والمزودون) وContracts وCarter وASP.NET Core و`EnableDynamicLoading`: تجميعة الدخول |
 | `Module` | أي مشروع خادم آخر | Contracts وCarter وASP.NET Core؛ ويضيف `ModuleUsesData=true` الحزمة Data. والوحدة ذات المشروع الواحد (Greeting) تضبط `EnableDynamicLoading=true` بنفسها |
+| `Module` بوصفها الدخول | `*.Web` (ليس مشروع Razor) | تجميعة الدخول لوحدة بالمعمارية النظيفة (Core وUseCases وInfrastructure وWeb): ‏`EnableDynamicLoading` و`ModuleUsesData` مفعلان افتراضيا. اضبط `ModuleUsesData=false` لوحدة بلا بيانات |
 | `Client` | مشروع Razor SDK، أو `<ModuleLayer>Client</ModuleLayer>` (عميل API مولد) | Abstractions ومنصة المتصفح؛ ويضمن `wwwroot` في التجميعة |
+
+ما يضبطه ملف المشروع من `ModuleLayer` أو `EnableDynamicLoading` أو `ModuleUsesData` يغلب الاسم. وكل طبقة تضمّن ترجماتها
+أيضا، `i18n/{culture}.json` (انظر [اللغات](/ar/guides/i18n/)). وللمعمارية النظيفة قالب `dotnet new` خاص بها:
+[قالب الوحدة بالمعمارية النظيفة](/ar/backend/module-template-clean-architecture/).
 
 التجميعات التي يشحنها المضيف للبناء فقط، فلا تحوي مخرجات البناء إلا تجميعاتك وتبعياتك الخاصة، حتى حين تعتمد حزمة خاصة
 (Elsa) على EF Core نفسها. لا تضف `PackageReference` خاصا بك إلى EF Core أو Carter أو Ardalis.Specification.

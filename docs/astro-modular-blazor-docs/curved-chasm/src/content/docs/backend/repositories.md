@@ -80,11 +80,16 @@ it pick the references by the project's **name suffix** (or `<ModuleLayer>` set 
 
 | Layer | Recognised by | Gets |
 | --- | --- | --- |
-| `Domain` | `*.Domain` | SharedKernel |
-| `Application` | `*.Application` | SharedKernel, Contracts, ASP.NET Core |
-| `Infrastructure` | `*.Infrastructure` | Data (EF Core, the providers), Contracts, Carter, ASP.NET Core, `EnableDynamicLoading`: the entry assembly |
+| `Domain` | `*.Domain`, or `*.Core` (Clean Architecture) | SharedKernel |
+| `Application` | `*.Application`, or `*.UseCases` | SharedKernel, Contracts, ASP.NET Core |
+| `Infrastructure` | `*.Infrastructure` | Data (EF Core, the providers), Contracts, Carter, ASP.NET Core, `EnableDynamicLoading`: the entry assembly of a Domain/Application/Infrastructure module, and what dotnet-ef needs for migrations |
 | `Module` | any other server project | Contracts, Carter, ASP.NET Core; `ModuleUsesData=true` adds Data. A single-project module (Greeting) sets `EnableDynamicLoading=true` itself |
+| `Module`, as the entry | `*.Web` (not a Razor project) | The entry assembly of a Clean Architecture module (Core, UseCases, Infrastructure, Web): `EnableDynamicLoading` and `ModuleUsesData` default to true. Set `ModuleUsesData=false` for a module without data |
 | `Client` | a Razor SDK project, or `<ModuleLayer>Client</ModuleLayer>` (a generated API client) | Abstractions, the browser platform; `wwwroot` is embedded in the assembly |
+
+A `ModuleLayer`, `EnableDynamicLoading` or `ModuleUsesData` set in the project file wins over the name. Every layer
+also embeds its translations, `i18n/{culture}.json` (see [Languages](/guides/i18n/)). The Clean Architecture layout
+has its own `dotnet new` template: [Clean Architecture module template](/backend/module-template-clean-architecture/).
 
 Host-shipped assemblies are compile-only, so the build output holds your assemblies and your private dependencies
 only, even when a private package (Elsa) depends on EF Core itself. Do not add your own `PackageReference` to EF Core,

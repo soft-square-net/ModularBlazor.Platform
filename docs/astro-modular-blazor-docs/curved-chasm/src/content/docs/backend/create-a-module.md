@@ -473,7 +473,7 @@ using soft.square.net.ModularBlazor.Abstractions;
 | `RoutePrefixes` | Opening a page under them loads the module (lazy load). Default: the first segment of each `@page` |
 | `Dependencies` | Client module ids loaded first. Their assemblies resolve this module's references |
 | `Styles`, `Scripts` | Files from `wwwroot/`, added to the page while the module is loaded |
-| `NavTitle`, `NavHref`, `NavOrder` | The menu entry. Leave them out for no menu entry |
+| `NavTitle`, `NavHref`, `NavOrder` | A single menu entry in `main`, used only when the module has no `[MenuLink]` or `[MenuGroup]` (below). Leave them out for no menu entry |
 | `RequiresAuth`, `RequiredRole`, `AvailableToRoles` | Who gets the module in their manifest (default: every signed-in user) |
 | `Hidden` | No pages or menu: a library other modules depend on |
 | `LoadOnStartup` | Loaded before the first render (layouts, themes). Default: on navigation |
@@ -507,8 +507,27 @@ A page calls the API through the host's `WebApi` HttpClient, which goes to the g
 }
 ```
 
+To place entries in a particular menu, or to group them, use the menu attributes instead of `NavTitle`. They are read
+on upload too, and an entry can show a live badge from the module's API ([Menus](/guides/menus/)):
+
+```csharp title="src/Module.Notes/ModuleInfo.cs"
+[assembly: MenuGroup("notes", "Notes", Href = "notes", Order = 50)]
+[assembly: MenuLink("archive", "Archive", "notes/archive", Parent = "notes",
+    Badge = "api/notes/unread-count", BadgeRefresh = 120)]
+```
+
+Texts are written in English and read through `IStringLocalizer<T>`; the Arabic goes in `i18n/ar.json` next to the
+project, keyed by the English text. The SDK embeds it, and the menu titles are translated from it on upload
+([Languages](/guides/i18n/)):
+
+```json title="src/Module.Notes/i18n/ar.json"
+{ "Notes": "الملاحظات", "Archive": "الأرشيف", "You don't have the permission for this.": "ليست لديك صلاحية لهذا." }
+```
+
 Rules for the UI:
 
+- **Write every text through `L[...]` and CSS with logical properties** (`margin-inline-start`, never `margin-left`):
+  the app is Arabic and right to left by default.
 - **Tenant-bound APIs need a tenant sign-in.** The platform admin is signed in without a tenant and gets 400 from
   them. Sign in with an organisation on the client's sign-in page, and give the user the module's permissions in
   that tenant (step 13).
