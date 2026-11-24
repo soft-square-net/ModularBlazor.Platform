@@ -37,6 +37,7 @@ public sealed record ClientModuleNavItem(string Title, string Href, int Order = 
 /// <param name="External">An absolute http(s) link. Modules cannot declare one; kept for links an admin adds.</param>
 /// <param name="Badge">An API url ("api/...") the client asks for the entry's badge.</param>
 /// <param name="BadgeRefresh">Seconds between two asks (15-3600); 0: the client's default.</param>
+/// <param name="Permissions">The user needs any one of them to see the entry; null: everyone who gets the module.</param>
 public sealed record ClientModuleMenuItem(
     string Id,
     string Kind,
@@ -49,7 +50,40 @@ public sealed record ClientModuleMenuItem(
     IReadOnlyDictionary<string, string>? Titles = null,
     bool External = false,
     string? Badge = null,
-    int BadgeRefresh = 0);
+    int BadgeRefresh = 0,
+    IReadOnlyList<string>? Permissions = null);
+
+/// <summary>
+/// A header action, dock or context panel the module declares ([assembly: HeaderAction / Dock / ContextPanel]), read
+/// when it is uploaded and kept per version like its menu. The client app's ShellContribution has the same shape.
+/// </summary>
+/// <param name="Id">"{moduleId}:{localId}".</param>
+/// <param name="Kind">"header-action", "dock" or "context-panel".</param>
+/// <param name="Component">Full name of the component type in the module's own assembly.</param>
+/// <param name="ForRoutes">Context panels: page path patterns ('*' one segment, a final '**' the rest).</param>
+/// <param name="ForContext">Context panels: page-context keys ("content.post").</param>
+public sealed record ClientModuleContribution(
+    string Id,
+    string Kind,
+    string Title,
+    string Component,
+    string? Icon = null,
+    int Order = 100,
+    IReadOnlyDictionary<string, string>? Titles = null,
+    IReadOnlyList<string>? Permissions = null,
+    string? Badge = null,
+    int BadgeRefresh = 0,
+    IReadOnlyList<string>? ForRoutes = null,
+    IReadOnlyList<string>? ForContext = null);
+
+/// <summary>What a layout of the module offers ([LayoutInfo] next to its [LayoutKey]).</summary>
+/// <param name="Role">"app", "admin", "public", "auth" or "blank"; null when it did not say.</param>
+public sealed record ClientModuleLayout(
+    string Key,
+    string? Role,
+    IReadOnlyList<string> Sections,
+    IReadOnlyList<string> Zones,
+    IReadOnlyList<string> Contributions);
 
 /// <summary>What an admin decides about a client module. Kept across versions: a new version keeps the module's settings.</summary>
 public sealed record ClientModuleSettings
@@ -119,6 +153,15 @@ public sealed record ClientModuleVersion
 
     /// <summary>The menu groups and links the module declares ([assembly: MenuGroup] / [MenuLink]).</summary>
     public IReadOnlyList<ClientModuleMenuItem> Menu { get; init; } = [];
+
+    /// <summary>The header actions, docks and context panels the module declares.</summary>
+    public IReadOnlyList<ClientModuleContribution> Contributions { get; init; } = [];
+
+    /// <summary>What the module's layouts offer ([LayoutInfo]); layouts without it are only in <see cref="Layouts"/>.</summary>
+    public IReadOnlyList<ClientModuleLayout> LayoutDetails { get; init; } = [];
+
+    /// <summary>The platform contracts (ModularBlazor.Abstractions) it was built against; null: it does not reference them.</summary>
+    public string? PlatformVersion { get; init; }
 }
 
 /// <summary>A client module in the catalog.</summary>
@@ -169,7 +212,8 @@ public sealed record ClientModuleDescriptor(
     IReadOnlyList<string> Styles,
     IReadOnlyList<string> Scripts,
     IReadOnlyList<ClientModuleNavItem> Nav,
-    IReadOnlyList<ClientModuleMenuItem> Menu);
+    IReadOnlyList<ClientModuleMenuItem> Menu,
+    IReadOnlyList<ClientModuleContribution> Contributions);
 
 /// <summary>The modules the caller may use; <see cref="ETag"/> changes whenever the list does.</summary>
 public sealed record ClientModuleManifest(string ETag, IReadOnlyList<ClientModuleDescriptor> Modules);
@@ -205,6 +249,15 @@ public sealed record ClientModuleUpload
 
     /// <summary>The menu groups and links the module declares.</summary>
     public IReadOnlyList<ClientModuleMenuItem> Menu { get; init; } = [];
+
+    /// <summary>The header actions, docks and context panels the module declares.</summary>
+    public IReadOnlyList<ClientModuleContribution> Contributions { get; init; } = [];
+
+    /// <summary>What the module's layouts offer ([LayoutInfo]).</summary>
+    public IReadOnlyList<ClientModuleLayout> LayoutDetails { get; init; } = [];
+
+    /// <summary>The platform contracts it was built against.</summary>
+    public string? PlatformVersion { get; init; }
     public IReadOnlyList<string> Warnings { get; init; } = [];
     public DateTimeOffset ExpiresAt { get; init; }
 }

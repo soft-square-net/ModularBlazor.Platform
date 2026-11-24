@@ -30,6 +30,15 @@ internal sealed record InspectedPackage(
     IReadOnlyList<ClientModuleMenuItem> Menu,
     IReadOnlyList<string> Warnings)
 {
+    /// <summary>What the module adds to the layout besides menus ([assembly: HeaderAction / Dock / ContextPanel]).</summary>
+    public IReadOnlyList<ClientModuleContribution> Contributions { get; init; } = [];
+
+    /// <summary>What each of the module's layouts offers ([LayoutInfo] next to [LayoutKey]).</summary>
+    public IReadOnlyList<ClientModuleLayout> LayoutDetails { get; init; } = [];
+
+    /// <summary>The platform contracts (ModularBlazor.Abstractions) the module was built against, "major.minor.patch".</summary>
+    public string? PlatformVersion { get; init; }
+
     /// <summary>
     /// SHA-256 over the files' names and hashes: equal for the same files, whatever the upload's format. A .nupkg is
     /// hashed by its content (the entries NuGet does not regenerate on every pack), so packing the same code again is
@@ -76,6 +85,24 @@ internal static partial class ClientModuleInspector
     private const string LayoutKeyAttribute = "soft.square.net.ModularBlazor.Abstractions.LayoutKeyAttribute";
     private const string MenuLinkAttribute = "soft.square.net.ModularBlazor.Abstractions.MenuLinkAttribute";
     private const string MenuGroupAttribute = "soft.square.net.ModularBlazor.Abstractions.MenuGroupAttribute";
+    private const string ShellNamespace = "soft.square.net.ModularBlazor.Abstractions.Shell.";
+    private const string LayoutInfoAttribute = ShellNamespace + "LayoutInfoAttribute";
+    private const string AbstractionsAssembly = "soft.square.net.ModularBlazor.Abstractions";
+
+    /// <summary>The shell contribution attributes and the kind each declares (ShellContributionKinds).</summary>
+    private static readonly Dictionary<string, string> ContributionAttributes = new(StringComparer.Ordinal)
+    {
+        [ShellNamespace + "HeaderActionAttribute"] = "header-action",
+        [ShellNamespace + "DockAttribute"] = "dock",
+        [ShellNamespace + "ContextPanelAttribute"] = "context-panel",
+    };
+
+    /// <summary>
+    /// The version of the platform contracts this server runs with (WebApi.Contracts ships with ModularBlazor.Abstractions
+    /// under one version): a module built against a newer major is refused, a newer minor gets a warning.
+    /// </summary>
+    internal static Version HostPlatformVersion { get; set; } =
+        typeof(soft.square.net.WebApi.Contracts.Tenancy.ITenantContext).Assembly.GetName().Version ?? new Version(1, 0);
     private const string RouteAttribute = "Microsoft.AspNetCore.Components.RouteAttribute";
     private const string AssemblyPrefix = "soft.square.net.";
     public const string SettingsFile = "client-module.json";
@@ -196,6 +223,7 @@ internal static partial class ClientModuleInspector
         }
         if (!primary.Info.References.Any(r => r.StartsWith("Microsoft.AspNetCore.Components", StringComparison.OrdinalIgnoreCase)))
             warnings.Add($"{primary.File.Name} does not reference Blazor (Microsoft.AspNetCore.Components).");
+        CheckPlatformVersion(primary.File.Name, primary.Info.PlatformVersion, warnings);
 
         var attribute = primary.Info.Attribute ?? new Dictionary<string, object?>();
         var id = attribute.GetValueOrDefault("Id") as string
@@ -212,12 +240,35 @@ internal static partial class ClientModuleInspector
             warnings.Add("No pages (@page) and no layouts ([LayoutKey]) were found.");
 
         var menu = Menu(id, primary.Info.Menu, detected.RoutePrefixes, primary.Info.Texts, warnings);
+        var contributions = Contributions(id, primary.Info.Contributions, primary.Info.Types, primary.Info.Texts, warnings);
 
         var ordered = new List<PackageFile> { primary.File };
         ordered.AddRange(files.Where(f => f != primary.File).OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase));
 
         return new InspectedPackage(ClientModuleKind.Dll, id, primary.Info.Version, detected, ordered,
-            primary.Info.Routes, primary.Info.Layouts, menu, warnings);
+            primary.Info.Routes, primary.Info.Layouts, menu, warnings)
+        {
+            Contributions = contributions,
+            LayoutDetails = primary.Info.LayoutDetails,
+            PlatformVersion = primary.Info.PlatformVersion?.ToString(3)
+        };
+    }
+
+    /// <summary>
+    /// The module was compiled against ModularBlazor.Abstractions <paramref name="built"/>: a newer major than this
+    /// server's contracts is refused (what it calls may not exist here); a newer minor or an older major is installed with
+    /// a warning. A module that does not reference the contracts is not checked.
+    /// </summary>
+    internal static void CheckPlatformVersion(string file, Version? built, List<string> warnings)
+    {
+        if (built is null) return;
+        var host = HostPlatformVersion;
+        if (built.Major > host.Major)
+            throw new ClientModuleException($"{file} is built for platform {built.ToString(3)}, newer than this server ({host.ToString(3)}). Update the platform first.");
+        if (built.Major < host.Major)
+            warnings.Add($"{file} is built for platform {built.ToString(3)}, an older major version than this server ({host.ToString(3)}); rebuild it against the current Module SDK.");
+        else if (built.Minor > host.Minor)
+            warnings.Add($"{file} is built for platform {built.ToString(3)}, newer than this server ({host.ToString(3)}); features it uses may be missing.");
     }
 
     // ---------------------------------------------------------------- settings
@@ -336,18 +387,13 @@ internal static partial class ClientModuleInspector
             if (parent is not null && !parent.Contains(':')) parent = $"{moduleId}:{parent}";
 
             // The badge: the module's own API (relative "api/..."), asked by the client with the user's token.
-            var badge = Named("Badge")?.TrimStart('/');
-            if (badge is not null && (!badge.StartsWith("api/", StringComparison.OrdinalIgnoreCase) || badge.Contains("//") || badge.Contains('\\')
-                                      || badge.Split(['?', '#'], 2)[0].Contains(':') || badge.Length > 500))
-            {
-                warnings.Add($"{what} '{local}': the badge '{badge}' is not an API url of the WebApi (api/...); the entry is kept without it.");
-                badge = null;
-            }
+            var badge = BadgeUrl(what, local, Named("Badge"), warnings);
             var refresh = badge is null ? 0 : d.Named.GetValueOrDefault("BadgeRefresh") as int? ?? 0;
             if (refresh != 0) refresh = Math.Clamp(refresh, 15, 3600);
 
             items.Add(new ClientModuleMenuItem($"{moduleId}:{local}", group ? "group" : "link", zone, title, href, parent, Named("Icon"),
-                d.Named.GetValueOrDefault("Order") as int? ?? 100, Translations(title, texts), Badge: badge, BadgeRefresh: refresh));
+                d.Named.GetValueOrDefault("Order") as int? ?? 100, Translations(title, texts), Badge: badge, BadgeRefresh: refresh,
+                Permissions: Permissions(what, local, d.Named, warnings)));
         }
 
         // A parent of the module's own that it does not declare: shown at the zone's top level instead.
@@ -359,6 +405,117 @@ internal static partial class ClientModuleInspector
 
     [GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")]
     private static partial Regex MenuIdPattern();
+
+    /// <summary>
+    /// A Permissions argument, checked: invalid names are dropped with a warning. Null when there are none; when every
+    /// name is invalid the entry gets an unknown permission, so it is hidden rather than shown to everyone.
+    /// </summary>
+    private static IReadOnlyList<string>? Permissions(string what, string local, IReadOnlyDictionary<string, object?> named, List<string> warnings)
+    {
+        if (named.GetValueOrDefault("Permissions") is not string[] { Length: > 0 } values) return null;
+        var kept = new List<string>();
+        foreach (var value in values.Select(v => v.Trim()))
+        {
+            if (!PermissionPattern().IsMatch(value)) warnings.Add($"{what} '{local}': '{value}' is not a valid permission name; it is ignored.");
+            else if (!kept.Contains(value, StringComparer.Ordinal)) kept.Add(value);
+        }
+        if (kept.Count > 0) return kept;
+        warnings.Add($"{what} '{local}': none of its permissions is valid, so nobody will see it.");
+        return [InvalidPermission];
+    }
+
+    /// <summary>A permission nobody holds (every name a module gave was invalid).</summary>
+    internal const string InvalidPermission = "invalid-permission";
+
+    [GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$")]
+    private static partial Regex PermissionPattern();
+
+    /// <summary>A badge url, checked: the module's own API (relative "api/..."), asked with the user's token. Null when invalid.</summary>
+    private static string? BadgeUrl(string what, string local, string? value, List<string> warnings)
+    {
+        var badge = value?.Trim().TrimStart('/');
+        if (string.IsNullOrEmpty(badge)) return null;
+        if (!badge.StartsWith("api/", StringComparison.OrdinalIgnoreCase) || badge.Contains("//") || badge.Contains('\\')
+            || badge.Split(['?', '#'], 2)[0].Contains(':') || badge.Length > 500)
+        {
+            warnings.Add($"{what} '{local}': the badge '{badge}' is not an API url of the WebApi (api/...); the entry is kept without it.");
+            return null;
+        }
+        return badge;
+    }
+
+    // ---------------------------------------------------------------- shell contributions
+
+    /// <summary>One [assembly: HeaderAction / Dock / ContextPanel] as written: its constructor arguments and named ones.</summary>
+    private sealed record ContributionDeclaration(string Kind, IReadOnlyList<string?> Arguments, IReadOnlyDictionary<string, object?> Named);
+
+    /// <summary>
+    /// The module's header actions, docks and context panels, checked like its menu: ids made unique ("{module}:{id}"),
+    /// the component must be a type of the module's own assembly, routes and context keys well formed. What does not fit
+    /// is left out with a warning; the module still installs.
+    /// </summary>
+    private static List<ClientModuleContribution> Contributions(string moduleId, IReadOnlyList<ContributionDeclaration> declarations,
+        IReadOnlySet<string> types, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> texts, List<string> warnings)
+    {
+        var items = new List<ClientModuleContribution>();
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var d in declarations)
+        {
+            var what = d.Kind switch { "header-action" => "HeaderAction", "dock" => "Dock", _ => "ContextPanel" };
+            var local = d.Arguments.ElementAtOrDefault(0)?.Trim() ?? "";
+            var title = d.Arguments.ElementAtOrDefault(1)?.Trim() ?? "";
+            var component = d.Arguments.ElementAtOrDefault(2)?.Split(',', 2)[0].Trim() ?? "";
+            string? Named(string name) => d.Named.GetValueOrDefault(name) is string { Length: > 0 } s ? s.Trim() : null;
+
+            if (!MenuIdPattern().IsMatch(local)) { warnings.Add($"{what} '{local}': the id must be 1-64 letters, digits, '-', '_' or '.'; left out."); continue; }
+            if (title.Length is 0 or > 100) { warnings.Add($"{what} '{local}': the title must be 1-100 characters; left out."); continue; }
+            if (!ids.Add(local)) { warnings.Add($"{what} '{local}': another contribution of the module has this id; left out."); continue; }
+            if (!types.Contains(component)) { warnings.Add($"{what} '{local}': its component '{component}' is not a type of the module's own assembly; left out."); continue; }
+
+            var badge = d.Kind == "header-action" ? null : BadgeUrl(what, local, Named("Badge"), warnings);
+            var refresh = badge is null ? 0 : d.Named.GetValueOrDefault("BadgeRefresh") as int? ?? 0;
+            if (refresh != 0) refresh = Math.Clamp(refresh, 15, 3600);
+
+            List<string>? routes = null, context = null;
+            if (d.Kind == "context-panel")
+            {
+                routes = [];
+                foreach (var r in Strings(d.Named, "ForRoutes").Select(r => r.Trim().Trim('/')))
+                {
+                    if (RoutePattern().IsMatch(r) && !r.Split('/').SkipLast(1).Contains("**")) { if (!routes.Contains(r, StringComparer.OrdinalIgnoreCase)) routes.Add(r); }
+                    else warnings.Add($"ContextPanel '{local}': '{r}' is not a page path pattern (segments, '*', a final '**'); it is ignored.");
+                }
+                context = [];
+                foreach (var k in Strings(d.Named, "ForContext").Select(k => k.Trim()))
+                {
+                    if (ContextKeyPattern().IsMatch(k)) { if (!context.Contains(k, StringComparer.OrdinalIgnoreCase)) context.Add(k); }
+                    else warnings.Add($"ContextPanel '{local}': '{k}' is not a context key like 'content.post'; it is ignored.");
+                }
+                if (routes.Count == 0 && context.Count == 0)
+                {
+                    warnings.Add($"ContextPanel '{local}': it names no page (ForRoutes) and no context key (ForContext), so it would never show; left out.");
+                    continue;
+                }
+                if (routes.Count == 0) routes = null;
+                if (context.Count == 0) context = null;
+            }
+
+            items.Add(new ClientModuleContribution($"{moduleId}:{local}", d.Kind, title, component, Named("Icon"),
+                d.Named.GetValueOrDefault("Order") as int? ?? 100, Translations(title, texts),
+                Permissions(what, local, d.Named, warnings), badge, refresh, routes, context));
+        }
+        return items;
+    }
+
+    private static string[] Strings(IReadOnlyDictionary<string, object?> named, string name) => named.GetValueOrDefault(name) as string[] ?? [];
+
+    /// <summary>Page path patterns: up to 16 segments, each a literal, '*' or '**'.</summary>
+    [GeneratedRegex(@"^(\*\*|\*|[A-Za-z0-9._~-]+)(/(\*\*|\*|[A-Za-z0-9._~-]+)){0,15}$")]
+    private static partial Regex RoutePattern();
+
+    /// <summary>"{module}.{entity}" (2-4 lower-case parts): "content.post", "shifts.roster.day".</summary>
+    [GeneratedRegex(@"^[a-z0-9][a-z0-9-]{0,49}(\.[a-z0-9][a-z0-9-]{0,49}){1,3}$")]
+    private static partial Regex ContextKeyPattern();
 
     // ---------------------------------------------------------------- translations
 
@@ -410,7 +567,17 @@ internal static partial class ClientModuleInspector
 
     private sealed record AssemblyInfo(string Name, string Version, IReadOnlyDictionary<string, object?>? Attribute,
         IReadOnlyList<string> Routes, IReadOnlyList<string> Layouts, IReadOnlyList<string> References,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> Texts, IReadOnlyList<MenuDeclaration> Menu);
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> Texts, IReadOnlyList<MenuDeclaration> Menu)
+    {
+        public IReadOnlyList<ContributionDeclaration> Contributions { get; init; } = [];
+        public IReadOnlyList<ClientModuleLayout> LayoutDetails { get; init; } = [];
+
+        /// <summary>Full names of the types the assembly defines ("Ns.Type", nested "Ns.Outer+Inner").</summary>
+        public IReadOnlySet<string> Types { get; init; } = new HashSet<string>();
+
+        /// <summary>The version of ModularBlazor.Abstractions it references (null: none).</summary>
+        public Version? PlatformVersion { get; init; }
+    }
 
     private static AssemblyInfo ReadAssembly(PackageFile file)
     {
@@ -425,35 +592,63 @@ internal static partial class ClientModuleInspector
             IReadOnlyDictionary<string, object?>? client = null;
             string? informational = null;
             var menu = new List<MenuDeclaration>();
+            var contributions = new List<ContributionDeclaration>();
             foreach (var handle in assembly.GetCustomAttributes())
             {
                 var attribute = md.GetCustomAttribute(handle);
-                switch (AttributeName(md, attribute))
+                var name = AttributeName(md, attribute);
+                switch (name)
                 {
                     case ClientAttribute: client = Values(attribute); break;
                     case MenuLinkAttribute: menu.Add(new MenuDeclaration("link", Arguments(attribute), Values(attribute))); break;
                     case MenuGroupAttribute: menu.Add(new MenuDeclaration("group", Arguments(attribute), Values(attribute))); break;
                     case "System.Reflection.AssemblyInformationalVersionAttribute": informational = FirstString(attribute); break;
+                    default:
+                        if (ContributionAttributes.TryGetValue(name, out var kind))
+                            contributions.Add(new ContributionDeclaration(kind, Arguments(attribute), Values(attribute)));
+                        break;
                 }
             }
 
             var routes = new List<string>();
             var layouts = new List<string>();
+            var layoutDetails = new List<ClientModuleLayout>();
+            var types = new HashSet<string>(StringComparer.Ordinal);
             foreach (var handle in md.TypeDefinitions)
-                foreach (var a in md.GetTypeDefinition(handle).GetCustomAttributes())
+            {
+                var type = md.GetTypeDefinition(handle);
+                types.Add(FullName(md, type));
+                string? key = null, role = null;
+                Dictionary<string, object?>? info = null;
+                foreach (var a in type.GetCustomAttributes())
                 {
                     var attribute = md.GetCustomAttribute(a);
                     switch (AttributeName(md, attribute))
                     {
                         case RouteAttribute when FirstString(attribute) is { } template: routes.Add(template); break;
-                        case LayoutKeyAttribute when FirstString(attribute) is { } key: layouts.Add(key); break;
+                        case LayoutKeyAttribute when FirstString(attribute) is { } k: layouts.Add(key = k); break;
+                        case LayoutInfoAttribute: (role, info) = (FirstString(attribute), Values(attribute)); break;
                     }
                 }
+                if (key is not null && info is not null)
+                    layoutDetails.Add(new ClientModuleLayout(key, role,
+                        info.GetValueOrDefault("Sections") as string[] ?? [],
+                        info.GetValueOrDefault("Zones") as string[] ?? [],
+                        info.GetValueOrDefault("Contributions") as string[] ?? []));
+            }
 
-            var references = md.AssemblyReferences.Select(r => md.GetString(md.GetAssemblyReference(r).Name)).ToList();
+            var references = md.AssemblyReferences.Select(md.GetAssemblyReference).ToList();
+            var platform = references.Where(r => md.GetString(r.Name).Equals(AbstractionsAssembly, StringComparison.OrdinalIgnoreCase))
+                .Select(r => r.Version).FirstOrDefault();
             var version = NormalizeVersion(informational) ?? assembly.Version.ToString(3);
-            return new AssemblyInfo(md.GetString(assembly.Name), version, client, routes.Distinct().Order().ToList(), layouts.Distinct().ToList(), references,
-                ReadTexts(pe, md), menu);
+            return new AssemblyInfo(md.GetString(assembly.Name), version, client, routes.Distinct().Order().ToList(), layouts.Distinct().ToList(),
+                references.Select(r => md.GetString(r.Name)).ToList(), ReadTexts(pe, md), menu)
+            {
+                Contributions = contributions,
+                LayoutDetails = layoutDetails,
+                Types = types,
+                PlatformVersion = platform
+            };
         }
         catch (BadImageFormatException)
         {
@@ -462,6 +657,14 @@ internal static partial class ClientModuleInspector
     }
 
     private static string Join(string ns, string name) => ns.Length == 0 ? name : $"{ns}.{name}";
+
+    /// <summary>"Ns.Type", or "Ns.Outer+Inner" for a nested type: the name typeof() writes into an attribute.</summary>
+    private static string FullName(MetadataReader md, TypeDefinition type)
+    {
+        var name = md.GetString(type.Name);
+        var declaring = type.GetDeclaringType();
+        return declaring.IsNil ? Join(md.GetString(type.Namespace), name) : $"{FullName(md, md.GetTypeDefinition(declaring))}+{name}";
+    }
 
     private static string AttributeName(MetadataReader md, CustomAttribute attribute)
     {

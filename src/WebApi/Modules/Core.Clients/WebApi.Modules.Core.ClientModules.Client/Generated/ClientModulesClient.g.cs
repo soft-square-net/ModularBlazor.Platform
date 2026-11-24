@@ -1489,6 +1489,61 @@ namespace soft.square.net.WebApi.Modules.Core.ClientModules.Client
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ClientModuleContribution
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("id")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Id { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("kind")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Kind { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("title")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Title { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("component")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Component { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("icon")]
+        public string? Icon { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("order")]
+        public int? Order { get; set; } = 100;
+
+        [System.Text.Json.Serialization.JsonPropertyName("titles")]
+        public System.Collections.Generic.IDictionary<string, string>? Titles { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("permissions")]
+        public System.Collections.Generic.IReadOnlyList<string>? Permissions { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("badge")]
+        public string? Badge { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("badgeRefresh")]
+        public int? BadgeRefresh { get; set; } = 0;
+
+        [System.Text.Json.Serialization.JsonPropertyName("forRoutes")]
+        public System.Collections.Generic.IReadOnlyList<string>? ForRoutes { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("forContext")]
+        public System.Collections.Generic.IReadOnlyList<string>? ForContext { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class ClientModuleDescriptor
     {
 
@@ -1572,6 +1627,10 @@ namespace soft.square.net.WebApi.Modules.Core.ClientModules.Client
         [System.ComponentModel.DataAnnotations.Required]
         public System.Collections.Generic.IReadOnlyList<ClientModuleMenuItem> Menu { get; set; } = new System.Collections.Generic.List<ClientModuleMenuItem>();
 
+        [System.Text.Json.Serialization.JsonPropertyName("contributions")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.IReadOnlyList<ClientModuleContribution> Contributions { get; set; } = new System.Collections.Generic.List<ClientModuleContribution>();
+
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
         [System.Text.Json.Serialization.JsonExtensionData]
@@ -1618,6 +1677,40 @@ namespace soft.square.net.WebApi.Modules.Core.ClientModules.Client
 
         [System.Runtime.Serialization.EnumMember(Value = @"NuPkg")]
         NuPkg = 1,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ClientModuleLayout
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("key")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Key { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("role")]
+        public string? Role { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("sections")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.IReadOnlyList<string> Sections { get; set; } = new System.Collections.Generic.List<string>();
+
+        [System.Text.Json.Serialization.JsonPropertyName("zones")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.IReadOnlyList<string> Zones { get; set; } = new System.Collections.Generic.List<string>();
+
+        [System.Text.Json.Serialization.JsonPropertyName("contributions")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.IReadOnlyList<string> Contributions { get; set; } = new System.Collections.Generic.List<string>();
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
 
     }
 
@@ -1702,6 +1795,9 @@ namespace soft.square.net.WebApi.Modules.Core.ClientModules.Client
 
         [System.Text.Json.Serialization.JsonPropertyName("badgeRefresh")]
         public int? BadgeRefresh { get; set; } = 0;
+
+        [System.Text.Json.Serialization.JsonPropertyName("permissions")]
+        public System.Collections.Generic.IReadOnlyList<string>? Permissions { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -1904,6 +2000,15 @@ namespace soft.square.net.WebApi.Modules.Core.ClientModules.Client
         [System.Text.Json.Serialization.JsonPropertyName("menu")]
         public System.Collections.Generic.IReadOnlyList<ClientModuleMenuItem>? Menu { get; set; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("contributions")]
+        public System.Collections.Generic.IReadOnlyList<ClientModuleContribution>? Contributions { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("layoutDetails")]
+        public System.Collections.Generic.IReadOnlyList<ClientModuleLayout>? LayoutDetails { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("platformVersion")]
+        public string? PlatformVersion { get; set; } = default!;
+
         [System.Text.Json.Serialization.JsonPropertyName("warnings")]
         public System.Collections.Generic.IReadOnlyList<string>? Warnings { get; set; } = default!;
 
@@ -1963,6 +2068,15 @@ namespace soft.square.net.WebApi.Modules.Core.ClientModules.Client
 
         [System.Text.Json.Serialization.JsonPropertyName("menu")]
         public System.Collections.Generic.IReadOnlyList<ClientModuleMenuItem>? Menu { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("contributions")]
+        public System.Collections.Generic.IReadOnlyList<ClientModuleContribution>? Contributions { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("layoutDetails")]
+        public System.Collections.Generic.IReadOnlyList<ClientModuleLayout>? LayoutDetails { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("platformVersion")]
+        public string? PlatformVersion { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 

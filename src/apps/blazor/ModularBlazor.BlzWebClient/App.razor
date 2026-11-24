@@ -4,6 +4,7 @@
 @inject AuthenticationStateProvider AuthProvider
 @inject NavigationManager Nav
 @inject ILocaleService Locale
+@inject PageContextService PageContext
 @inject IStringLocalizer<App> L
 @implements IDisposable
 
@@ -51,6 +52,9 @@
   /// </summary>
   private async Task OnNavigateAsync(NavigationContext context)
   {
+    // The page context belongs to the page being left; the next page sets its own.
+    PageContext.Reset();
+
     var path = ModuleManager.NormalizePath(context.Path);
 
     // authentication/{action}: the OpenID Connect round trips (login, login-callback, logout, ...) must never be

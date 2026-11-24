@@ -76,6 +76,9 @@ public sealed class ModuleDescriptor
 
     /// <summary>The module's menu groups and links (its MenuGroup and MenuLink attributes), in every zone.</summary>
     public MenuItem[] Menu { get; set; } = [];
+
+    /// <summary>What the module adds to the layout besides menus: header actions, docks, context panels.</summary>
+    public ShellContribution[] Contributions { get; set; } = [];
 }
 
 public sealed class ModuleManifest

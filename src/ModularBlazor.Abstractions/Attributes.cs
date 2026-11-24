@@ -98,6 +98,12 @@ public sealed class MenuLinkAttribute(string id, string title, string href) : At
 
   /// <summary>Seconds between two asks for the badge (15-3600; default 60).</summary>
   public int BadgeRefresh { get; set; }
+
+  /// <summary>
+  /// Permissions (any one of them) the user needs to see the link, e.g. "content.posts.review". None: everyone who gets the
+  /// module. The server leaves the entry out of the user's menu; the page's API still checks for itself.
+  /// </summary>
+  public string[] Permissions { get; set; } = [];
 }
 
 /// <summary>
@@ -123,6 +129,9 @@ public sealed class MenuGroupAttribute(string id, string title) : Attribute
   public string? Badge { get; set; }
 
   public int BadgeRefresh { get; set; }
+
+  /// <summary>Permissions (any one of them) the user needs to see the group, like <see cref="MenuLinkAttribute.Permissions"/>.</summary>
+  public string[] Permissions { get; set; } = [];
 }
 
 /// <summary>

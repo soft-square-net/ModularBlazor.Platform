@@ -596,6 +596,87 @@
   },
   "components": {
     "schemas": {
+      "ClientModuleContribution": {
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "component"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "component": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "order": {
+            "type": "integer",
+            "format": "int32",
+            "default": 100
+          },
+          "titles": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "permissions": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "badge": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "badgeRefresh": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          },
+          "forRoutes": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "forContext": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "ClientModuleDescriptor": {
         "required": [
           "id",
@@ -618,7 +699,8 @@
           "styles",
           "scripts",
           "nav",
-          "menu"
+          "menu",
+          "contributions"
         ],
         "type": "object",
         "properties": {
@@ -717,6 +799,12 @@
             "items": {
               "$ref": "#/components/schemas/ClientModuleMenuItem"
             }
+          },
+          "contributions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientModuleContribution"
+            }
           }
         }
       },
@@ -746,6 +834,45 @@
           "NuPkg"
         ],
         "type": "string"
+      },
+      "ClientModuleLayout": {
+        "required": [
+          "key",
+          "role",
+          "sections",
+          "zones",
+          "contributions"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "role": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "zones": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "contributions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
       },
       "ClientModuleLoadStrategy": {
         "enum": [
@@ -840,6 +967,15 @@
             "type": "integer",
             "format": "int32",
             "default": 0
+          },
+          "permissions": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -1077,6 +1213,24 @@
               "$ref": "#/components/schemas/ClientModuleMenuItem"
             }
           },
+          "contributions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientModuleContribution"
+            }
+          },
+          "layoutDetails": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientModuleLayout"
+            }
+          },
+          "platformVersion": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "warnings": {
             "type": "array",
             "items": {
@@ -1147,6 +1301,24 @@
             "items": {
               "$ref": "#/components/schemas/ClientModuleMenuItem"
             }
+          },
+          "contributions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientModuleContribution"
+            }
+          },
+          "layoutDetails": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientModuleLayout"
+            }
+          },
+          "platformVersion": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

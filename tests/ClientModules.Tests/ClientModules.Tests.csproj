@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The client-modules core module: the inspector reads the layout contract (shell contributions, permissions,
+       platform version) from a real compiled module (ClientModules.Fixture). -->
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" PrivateAssets="all" />
+    <PackageReference Include="Shouldly" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\..\src\WebApi\Modules\Core\WebApi.Modules.Core.ClientModules\WebApi.Modules.Core.ClientModules.csproj" />
+    <ProjectReference Include="..\..\src\WebApi\WebApi.Contracts\WebApi.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Share.All\Share.All.csproj" />
+    <!-- Test input only: its DLL is read as metadata, never loaded. -->
+    <ProjectReference Include="..\ClientModules.Fixture\ClientModules.Fixture.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>FixtureModule</_Parameter1>
+      <_Parameter2>$(MSBuildThisFileDirectory)../ClientModules.Fixture/bin/$(Configuration)/$(TargetFramework)/soft.square.net.ClientModules.Fixture.dll</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Shouldly" />
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

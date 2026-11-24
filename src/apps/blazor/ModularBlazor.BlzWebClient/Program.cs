@@ -63,6 +63,15 @@ builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Menus.IMen
 builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Lookups.ILookupService, soft.square.net.ModularBlazor.BlzWebClient.Services.LookupService>();
 builder.Services.AddScoped<ModuleDialogService>();
 builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.IModuleDialogs>(sp => sp.GetRequiredService<ModuleDialogService>());
+// The layout contract (Abstractions/Shell): page context, module contributions (header actions, docks, context
+// panels), the tenant's brand and the user's permissions. Branding and permissions are placeholders until their
+// server parts exist.
+builder.Services.AddScoped<PageContextService>();
+builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Shell.IPageContext>(sp => sp.GetRequiredService<PageContextService>());
+builder.Services.AddScoped<ShellContributionService>();
+builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Shell.IShellContributions>(sp => sp.GetRequiredService<ShellContributionService>());
+builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Shell.IBranding, DefaultBranding>();
+builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Shell.IUserPermissions, PendingUserPermissions>();
 // Development only: a module repo's playground reloads a rebuilt client module in place (see DevModuleReloader).
 builder.Services.AddScoped<DevModuleReloader>();
 
