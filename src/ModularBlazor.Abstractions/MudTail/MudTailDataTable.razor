@@ -7,7 +7,7 @@
 
 @*
   MudTail's data table (search, column filters, sorting, paging, a menu of row actions) over rows from .NET.
-  Rendered by MudTail's runtime from the Layouts.Default module (moduleHost.get('Layouts.Default').create('datatable', ...)),
+  Rendered by MudTail's runtime from the Layouts.Default module (moduleHost.get('UI.MudTail').create('datatable', ...)),
   so the host's pages and every module's pages share one theme. The host registers MudTailRuntime; modules only use
   this component (it lives in ModularBlazor.Abstractions, which the host provides).
 
@@ -19,7 +19,7 @@
 @if (_unavailable)
 {
   <p class="mud-typography mud-typography-body2" style="color: var(--mud-palette-error)">
-    The table needs MudTail from the Layouts.Default module, which is not active. Check the module catalog and the browser console.
+    The table needs MudTail from the UI.MudTail module, which is not active. Check the module catalog and the browser console.
   </p>
 }
 

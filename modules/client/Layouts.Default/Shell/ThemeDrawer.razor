@@ -1,0 +1,173 @@
+@inject MudTailRuntime MudTail
+@inject IBranding Branding
+@inject IJSRuntime JS
+@inject IStringLocalizer<DefaultLayout> L
+
+@*
+  The layout's theme settings, a temporary drawer at the inline end (right in LTR, left in RTL) that slides over the
+  page. Changes apply at once and are saved for this browser: the mode, palette, radius and digits in MudTail's theme,
+  the density in the shell's own settings. The tenant's brand decides which modes may be picked and whether the user
+  may change the colours at all.
+*@
+@if (Open)
+{
+  <div class="mud-drawer-overlay open" @onclick="CloseAsync"></div>
+}
+<aside class="mud-drawer anchor-end shell-theme @(Open ? "open" : null)" aria-label="@L["Theme"]" aria-hidden="@(Open ? "false" : "true")"
+       inert="@(!Open)" @onkeydown="OnKeyDown">
+  <header class="shell-theme-header">
+    <h2>@L["Theme"]</h2>
+    <button type="button" class="shell-icon-button" title="@L["Close"]" @onclick="CloseAsync"><ShellIcon Name="x" /></button>
+  </header>
+
+  <div class="shell-theme-body">
+    <fieldset class="shell-field">
+      <legend>@L["Mode"]</legend>
+      <div class="shell-segmented">
+        @foreach (var (mode, icon, label) in Modes)
+        {
+          if (!Branding.Current.Allows(mode)) continue;
+          <button type="button" class="@(_theme.Mode == mode ? "active" : null)" aria-pressed="@(_theme.Mode == mode ? "true" : "false")"
+                  @onclick="() => SetModeAsync(mode)">
+            <ShellIcon Name="@icon" /> @L[label]
+          </button>
+        }
+      </div>
+    </fieldset>
+
+    @if (Branding.Current.AllowUserColors)
+    {
+      <fieldset class="shell-field">
+        <legend>@L["Colours"]</legend>
+        <div class="shell-swatches">
+          @foreach (var preset in Presets)
+          {
+            var active = string.Equals(_theme.Primary, preset.Primary, StringComparison.OrdinalIgnoreCase);
+            <button type="button" class="shell-swatch @(active ? "active" : null)" aria-pressed="@(active ? "true" : "false")"
+                    title="@preset.Name" style="--swatch-a:@preset.Primary;--swatch-b:@preset.Secondary"
+                    @onclick="() => SetThemeAsync(new { primary = preset.Primary, secondary = preset.Secondary })">
+              <span class="sr-only">@preset.Name</span>
+            </button>
+          }
+        </div>
+      </fieldset>
+
+      <fieldset class="shell-field">
+        <legend>@L["Corners"]</legend>
+        <input type="range" min="0" max="16" step="2" value="@_theme.BorderRadius" aria-label="@L["Corners"]"
+               @onchange="e => SetThemeAsync(new { borderRadius = int.Parse((string)e.Value!) })" />
+      </fieldset>
+    }
+
+    <fieldset class="shell-field">
+      <legend>@L["Density"]</legend>
+      <div class="shell-segmented">
+        @foreach (var (density, label) in Densities)
+        {
+          <button type="button" class="@(Density == density ? "active" : null)" aria-pressed="@(Density == density ? "true" : "false")"
+                  @onclick="() => DensityChanged.InvokeAsync(density)">@L[label]</button>
+        }
+      </div>
+    </fieldset>
+
+    <fieldset class="shell-field">
+      <legend>@L["Digits"]</legend>
+      <div class="shell-segmented">
+        @foreach (var (numerals, label) in Digits)
+        {
+          var active = (_theme.Numerals ?? "auto") == numerals;
+          <button type="button" class="@(active ? "active" : null)" aria-pressed="@(active ? "true" : "false")"
+                  @onclick="() => SetThemeAsync(new { numerals })">@(numerals == "auto" ? L[label] : label)</button>
+        }
+      </div>
+    </fieldset>
+
+    <button type="button" class="shell-button shell-button--text" @onclick="ResetAsync">
+      <ShellIcon Name="refresh-cw" /> @L["Reset to the brand"]
+    </button>
+  </div>
+</aside>
+
+@code {
+  [Parameter] public bool Open { get; set; }
+  [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+
+  /// <summary>"comfortable" or "compact" (the shell's own setting).</summary>
+  [Parameter] public string Density { get; set; } = "comfortable";
+  [Parameter] public EventCallback<string> DensityChanged { get; set; }
+
+  private static readonly (string Mode, string Icon, string Label)[] Modes =
+  [
+    (ThemeModes.Light, "sun", "Light"), (ThemeModes.Dark, "moon", "Dark"), (ThemeModes.System, "monitor", "System"),
+  ];
+
+  private static readonly (string Density, string Label)[] Densities = [("comfortable", "Comfortable"), ("compact", "Compact")];
+
+  // MudTail's palette presets (src/MudTail/src/core/theme-tokens.ts).
+  private static readonly (string Name, string Primary, string Secondary)[] Presets =
+  [
+    ("MudBlazor Purple", "#594ae2", "#ff4081"), ("Material Blue", "#0284c7", "#ec4899"), ("Emerald", "#059669", "#d97706"),
+    ("Amber", "#ea580c", "#8b5cf6"), ("Indigo", "#6366f1", "#a855f7"),
+  ];
+
+  // The digits are shown as themselves so a reader of either script recognises them.
+  private static readonly (string Numerals, string Label)[] Digits = [("auto", "Auto"), ("latn", "123"), ("arab", "١٢٣")];
+
+  private Theme _theme = new();
+  private bool _wasOpen;
+
+  protected override async Task OnParametersSetAsync()
+  {
+    if (Open && !_wasOpen) await ReadAsync();
+    _wasOpen = Open;
+  }
+
+  private async Task ReadAsync()
+  {
+    if (await MudTail.GetAsync() is not { } runtime) return;
+    _theme = await runtime.InvokeAsync<Theme>("getTheme");
+    _theme.Mode = await runtime.InvokeAsync<string>("mode");
+  }
+
+  private async Task SetModeAsync(string mode)
+  {
+    if (await MudTail.GetAsync() is not { } runtime) return;
+    await runtime.InvokeVoidAsync("setMode", mode);
+    await ReadAsync();
+  }
+
+  private async Task SetThemeAsync(object updates)
+  {
+    if (await MudTail.GetAsync() is not { } runtime) return;
+    await runtime.InvokeVoidAsync("setTheme", updates);
+    await ReadAsync();
+  }
+
+  // Back to MudTail's defaults, which the brand script (index.html, appBrand) reads as "no choice of the user's",
+  // then the brand applied again.
+  private async Task ResetAsync()
+  {
+    if (await MudTail.GetAsync() is not { } runtime) return;
+    await runtime.InvokeVoidAsync("setTheme", new { primary = "#594ae2", secondary = "#ff4081", borderRadius = 4, numerals = (string?)null });
+    var brand = Branding.Current;
+    await runtime.InvokeVoidAsync("setMode", brand.Allows(brand.DefaultMode) ? brand.DefaultMode : brand.AllowedModes![0]);
+    await JS.InvokeVoidAsync("appBrand.apply", Branding.Current, null, null);
+    await ReadAsync();
+  }
+
+  private Task CloseAsync() => OpenChanged.InvokeAsync(false);
+
+  private async Task OnKeyDown(KeyboardEventArgs e)
+  {
+    if (e.Key == "Escape") await CloseAsync();
+  }
+
+  private sealed class Theme
+  {
+    public string? Primary { get; set; }
+    public string? Secondary { get; set; }
+    public int BorderRadius { get; set; } = 4;
+    public string? Numerals { get; set; }
+    public string Mode { get; set; } = ThemeModes.System;
+  }
+}

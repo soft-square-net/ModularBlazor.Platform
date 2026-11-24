@@ -840,6 +840,15 @@
             "additionalProperties": {
               "type": "string"
             }
+          },
+          "providesLayouts": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

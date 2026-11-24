@@ -1,0 +1,94 @@
+@implements IDisposable
+@inject IShellContributions Contributions
+@inject IMenuBadges Badges
+@inject IStringLocalizer<DefaultLayout> L
+
+@*
+  The footer's dock bar ([assembly: Dock]): a tab per dock, drawn from the module's metadata before its code is
+  downloaded. Opening a dock loads its module and shows its panel above the bar. A dock opened once stays rendered
+  (hidden while closed), so a chat keeps its connection while the user moves between pages of this layout.
+*@
+@{ var docks = Contributions.Of(ShellContributionKinds.Dock); }
+@if (docks.Count > 0)
+{
+  <footer class="shell-docks" aria-label="@L["Docks"]">
+    @foreach (var dock in docks.Where(d => _mounted.Contains(d.Id)))
+    {
+      var open = Open == dock.Id;
+      var pinned = Pinned == dock.Id;
+      <section @key="dock.Id" id="@PanelId(dock)" class="shell-dock-panel" hidden="@(!open)"
+               aria-label="@dock.LocalTitle" @onkeydown="OnKeyDown">
+        <header class="shell-dock-header">
+          <ShellIcon Name="@dock.Icon" Fallback="@dock.LocalTitle" />
+          <h2>@dock.LocalTitle</h2>
+          <button type="button" class="shell-icon-button" aria-pressed="@(pinned ? "true" : "false")"
+                  title="@(pinned ? L["Unpin"] : L["Keep open"])" @onclick="() => PinnedChanged.InvokeAsync(pinned ? null : dock.Id)">
+            <ShellIcon Name="@(pinned ? "pin-off" : "pin")" />
+          </button>
+          <button type="button" class="shell-icon-button" title="@L["Close"]" @onclick="() => OpenChanged.InvokeAsync(null)">
+            <ShellIcon Name="x" />
+          </button>
+        </header>
+        <div class="shell-dock-body">
+          <ContributionHost Contribution="dock" />
+        </div>
+      </section>
+    }
+
+    <div class="shell-dock-tabs" role="toolbar" aria-label="@L["Docks"]">
+      @foreach (var dock in docks)
+      {
+        var badge = Badges.Of(dock.Id);
+        <button @key="dock.Id" type="button" class="shell-dock-tab @(Open == dock.Id ? "active" : null)"
+                aria-expanded="@(Open == dock.Id ? "true" : "false")" aria-controls="@PanelId(dock)" @onclick="() => ToggleAsync(dock)">
+          <ShellIcon Name="@dock.Icon" Fallback="@dock.LocalTitle" />
+          <span>@dock.LocalTitle</span>
+          @if (badge is not null)
+          {
+            <span class="shell-badge shell-badge--@badge.Tone" title="@badge.Label">@badge.Text</span>
+          }
+        </button>
+      }
+    </div>
+  </footer>
+}
+
+@code {
+  /// <summary>The open dock's id (one at a time), owned by the layout.</summary>
+  [Parameter] public string? Open { get; set; }
+  [Parameter] public EventCallback<string?> OpenChanged { get; set; }
+
+  /// <summary>The dock pinned open: it stays open on a click elsewhere.</summary>
+  [Parameter] public string? Pinned { get; set; }
+  [Parameter] public EventCallback<string?> PinnedChanged { get; set; }
+
+  private readonly HashSet<string> _mounted = new(StringComparer.OrdinalIgnoreCase);
+
+  protected override void OnInitialized()
+  {
+    Contributions.Changed += OnChanged;
+    Badges.Changed += OnChanged;
+  }
+
+  protected override void OnParametersSet()
+  {
+    if (Open is not null) _mounted.Add(Open);
+  }
+
+  private static string PanelId(ShellContribution dock) => "dock-" + dock.Id.Replace(':', '-').Replace('.', '-');
+
+  private Task ToggleAsync(ShellContribution dock) => OpenChanged.InvokeAsync(Open == dock.Id ? null : dock.Id);
+
+  private async Task OnKeyDown(KeyboardEventArgs e)
+  {
+    if (e.Key == "Escape") await OpenChanged.InvokeAsync(null);
+  }
+
+  private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+  public void Dispose()
+  {
+    Contributions.Changed -= OnChanged;
+    Badges.Changed -= OnChanged;
+  }
+}

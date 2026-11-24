@@ -1,0 +1,29 @@
+{
+  "name": "ui-mudtail-assets",
+  "version": "1.0.0",
+  "description": "Builds the UI.MudTail module's wwwroot (css/mudtail.min.css, js/module.js): the MudTail runtime every layout shares.",
+  "scripts": {
+    "build:mudtail": "npm --prefix ../../../../src/MudTail run build",
+    "build": "npm run build:mudtail && vite build",
+    "dev": "vite build --watch"
+  },
+  "license": "MIT",
+  "keywords": [],
+  "author": "",
+  "type": "module",
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.5",
+    "autoprefixer": "^10.6.2",
+    "glob": "^13.0.7",
+    "postcss": "^8.5.32",
+    "sass": "^1.80.0",
+    "sass-embedded": "^1.108.1",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2"
+  },
+  "dependencies": {
+    "lucide": "^1.70.0",
+    "mudtail": "file:../../../../src/MudTail"
+  }
+}

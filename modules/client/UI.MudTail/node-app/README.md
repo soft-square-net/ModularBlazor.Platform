@@ -1,0 +1,63 @@
+# UI.MudTail assets
+
+This folder builds the UI.MudTail module's `wwwroot`. The `.csproj` embeds that `wwwroot` into the module DLL, and the
+WebApi serves each file from a real URL (`api/client-modules/files/{id}/{version}/{token}/...`) with an integrity hash.
+
+UI.MudTail is a hidden startup module with no pages. It holds the one copy of the MudTail runtime and stylesheet that
+every layout and module shares, so a layout only adds its own shell on top.
+
+| Source | Output | What it is |
+| --- | --- | --- |
+| `src/framework/mudtail.css` | `../wwwroot/css/mudtail.min.css` | Tailwind utilities (no preflight), the MudTail preset, all MudTail CSS (components, editorial, sport, gallery, site shell) and `_host.css` |
+| `src/js/module.ts` | `../wwwroot/js/module.js` | On activation: applies the saved MudTail theme and starts `MudTail.autoInit(document.body)`. Returns the MudTail API |
+
+## Shell helpers
+
+Besides MudTail's own interop, the API has what a layout needs without a script of its own:
+
+| Member | What it does |
+| --- | --- |
+| `iconNames()` | the names in the icon sprite (`src/js/icons.ts`, a short list of Lucide icons plus a few aliases such as `chat` and `tasks`) |
+| `addIcons({ name: lucideNode \| '<path …/>' })` | adds icons to the sprite, for a module's own |
+| `mode()`, `setMode('light' \| 'dark' \| 'system')` | the colour mode; `system` follows the operating system and is saved as `mode` in MudTail's theme |
+| `watchMedia(queries, dotNetRef)` | calls `OnMedia(bool[])` now and whenever a media query changes; returns a handle with `dispose()` |
+
+The sprite is an inline `<svg>` at the top of `<body>`; draw an icon with `<svg><use href="#mt-i-users"/></svg>`.
+
+## Using the API
+
+C# code uses `MudTailRuntime` (ModularBlazor.Abstractions), which reads the API with `moduleHost.get('UI.MudTail')`.
+`moduleHost.get('Layouts.Default')` still returns the same object, for modules written against Layouts.Default 1.x.
+
+## Behaviours without interop
+
+Because `module.js` runs `autoInit` on `<body>`, any module's Razor page gets the interactive components just by
+rendering the markup: a ticker (`data-mud="ticker"`), live scores (`data-mud="score-strip"`), a gallery lightbox
+(`data-mud="lightbox"`), scroll reveal (`data-mud-reveal`), `mega-nav`, `reading-progress` and `theme-toggle`. The
+markup and rules are in `src/MudTail/README.md`.
+
+## One token set
+
+Every colour, radius and z-index comes from MudTail's `--mud-palette-*` tokens (`src/MudTail`, a `file:` dependency).
+`_host.css` points the host's own `app.css` variables (`--bg`, `--accent`, …) at those tokens, so host pages follow the
+same theme, dark mode included, whatever layout is active.
+
+MudTail's CSS and `_host.css` are imported **unlayered** on purpose. The host's `app.css` is unlayered, and unlayered
+CSS always beats layered CSS. If they were layered, plain host rules such as `a { color }` would override MudTail's
+components.
+
+## Load order
+
+A layout or module that uses MudTail classes or the API declares `Dependencies = new[] { "UI.MudTail" }` in its
+`[assembly: ClientModule]`. The host then activates UI.MudTail first, so its stylesheet comes before the layout's.
+
+## Build
+
+```
+npm install
+npm run build      # builds MudTail first, then this module's wwwroot
+npm run dev        # rebuild on change (MudTail must already be built)
+```
+
+`preserveEntrySignatures` in `vite.config.ts` keeps `module.js`'s exports; without it the module tree-shakes down to
+nothing.

@@ -1,0 +1,16 @@
+@implements IDisposable
+@inject IShellContributions Contributions
+
+@* The modules' header actions ([assembly: HeaderAction]), in order, each loaded with its module. *@
+@foreach (var action in Contributions.Of(ShellContributionKinds.HeaderAction))
+{
+  <div @key="action.Id" class="shell-header-action" data-contribution="@action.Id">
+    <ContributionHost Contribution="action" ShowLoading="false" />
+  </div>
+}
+
+@code {
+  protected override void OnInitialized() => Contributions.Changed += OnChanged;
+  private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+  public void Dispose() => Contributions.Changed -= OnChanged;
+}

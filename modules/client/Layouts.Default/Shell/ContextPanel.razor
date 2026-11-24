@@ -1,0 +1,76 @@
+@implements IDisposable
+@inject IShellContributions Contributions
+@inject IPageContext PageContext
+@inject IStringLocalizer<DefaultLayout> L
+
+@*
+  The panel at the inline end of the page: first the page's own (LayoutSections.ContextPanel), then a tab per context
+  panel other modules add for this page or for the item it has selected ([assembly: ContextPanel]). A tab's module is
+  loaded when the tab is opened. Inline from 1280px; below that a sheet over the page. Hidden by the stylesheet when
+  it has nothing to show.
+*@
+<aside class="shell-context" aria-label="@L["Details"]" data-open="@(Open ? "true" : "false")" data-panels="@_panels.Count">
+  <header class="shell-context-header">
+    <h2>@L["Details"]</h2>
+    <button type="button" class="shell-icon-button" title="@L["Close"]" @onclick="() => OpenChanged.InvokeAsync(false)">
+      <ShellIcon Name="x" />
+    </button>
+  </header>
+  <div class="shell-context-own"><SectionOutlet SectionName="@LayoutSections.ContextPanel" /></div>
+  @if (_panels.Count > 0)
+  {
+    <div class="shell-tabs" role="tablist" aria-label="@L["Details"]">
+      @foreach (var panel in _panels)
+      {
+        <button @key="panel.Id" type="button" role="tab" class="shell-tab @(panel.Id == _selected ? "active" : null)"
+                aria-selected="@(panel.Id == _selected ? "true" : "false")" @onclick="() => _selected = panel.Id">
+          <ShellIcon Name="@panel.Icon" Fallback="@panel.LocalTitle" />
+          <span>@panel.LocalTitle</span>
+        </button>
+      }
+    </div>
+    @if (_panels.FirstOrDefault(p => p.Id == _selected) is { } current)
+    {
+      var (key, value) = ContextOf(current);
+      <div class="shell-context-body" role="tabpanel">
+        <ContributionHost @key="@($"{current.Id}|{key}|{value}")" Contribution="current" ContextKey="@key" ContextValue="@value" />
+      </div>
+    }
+  }
+</aside>
+
+@code {
+  [Parameter] public bool Open { get; set; }
+  [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+
+  private IReadOnlyList<ShellContribution> _panels = [];
+  private string? _selected;
+
+  protected override void OnInitialized()
+  {
+    Contributions.Changed += OnChanged;
+    Refresh();
+  }
+
+  private void Refresh()
+  {
+    _panels = Contributions.Of(ShellContributionKinds.ContextPanel);
+    if (_selected is null || _panels.All(p => p.Id != _selected)) _selected = _panels.FirstOrDefault()?.Id;
+  }
+
+  // The first of the panel's context keys the page has set (null: the panel shows for the route).
+  private (string? Key, string? Value) ContextOf(ShellContribution panel)
+  {
+    foreach (var key in panel.ForContext ?? [])
+      if (PageContext.Get(key) is { } value) return (key, value);
+    return (null, null);
+  }
+
+  private void OnChanged() => _ = InvokeAsync(() =>
+  {
+    Refresh();
+    StateHasChanged();
+  });
+
+  public void Dispose() => Contributions.Changed -= OnChanged;
+}

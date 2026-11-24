@@ -95,6 +95,7 @@ public sealed class ModuleAssetTests : IDisposable
         module.AssetBase.ShouldNotBeNull();
         module.AssetBase.ShouldStartWith("api/client-modules/files/Module.Fixture/");
         module.AssetHashes!.Keys.ShouldBe(["css/fixture.css", "js/module.js"], ignoreOrder: true); // what the client activates itself
+        module.ProvidesLayouts.ShouldBe(["fixture"]); // a page asking for "fixture" loads this module first
 
         var (id, version, token) = Parts(module.AssetBase);
         var chunk = catalog.ResolveAsset(id, version, token, "js/chunks/hello-a1b2c3.js");
@@ -130,6 +131,29 @@ public sealed class ModuleAssetTests : IDisposable
         var module = Described(fresh);
         var (id, version2, token) = Parts(module.AssetBase!);
         fresh.ResolveAsset(id, version2, token, "css/fixture.css").ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task Seeding_adds_the_dependencies_a_shipped_module_needs_and_keeps_the_admin_s_other_settings()
+    {
+        var seed = Path.Combine(_root, "seed");
+        var folder = Path.Combine(seed, "Module.Fixture");
+        Directory.CreateDirectory(folder);
+        File.Copy(FixturePath, Path.Combine(folder, Path.GetFileName(FixturePath)));
+        ClientModuleCatalog Seeded() => new(Options.Create(new ClientModulesOptions { Path = Path.Combine(_root, "catalog"), SeedPath = seed }),
+            new Environment(_root), NullLogger<ClientModuleCatalog>.Instance);
+
+        await Seeded().SeedAsync(CancellationToken.None);
+        await Seeded().UpdateSettingsAsync("Module.Fixture",
+            Seeded().Get("Module.Fixture").Settings with { Name = "Renamed by the admin" }, "admin", CancellationToken.None);
+
+        // The same files, now declaring a dependency (a release whose module needs another one).
+        File.WriteAllText(Path.Combine(folder, ClientModuleInspector.SettingsFile), """{ "dependencies": ["UI.MudTail"] }""");
+        await Seeded().SeedAsync(CancellationToken.None);
+
+        var settings = Seeded().Get("Module.Fixture").Settings;
+        settings.Dependencies.ShouldBe(["UI.MudTail"]);
+        settings.Name.ShouldBe("Renamed by the admin");
     }
 
     private sealed class Environment(string root) : IHostEnvironment

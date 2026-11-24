@@ -7,6 +7,8 @@
 // ctx = { moduleId }.
 window.moduleHost = (() => {
   const registry = new Map(); // moduleId -> { styles: HTMLElement[], scripts: { mod, api }[] }
+  // Modules whose script moved to another module: get(old) answers the new one's object (until the next major).
+  const aliases = { 'Layouts.Default': 'UI.MudTail' };
   const OWNER_ATTR = 'data-module';
 
   const safeDispose = (target, id) => {
@@ -129,6 +131,9 @@ window.moduleHost = (() => {
       setTimeout(() => URL.revokeObjectURL(url), 10000);
     },
     // The object the module's script returned, for other scripts that need to talk to it.
-    get: (moduleId, index = 0) => registry.get(moduleId)?.scripts[index]?.api ?? null,
+    get: (moduleId, index = 0) =>
+      registry.get(moduleId)?.scripts[index]?.api
+      ?? (aliases[moduleId] ? registry.get(aliases[moduleId])?.scripts[index]?.api : null)
+      ?? null,
   };
 })();

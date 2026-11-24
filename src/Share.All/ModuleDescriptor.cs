@@ -89,6 +89,12 @@ public sealed class ModuleDescriptor
 
     /// <summary>SHA-256 (hex) of the styles and scripts the client activates, by path: checked by the browser (integrity).</summary>
     public Dictionary<string, string>? AssetHashes { get; set; }
+
+    /// <summary>
+    /// The layout keys ([LayoutKey]) the module provides. A page that asks for one of them loads this module first, so
+    /// a layout module need not be a startup module or a dependency of the modules that use it.
+    /// </summary>
+    public string[]? ProvidesLayouts { get; set; }
 }
 
 public sealed class ModuleManifest

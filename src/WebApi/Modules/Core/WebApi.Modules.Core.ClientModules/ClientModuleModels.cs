@@ -224,7 +224,8 @@ public sealed record ClientModuleDescriptor(
     IReadOnlyList<ClientModuleMenuItem> Menu,
     IReadOnlyList<ClientModuleContribution> Contributions,
     string? AssetBase = null,
-    IReadOnlyDictionary<string, string>? AssetHashes = null);
+    IReadOnlyDictionary<string, string>? AssetHashes = null,
+    IReadOnlyList<string>? ProvidesLayouts = null);
 
 /// <summary>The modules the caller may use; <see cref="ETag"/> changes whenever the list does.</summary>
 public sealed record ClientModuleManifest(string ETag, IReadOnlyList<ClientModuleDescriptor> Modules);

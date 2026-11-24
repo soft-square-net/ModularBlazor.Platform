@@ -80,6 +80,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <CoreClientModule Include="$(ClientModulesDir)UI.MudTail\UI.MudTail.csproj" />
     <CoreClientModule Include="$(ClientModulesDir)Layouts.Default\Layouts.Default.csproj" />
     <CoreClientModule Include="$(ClientModulesDir)Layouts.Admin\Layouts.Admin.csproj" />
     <CoreClientModule Include="$(ClientModulesDir)Module.Admin\Module.Admin.csproj" />

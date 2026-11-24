@@ -248,6 +248,31 @@ public sealed class ModuleManager : IModuleNavigation
 
   // ---------------------------------------------------------------- layouts
 
+  /// <summary>
+  /// Loads the module that provides layout <paramref name="key"/> (its catalog entry's ProvidesLayouts) when no loaded
+  /// module registered it yet. False when no module provides it or loading fails: <see cref="ResolveLayout"/> then
+  /// falls back to the default layout, so a broken layout module never leaves a page without one.
+  /// </summary>
+  public async Task<bool> EnsureLayoutAsync(string? key, CancellationToken cancellationToken = default)
+  {
+    if (key is null || key.Equals("none", StringComparison.OrdinalIgnoreCase) || _layouts.ContainsKey(key)) return true;
+    var provider = _catalog.Values.FirstOrDefault(d => d.ProvidesLayouts?.Contains(key, StringComparer.OrdinalIgnoreCase) == true);
+    if (provider is null) return false;
+    try
+    {
+      await EnsureLoadedAsync(provider.Id, cancellationToken);
+      return _layouts.ContainsKey(key);
+    }
+    catch (Exception ex) when (ex is not OperationCanceledException)
+    {
+      Console.Error.WriteLine($"Client modules: layout '{key}' from '{provider.Id}' could not be loaded ({ex.Message}); using the default layout.");
+      return false;
+    }
+  }
+
+  /// <summary>The module whose assembly holds a layout component (its styles are active while the layout is shown).</summary>
+  public string? LayoutModule(Type? layout) => layout is null ? null : GetOwner(layout.Assembly)?.Id;
+
   /// <summary>Returns the layout registered under key, falling back to the default layout.</summary>
   public Type? ResolveLayout(string? key)
   {

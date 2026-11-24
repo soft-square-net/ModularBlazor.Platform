@@ -1,0 +1,30 @@
+@*
+  An icon from UI.MudTail's sprite (a Lucide name: "users", "messages-square"), or the first letter of Fallback when
+  the sprite has no such icon (or none was given). Decorative: the entry's title carries the meaning.
+*@
+@if (Known(Name))
+{
+  <svg class="shell-icon @Class" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2"
+       stroke-linecap="round" stroke-linejoin="round"><use href="#mt-i-@Name" /></svg>
+}
+else
+{
+  <span class="shell-icon shell-icon--letter @Class" aria-hidden="true">@Letter</span>
+}
+
+@code {
+  [Parameter] public string? Name { get; set; }
+
+  /// <summary>The text whose first letter stands in for a missing icon.</summary>
+  [Parameter] public string? Fallback { get; set; }
+
+  [Parameter] public string? Class { get; set; }
+
+  /// <summary>The sprite's icon names, once the layout has read them (null: not yet; draw the icon anyway).</summary>
+  internal static IReadOnlySet<string>? Names { get; set; }
+
+  private static bool Known(string? name) =>
+    !string.IsNullOrEmpty(name) && (Names is null || Names.Contains(name));
+
+  private string Letter => string.IsNullOrWhiteSpace(Fallback) ? "•" : Fallback.Trim()[..1].ToUpperInvariant();
+}

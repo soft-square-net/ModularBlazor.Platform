@@ -160,7 +160,8 @@ internal sealed class ClientModuleCatalog
             s.Hidden, s.RequiresAuth, s.RequiredRole, s.AvailableToRoles, s.RoutePrefixes, s.Layout,
             s.Dependencies, s.Styles, s.Scripts, s.Nav, v.Menu, v.Contributions,
             served ? AssetBase(r.Id, v) : null,
-            served ? AssetHashes(v.Assets!, s) : null);
+            served ? AssetHashes(v.Assets!, s) : null,
+            v.Layouts.Count > 0 ? v.Layouts : null);
     }
 
     /// <summary>
@@ -505,7 +506,15 @@ internal sealed class ClientModuleCatalog
                     _log.LogWarning("Core client module {Module} not seeded: an uploaded module has that id.", package.Id);
                     continue;
                 }
-                if (existing?.Active?.PackageHash == package.PackageHash) continue;
+                if (existing?.Active?.PackageHash == package.PackageHash)
+                {
+                    // Same files; still make sure the dependencies they need are listed (see AddVersion).
+                    var needed = package.Detected.Dependencies
+                        .Where(d => !existing.Settings.Dependencies.Contains(d, StringComparer.OrdinalIgnoreCase)).ToList();
+                    if (needed.Count > 0)
+                        existing.Settings = existing.Settings with { Dependencies = [.. existing.Settings.Dependencies, .. needed] };
+                    continue;
+                }
 
                 var record = AddVersion(records, package, settings: null, activate: true, replace: true, core: true, "seed", user: null);
                 // Older shipped versions are not needed any more; uploaded ones stay for rollback.
@@ -694,6 +703,15 @@ internal sealed class ClientModuleCatalog
         else
         {
             if (settings is not null) record.Settings = Validate(settings, record.Id);
+            else if (core)
+            {
+                // A shipped version's dependencies are what its code needs, not an admin preference: a release that
+                // adds one (Layouts.Default 2.0 needs UI.MudTail) gets it even though the admin's other settings stay.
+                var needed = package.Detected.Dependencies
+                    .Where(d => !record.Settings.Dependencies.Contains(d, StringComparer.OrdinalIgnoreCase)).ToList();
+                if (needed.Count > 0)
+                    record.Settings = record.Settings with { Dependencies = [.. record.Settings.Dependencies, .. needed] };
+            }
             if (activate) record.ActiveVersion = package.Version;
         }
 

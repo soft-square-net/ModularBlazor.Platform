@@ -57,7 +57,8 @@
                 if (brand.font) style.setProperty('--mb-brand-font', brand.font); else style.removeProperty('--mb-brand-font');
 
                 var allowed = brand.allowedModes && brand.allowedModes.length ? brand.allowedModes : modes;
-                var mode = typeof user.isDark === 'boolean' ? (user.isDark ? 'dark' : 'light') : brand.defaultMode;
+                // user.mode: the layout's theme drawer ('light' | 'dark' | 'system'); isDark alone: an older MudTail theme.
+                var mode = modes.indexOf(user.mode) >= 0 ? user.mode : typeof user.isDark === 'boolean' ? (user.isDark ? 'dark' : 'light') : brand.defaultMode;
                 if (allowed.indexOf(mode) < 0) mode = allowed.indexOf(brand.defaultMode) >= 0 ? brand.defaultMode : allowed[0];
                 if (mode === 'system') mode = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
                 if (mode === 'dark') root.setAttribute('data-theme', 'dark'); else root.removeAttribute('data-theme');
