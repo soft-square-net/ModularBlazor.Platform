@@ -37,21 +37,23 @@ Each deployment of the image reads three settings (implemented in the `src/WebAp
 | --- | --- | --- |
 | `Modules:Pool` | `core`, `sales`, `worker`, … | The pool's name, shown in status, logs and broadcast messages |
 | `Modules:Enabled` | module ids, e.g. `identity`, `workflow`, `inventory`; empty means all | Which modules this pool loads, maps and registers |
+| `Modules:Excluded` | module ids; empty by default | Modules this pool never loads, even when `Modules:Enabled` is empty. The pool that keeps "everything else" lists the extracted modules here, so a newly uploaded module is served without a configuration change |
 | `Modules:Role` | `Api` or `Worker` | `Api` maps HTTP endpoints; `Worker` loads modules for their message consumers and scheduled jobs, without routes |
 
 ```text
 Scenario A           all    = Enabled: (all)              Role: Api      ×N
-Extract one module   core   = Enabled: all but sales      Role: Api      ×2
+Extract one module   core   = Enabled: (all), Excluded: sales   Role: Api      ×2
                      sales  = Enabled: sales              Role: Api      ×4
                      worker = Enabled: (all)              Role: Worker   ×2
 ```
 
-To move a module into its own pool: add a deployment with its `Modules:Enabled`, add a YARP cluster for its path,
+To move a module into its own pool: add a deployment with its `Modules:Enabled`, add it to the core pool's
+`Modules:Excluded`, add a YARP cluster for its path,
 and switch its contract registration in the other pools from in-process to the gRPC client. No module code
 changes. The host's module registry (`HostModules`) is where the switch belongs.
 
 Every pool reads the **same module catalog**. A lifecycle change made through any replica is written to the
-catalog and broadcast on the broker, and each replica applies it according to its own `Enabled` list and `Role`;
+catalog and broadcast on the broker, and each replica applies it according to its own `Enabled` and `Excluded` lists and `Role`;
 see [Runtime modules](/backend/runtime-modules/#pools-and-replicas).
 
 The [Hybrid architecture lab](/backend/hybrid-lab/) runs this design locally with .NET Aspire: a YARP gateway, a

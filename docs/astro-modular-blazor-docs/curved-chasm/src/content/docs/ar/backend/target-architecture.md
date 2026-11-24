@@ -36,16 +36,18 @@ Observability: OpenTelemetry traces, metrics and logs, tagged with tenant and co
 | --- | --- | --- |
 | `Modules:Pool` | `core` أو `sales` أو `worker` أو غيرها | اسم المجموعة، ويظهر في الحالة والسجلات ورسائل البث |
 | `Modules:Enabled` | معرفات وحدات، مثل `identity` و`workflow` و`inventory`؛ والفارغة تعني الكل | الوحدات التي تحملها هذه المجموعة وتربط مساراتها وتسجل خدماتها |
+| `Modules:Excluded` | معرفات وحدات؛ فارغة افتراضيا | وحدات لا تحملها المجموعة أبدا، حتى لو كانت `Modules:Enabled` فارغة. تضع المجموعة التي تأخذ "كل ما عدا ذلك" الوحدات المستخرجة هنا، فتُخدم أي وحدة مرفوعة حديثا دون تغيير الإعدادات |
 | `Modules:Role` | `Api` أو `Worker` | `Api` يربط نقاط نهاية HTTP؛ و`Worker` يحمل الوحدات لمستهلكي رسائلها ومهامها المجدولة، دون مسارات |
 
 ```text
 Scenario A           all    = Enabled: (all)              Role: Api      ×N
-Extract one module   core   = Enabled: all but sales      Role: Api      ×2
+Extract one module   core   = Enabled: (all), Excluded: sales   Role: Api      ×2
                      sales  = Enabled: sales              Role: Api      ×4
                      worker = Enabled: (all)              Role: Worker   ×2
 ```
 
-لنقل وحدة إلى مجموعتها الخاصة: أضف نشرا بقيمة `Modules:Enabled` الخاصة بها، وأضف عنقود YARP لمسارها، وبدل تسجيل
+لنقل وحدة إلى مجموعتها الخاصة: أضف نشرا بقيمة `Modules:Enabled` الخاصة بها، وأضفها إلى `Modules:Excluded` في مجموعة
+core، وأضف عنقود YARP لمسارها، وبدل تسجيل
 عقدها في المجموعات الأخرى من التنفيذ الداخلي إلى عميل gRPC. لا تتغير شيفرة الوحدة. ومكان هذا التبديل هو سجل
 وحدات المضيف (`HostModules`).
 

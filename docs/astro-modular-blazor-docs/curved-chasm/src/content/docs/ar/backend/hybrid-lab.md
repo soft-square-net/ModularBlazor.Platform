@@ -28,7 +28,7 @@ dotnet run --project src/Aspire/Hybird --launch-profile http -- --Lab:Engines=sq
 | المورد | ما هو |
 | --- | --- |
 | `gateway` (المنفذ 5080) | YARP. يذهب `/api/sales/**` و`/api/greeting/**` إلى مجموعة sales؛ وكل ما عداهما إلى core. ويصل `/pools/{core\|sales\|worker}/**` إلى مجموعة واحدة مباشرة (للمختبر فقط) |
-| `core-1`، `core-2` | مجموعة core، `Role=Api`، الوحدات: identity وtenancy (وحدات أساسية، مفعلة افتراضيا) وworkflow وinventory |
+| `core-1`، `core-2` | مجموعة core، `Role=Api`: كل الوحدات عدا المستخرجة إلى مجموعتي sales وworkflow (`Modules__Excluded`). ويشمل ذلك identity وtenancy وclient-modules (وحدات أساسية، مفعلة افتراضيا) وinventory، وأي وحدة ترفعها، مثل `dynamicfields` من مستودع وحدة |
 | `sales-1` … `sales-4` | مجموعة sales، `Role=Api`، الوحدات: sales وgreeting (الوحدة النموذجية تقوم مقام Sales) |
 | `worker-1`، `worker-2` | مجموعة العمال، `Role=Worker`: تحمل الوحدات (خدمات ومستهلكون) دون مسارات، ولا يصل إليها أي مسار عام |
 | `broker` | RabbitMQ مع واجهة الإدارة |
@@ -43,7 +43,8 @@ dotnet run --project src/Aspire/Hybird --launch-profile http -- --Lab:Engines=sq
 ```text
 Modules__Pool        core | sales | worker
 Modules__Role        Api | Worker
-Modules__Enabled__N  the modules this pool applies
+Modules__Enabled__N  the modules this pool applies (none: every module)
+Modules__Excluded__N the modules this pool never applies, even with no Enabled list
 Modules__Path        App_Data/modules-catalog   one catalog for every pool
 ConnectionStrings    broker, redis, TenantStore  injected by Aspire
 ```
@@ -64,7 +65,7 @@ curl -X POST http://localhost:5080/api/admin/modules/greeting/activate
 curl http://localhost:5080/api/greeting/john_doe
 
 # how each pool sees the module
-curl http://localhost:5080/pools/core/api/admin/modules     # enabledInPool: false, not loaded
+curl http://localhost:5080/pools/core/api/admin/modules     # enabledInPool: false (excluded), not loaded
 curl http://localhost:5080/pools/sales/api/admin/modules    # loaded, routes mapped
 curl http://localhost:5080/pools/worker/api/admin/modules   # loaded, no routes
 ```
