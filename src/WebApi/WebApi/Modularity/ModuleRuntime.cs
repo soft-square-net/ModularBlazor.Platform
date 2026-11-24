@@ -205,20 +205,11 @@ internal sealed partial class ModuleRuntime
             : new UnloadResult(record.Id, Unloaded: true, GcPasses: 0, Note: "The module was not loaded on this replica.");
     }
 
-    /// <summary>Load contexts that were unloaded but not yet collected; runs a GC and drops the collected ones.</summary>
-    public async Task<IReadOnlyList<string>> PendingUnloadsAsync(CancellationToken ct)
+    /// <summary>Load contexts that were unloaded but not yet collected; runs GCs and drops the collected ones.</summary>
+    public Task<IReadOnlyList<string>> PendingUnloadsAsync(CancellationToken ct)
     {
-        await _gate.WaitAsync(ct);
-        try
-        {
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-            foreach (var (key, context) in _unloading.ToArray())
-                if (!context.IsAlive) _unloading.Remove(key);
-            return _unloading.Keys.ToArray();
-        }
-        finally { _gate.Release(); }
+        CollectPending();
+        lock (_unloading) return Task.FromResult<IReadOnlyList<string>>(_unloading.Keys.ToArray());
     }
 
     public async Task<UnloadResult> UninstallAsync(string id, bool deferred, CancellationToken ct)
@@ -416,6 +407,16 @@ internal sealed partial class ModuleRuntime
     /// </summary>
     public async Task<SyncResult> SyncAsync(CancellationToken ct)
     {
+        var result = await ConvergeAsync(ct);
+        // Released copies are waited on only now: ConvergeAsync's state machine (finished, so the runtime has cleared it)
+        // held the copies in its hoisted locals (the foreach over _loaded), and its callers' frames would too, so a GC
+        // loop inside it could never collect them.
+        await CollectReleasedAsync(result);
+        return result;
+    }
+
+    private async Task<SyncResult> ConvergeAsync(CancellationToken ct)
+    {
         await _gate.WaitAsync(ct);
         try
         {
@@ -435,14 +436,14 @@ internal sealed partial class ModuleRuntime
                             Note: "HotUnload is false: routes removed; the loaded copy keeps running until the next restart (restartRequired).");
                         continue;
                     }
-                    result.Unloaded[id] = await UnloadLocalAsync(id, record?.Version ?? module.Version);
+                    await UnloadLocalAsync(result, id, record?.Version ?? module.Version);
                 }
                 else if (module.InstalledAt != record!.InstalledAt || module.Settings != SettingsFingerprint(record))
                 {
                     if (KeptUntilRestart(id, module, "swap")) continue; // the running copy keeps serving
 
                     // Re-installed or re-configured: swap to a freshly loaded copy, then release the old one.
-                    try { result.Unloaded[id] = await SwapAsync(record, module); }
+                    try { result.Released.Add(await SwapAsync(record, module)); }
                     catch (Exception e) when (e is ModuleException or IOException or BadImageFormatException or TypeLoadException or InvalidOperationException)
                     {
                         _log.LogError(e, "Module {Id} could not be reloaded in pool {Pool}; keeping the running copy", id, _options.Pool);
@@ -522,7 +523,7 @@ internal sealed partial class ModuleRuntime
     /// Blue/green on one replica: the new copy is loaded and its routes replace the old ones in a single data source
     /// update, so requests never see a 404 window; then the old copy is released.
     /// </summary>
-    private async Task<UnloadResult> SwapAsync(ModuleRecord record, LoadedModule old)
+    private async Task<ReleasedCopy> SwapAsync(ModuleRecord record, LoadedModule old)
     {
         var fresh = Load(record);
         try
@@ -547,21 +548,23 @@ internal sealed partial class ModuleRuntime
         _loaded[record.Id] = fresh;
         _log.LogInformation("Swapped module {Id} to {Version} ({InstalledAt}) in pool {Pool}", record.Id, record.Version, record.InstalledAt, _options.Pool);
         // Hosted services: the old copy's stop before the new copy's start, so two copies never consume or schedule at once.
-        var released = await ReleaseLoadedAsync(record.Id, old.Version, old);
+        var released = await ReleaseCopyAsync(record.Id, old.Version, old);
         await fresh.HostedServices.StartAsync(_options.HostedServiceTimeout);
         return released;
     }
 
-    private async Task<UnloadResult> UnloadLocalAsync(string id, string version)
+    private async Task UnloadLocalAsync(SyncResult result, string id, string version)
     {
         _endpoints.Remove(id);
-        if (!_loaded.Remove(id, out var module))
-            return new UnloadResult(id, Unloaded: true, GcPasses: 0, Note: "The module was not loaded on this replica.");
-        return await ReleaseLoadedAsync(id, version, module);
+        if (_loaded.Remove(id, out var module)) result.Released.Add(await ReleaseCopyAsync(id, version, module));
+        else result.Unloaded[id] = new UnloadResult(id, Unloaded: true, GcPasses: 0, Note: "The module was not loaded on this replica.");
     }
 
-    /// <summary>Disposes a module copy that no longer has routes and waits for its load context to be collected.</summary>
-    private async Task<UnloadResult> ReleaseLoadedAsync(string id, string version, LoadedModule? module)
+    /// <summary>
+    /// Disposes a module copy that no longer has routes and unloads its load context. Collection is waited on by
+    /// <see cref="CollectReleasedAsync"/>, once the frames of the sync, which still reference the copy, are gone.
+    /// </summary>
+    private async Task<ReleasedCopy> ReleaseCopyAsync(string id, string version, LoadedModule? module)
     {
         // ApiExplorer keeps the last computed descriptions (module request/response types) until it is read
         // again; the routes are gone now, so recompute it without them.
@@ -569,22 +572,96 @@ internal sealed partial class ModuleRuntime
 
         var (context, stopNote) = await ReleaseAsync(module!, _hostRoot, _host.Services, _options.HostedServiceTimeout);
         module = null; // the async state machine would otherwise keep the module alive
+        return new ReleasedCopy(id, version, context, stopNote);
+    }
 
-        // Collection needs several GCs (the loader allocator is freed by finalizers) and other threads can briefly
-        // hold the last references, so wait between passes instead of spinning.
+    /// <summary>
+    /// Waits for the released copies' load contexts to be collected and records the result per module. Collection
+    /// needs several GCs (the loader allocator is freed by finalizers) and other threads, e.g. a request to the module
+    /// that is still finishing, can briefly hold the last references, so it waits between passes instead of spinning.
+    /// A copy still referenced after that is tracked under <see cref="PendingUnloadsAsync"/> and re-checked in the background.
+    /// </summary>
+    private async Task CollectReleasedAsync(SyncResult result)
+    {
+        if (result.Released.Count == 0) return;
+
         var passes = 0;
-        for (; context.IsAlive && passes < 20; passes++)
+        for (; result.Released.Any(r => r.Context.IsAlive) && passes < 20; passes++)
         {
             GC.Collect();
             GC.WaitForPendingFinalizers();
-            if (context.IsAlive) await Task.Delay(50, CancellationToken.None);
+            if (result.Released.Any(r => r.Context.IsAlive)) await Task.Delay(50, CancellationToken.None);
         }
 
-        var unloaded = !context.IsAlive;
-        if (!unloaded) _unloading[$"{id}@{version}#{Guid.NewGuid():n}"] = context;
-        _log.LogInformation("Unloaded module {Id} in pool {Pool}: {Result} after {Passes} GC passes", id, _options.Pool, unloaded ? "collected" : "still referenced", passes);
-        var note = unloaded ? null : "Not collected yet; tracked under GET /api/admin/modules/unloading. If it never clears, something still references the module's types.";
-        return new UnloadResult(id, unloaded, passes, stopNote is null ? note : $"{stopNote} {note}".Trim());
+        var pending = false;
+        foreach (var copy in result.Released)
+        {
+            var unloaded = !copy.Context.IsAlive;
+            if (!unloaded)
+            {
+                lock (_unloading) _unloading[$"{copy.Id}@{copy.Version}#{Guid.NewGuid():n}"] = copy.Context;
+                pending = true;
+            }
+            _log.LogInformation("Unloaded module {Id} {Version} in pool {Pool}: {Result} after {Passes} GC passes",
+                copy.Id, copy.Version, _options.Pool, unloaded ? "collected" : "still referenced", passes);
+            var note = unloaded ? null : "Not collected yet; tracked under GET /api/admin/modules/unloading and re-checked in the background. If it never clears, something still references the module's types.";
+            result.Unloaded[copy.Id] = new UnloadResult(copy.Id, unloaded, passes, copy.StopNote is null ? note : $"{copy.StopNote} {note}".Trim());
+        }
+        result.Released.Clear();
+        if (pending) StartUnloadRecheck();
+    }
+
+    /// <summary>When copies that were not collected in the request are re-checked (with GCs): an idle host runs no GC on its own.</summary>
+    private static readonly TimeSpan[] UnloadRecheckDelays =
+        [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(10)];
+
+    private int _recheckRunning;
+
+    private void StartUnloadRecheck()
+    {
+        if (Interlocked.Exchange(ref _recheckRunning, 1) == 1) return;
+        _ = Task.Run(async () =>
+        {
+            var remaining = 0;
+            try
+            {
+                foreach (var delay in UnloadRecheckDelays)
+                {
+                    await Task.Delay(delay);
+                    remaining = CollectPending();
+                    if (remaining == 0) break;
+                }
+                if (remaining > 0) _log.LogWarning("{Count} unloaded module copies are still referenced in pool {Pool}; see GET /api/admin/modules/unloading", remaining, _options.Pool);
+            }
+            catch (Exception e) { _log.LogError(e, "Re-checking unloaded module copies failed in pool {Pool}", _options.Pool); }
+            finally { Volatile.Write(ref _recheckRunning, 0); }
+
+            // A copy added while this loop was finishing found it still running and did not start another one.
+            bool added;
+            lock (_unloading) added = remaining == 0 && _unloading.Count > 0;
+            if (added) StartUnloadRecheck();
+        });
+    }
+
+    /// <summary>Runs a few GCs and drops the collected copies from <see cref="_unloading"/>; returns how many are left.</summary>
+    private int CollectPending()
+    {
+        lock (_unloading) if (_unloading.Count == 0) return 0;
+        for (var pass = 0; pass < 3; pass++) // the loader allocator needs more than one GC: finalizers free it
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+        }
+        lock (_unloading)
+        {
+            foreach (var (key, context) in _unloading.ToArray())
+            {
+                if (context.IsAlive) continue;
+                _unloading.Remove(key);
+                _log.LogInformation("Unloaded module copy {Copy} was collected in pool {Pool}", key, _options.Pool);
+            }
+            return _unloading.Count;
+        }
     }
 
     /// <summary>
