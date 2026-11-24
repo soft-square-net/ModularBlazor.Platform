@@ -6,14 +6,13 @@
   (its end only moves later), cancel one (kept, with the reason). Periods that are not cancelled never overlap.
 *@
 
-<PageTitle>@L["Tenant {0}", Id]</PageTitle>
+<PageHeader Title="@(_tenant?.Name ?? Id)" />
 
 <div class="mud-container tn-page">
   <a href="tenants" class="mud-button-root mud-button-text mud-button-primary mud-button-small tn-back">@L["← All tenants"]</a>
 
   <header class="tn-header">
     <div>
-      <h1 class="mud-typography mud-typography-h4">@(_tenant?.Name ?? Id)</h1>
       <p class="mud-typography mud-typography-body1 tn-muted">@L["Tenant"] <code>@Id</code></p>
     </div>
     <div class="tn-actions">
