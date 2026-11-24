@@ -1640,6 +1640,10 @@ namespace soft.square.net.WebApi.Client
         [System.ComponentModel.DataAnnotations.Required]
         public System.Collections.Generic.IReadOnlyList<string> EnabledModules { get; set; } = new System.Collections.Generic.List<string>();
 
+        [System.Text.Json.Serialization.JsonPropertyName("excludedModules")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.IReadOnlyList<string> ExcludedModules { get; set; } = new System.Collections.Generic.List<string>();
+
         [System.Text.Json.Serialization.JsonPropertyName("instance")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
         public string Instance { get; set; } = default!;

@@ -1312,7 +1312,7 @@ Core modules can be deactivated, unloaded and configured, but not uninstalled or
 | 400 on activate: undeclared permission | `RequirePermission("x")` without `x` in the manifest | Add it to `Permissions` |
 | 400 on activate: authorization requirement or named policy | The module defines an `IAuthorizationRequirement` or uses `RequireAuthorization("policy")` | Use `RequirePermission` and `IAccessScopes` |
 | 409 on activate: route prefix in use | Another module has the same `RoutePrefix` | Choose another prefix |
-| 404 on `/api/notes` through the gateway | The gateway sends the prefix to a pool that does not enable the module, or the module is not `Active` | Align `Modules:Enabled` and the YARP route; check `/pools/<pool>/api/admin/modules` |
+| 404 on `/api/notes` through the gateway | The gateway sends the prefix to a pool that does not enable the module, or the module is not `Active` | Align `Modules:Enabled` / `Modules:Excluded` and the YARP route; check `/pools/<pool>/api/admin/modules` |
 | 400 "tenant required" | No `X-Tenant` header or tenant host name | Send the tenant, or mark platform routes `.TenantOptional()` |
 | 503 on the first request | The tenant's migration failed or is still running | Read the replica's log in the Aspire dashboard; fix the migration and retry |
 | 500 "A domain event handler must not save" | A handler called `SaveChangesAsync` or an `IRepository<T>` write method | Change tracked entities and return; the outer save writes them |

@@ -37,7 +37,8 @@ Pool configuration:
 
 - `Modules:Pool`: the pool name.
 - `Modules:Role`: `Api` maps routes; `Worker` only loads modules.
-- `Modules:Enabled`: which modules this pool applies.
+- `Modules:Enabled`: which modules this pool applies (empty: every module).
+- `Modules:Excluded`: which modules this pool never applies, even when `Modules:Enabled` is empty.
 
 A re-install or a settings change swaps to a fresh copy without a 404 window. See `src/Aspire/Hybird` for the multi-pool lab.
 
@@ -106,7 +107,7 @@ unloadable and upgradeable.
   (seeding never resets it). `DELETE` returns **409**, and so does uploading a package with a core module's id:
   core modules are upgraded only by a release. The admin API itself stays compiled into the host.
 - **Pools:** no special case. A core module is in the shared catalog for every pool, and a pool applies it only if
-  `Modules:Enabled` lists it (or the list is empty).
+  `Modules:Enabled` lists it (or the list is empty) and `Modules:Excluded` does not.
 - `Modules:CorePath` (default `CoreModules`, relative to the app base directory) points elsewhere if needed.
 - **Host overrides of module settings:** `Modules:Settings:{id}:{key}` in the host's configuration replaces that
   setting of module `{id}` when this instance loads it, over the catalog's value (manifest default or the admin's).

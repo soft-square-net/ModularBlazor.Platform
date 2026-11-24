@@ -96,6 +96,7 @@ sidebar:
 | `Modules:Pool` | `all` | اسم المجموعة |
 | `Modules:Role` | `Api` | `Api` يربط المسارات؛ و`Worker` يحمل الوحدات دون مسارات |
 | `Modules:Enabled` | فارغ (الكل) | معرفات الوحدات التي تطبقها المجموعة، مثل `Modules__Enabled__0=sales` |
+| `Modules:Excluded` | فارغ | معرفات وحدات لا تطبقها المجموعة أبدا، حتى لو كانت `Modules:Enabled` فارغة، مثل `Modules__Excluded__0=sales` |
 | `ConnectionStrings:broker` | لا شيء | اتصال RabbitMQ؛ حين يضبط، تبث تغييرات دورة الحياة على مبادلة البث `modules.state` |
 | `OpenApi:Enabled` | `false` (مفعل في بيئة التطوير) | يخدم مستندات OpenAPI وScalar خارج بيئة التطوير |
 | `Modules:CorePath` | `CoreModules` | مجلد حزم الوحدات الأساسية المشحونة مع الإصدار |

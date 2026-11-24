@@ -38,7 +38,8 @@ container, swap and broadcast); they differ in how they arrive:
 - `Modules/Directory.Build.props` and `Core/Directory.Build.props` set up the core modules and their packaging.
 - The Module SDK (`soft.square.net.ModularBlazor.Module.Sdk`) gives custom modules the same layer rules (`<Name>.Domain`,
   `<Name>.Application`, `<Name>.Infrastructure`) from NuGet. The Infrastructure project is the module's entry assembly.
-- A pool applies either kind only if its `Modules:Enabled` list includes it, or the list is empty.
+- A pool applies either kind only if its `Modules:Enabled` list includes it, or the list is empty, and its
+  `Modules:Excluded` list does not include it.
 
 ### The core modules
 
@@ -170,6 +171,7 @@ The same image runs as every pool. Three settings decide what an instance does:
 | `Modules:Pool` | a name (`core`, `sales`, `worker`) | Shown in status and logs; the origin of broadcast messages |
 | `Modules:Role` | `Api` (default) or `Worker` | `Api` maps the routes of active modules; `Worker` loads them (services, consumers) without routes |
 | `Modules:Enabled` | list of module ids; empty means all | The pool applies only these modules and ignores the rest of the catalog |
+| `Modules:Excluded` | list of module ids; empty by default | The pool never applies these modules, even when `Modules:Enabled` is empty: "every module except the extracted ones" |
 
 An admin call reaches **one** replica, through the gateway. Without help, the other replicas would never hear about
 it: before the broadcast existed, activating `greeting` this way left `/api/greeting` answering 404 on three of the
