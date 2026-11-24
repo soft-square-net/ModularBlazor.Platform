@@ -1,0 +1,102 @@
+// Lookup cascade and picker (ModularBlazor.Abstractions/Lookups). The autocomplete itself lives in _accordion.scss.
+
+.mud-lookup-cascade {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mud-lookup-cascade__level + .mud-lookup-cascade__level {
+  padding-inline-start: 16px;
+  border-inline-start: 2px solid var(--mud-palette-lines-default, rgba(0, 0, 0, 0.12));
+}
+
+.mud-lookup-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mud-lookup-picker__bar,
+.mud-lookup-picker__search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+
+  > .mud-input-wrapper { flex: 1 1 140px; min-width: 0; }
+}
+
+.mud-lookup-picker__value { flex: 2 1 200px; min-width: 0; }
+
+.mud-lookup-picker__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mud-lookup-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-block: 2px;
+  padding-inline: 10px;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+
+  button {
+    display: inline-flex;
+    border: 0;
+    padding: 2px;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0.7;
+    &:hover { opacity: 1; }
+  }
+}
+
+.mud-lookup-chip--filter {
+  border: 1px solid rgba(var(--mud-palette-primary-rgb), 0.5);
+  color: var(--mud-palette-primary);
+}
+
+.mud-lookup-chip--locked {
+  border-style: dashed;
+  opacity: 0.85;
+}
+
+.mud-lookup-chip--selected {
+  background-color: rgba(var(--mud-palette-primary-rgb), 0.12);
+  color: var(--mud-palette-primary);
+  padding-inline-end: 4px;
+}
+
+.mud-lookup-picker__results {
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--mud-palette-lines-default, rgba(0, 0, 0, 0.12));
+  border-radius: 8px;
+}
+
+.mud-lookup-picker__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+
+  &:hover { background-color: rgba(var(--mud-palette-primary-rgb), 0.06); }
+  &.selected { background-color: rgba(var(--mud-palette-primary-rgb), 0.1); }
+  input:disabled + .mud-lookup-picker__text { opacity: 0.5; }
+}
+
+.mud-lookup-picker__text { flex: 1 1 auto; min-width: 0; }
+
+.mud-lookup-picker__cell {
+  flex: 0 0 auto;
+  font-size: 0.8125rem;
+  opacity: 0.75;
+}

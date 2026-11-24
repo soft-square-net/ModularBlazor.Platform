@@ -1,0 +1,325 @@
+@namespace soft.square.net.ModularBlazor.Abstractions.Lookups
+@using Microsoft.Extensions.Localization
+@using Microsoft.AspNetCore.Components.Web
+@implements IDisposable
+@inject ILookupService Lookups
+@inject IStringLocalizer<LookupPicker> L
+
+@*
+  Browse a lookup with composed filters and pick one or many items.
+    <LookupPicker Lookup="inventory.stock-items" Multiple PresetFilters="author's chips" @bind-Selected="model.Items" />
+  - Filter bar: field, operator (from the field's type), value (an autocomplete when the field has a value lookup).
+  - Filter chips (outlined, funnel) combine with AND; preset chips are locked. "in" takes several values.
+  - Results: a page at a time with the total, checkboxes (multiple) or radio buttons (single).
+  - Selected items (filled chips) are kept when the filters change.
+*@
+
+<div class="mud-lookup-picker">
+  @if (_descriptor is null)
+  {
+    <p class="mud-typography mud-typography-body2 mn-muted">@(_error ?? L["Loading…"])</p>
+  }
+  else
+  {
+    @if (AllowUserFilters && _descriptor.FilterFields.Count > 0)
+    {
+      <div class="mud-lookup-picker__bar">
+        <div class="mud-input-wrapper mud-input-wrapper--select">
+          <select class="mud-input-slot" aria-label="@L["Field"]" value="@_field" @onchange="FieldChanged">
+            @foreach (var f in _descriptor.FilterFields)
+            {
+              <option value="@f.Name">@f.Label</option>
+            }
+          </select>
+        </div>
+        @if (Field is { } field)
+        {
+          <div class="mud-input-wrapper mud-input-wrapper--select">
+            <select class="mud-input-slot" aria-label="@L["Operator"]" @bind="_op">
+              @foreach (var op in field.Ops)
+              {
+                <option value="@op">@L[LookupOps.Symbol(op)]</option>
+              }
+            </select>
+          </div>
+          @if (!LookupOps.TakesNoValue(_op))
+          {
+            @if (field.ValueLookup is { } valueLookup)
+            {
+              <div class="mud-lookup-picker__value">
+                <LookupAutocomplete Lookup="@valueLookup" Multiple="@(_op == "in")" @bind-Value="_valueItem" @bind-Values="_valueItems" />
+              </div>
+            }
+            else if (field.Type == "bool")
+            {
+              <div class="mud-input-wrapper mud-input-wrapper--select">
+                <select class="mud-input-slot" aria-label="@L["Value"]" @bind="_value">
+                  <option value="true">@L["Yes"]</option>
+                  <option value="false">@L["No"]</option>
+                </select>
+              </div>
+            }
+            else
+            {
+              <div class="mud-input-wrapper">
+                <input class="mud-input-slot" type="@InputType(field.Type)" aria-label="@L["Value"]" placeholder="@ValueHint" @bind="_value" @onkeydown="AddOnEnter" />
+              </div>
+              @if (_op == "between")
+              {
+                <div class="mud-input-wrapper">
+                  <input class="mud-input-slot" type="@InputType(field.Type)" aria-label="@L["To"]" @bind="_value2" @onkeydown="AddOnEnter" />
+                </div>
+              }
+            }
+          }
+          <button type="button" class="mud-button-root mud-button-outlined mud-button-primary mud-button-small" @onclick="AddFilterAsync">@L["Add filter"]</button>
+        }
+      </div>
+    }
+    @if (_filterError is not null)
+    {
+      <div class="mud-input-helper-text mn-error" role="alert">@_filterError</div>
+    }
+
+    @if (PresetFilters.Count + _filters.Count > 0)
+    {
+      <div class="mud-lookup-picker__chips" aria-label="@L["Filters"]">
+        @foreach (var f in PresetFilters)
+        {
+          <span class="mud-lookup-chip mud-lookup-chip--filter mud-lookup-chip--locked" title="@L["Set by the field"]">⧩ @ChipText(f)</span>
+        }
+        @for (var i = 0; i < _filters.Count; i++)
+        {
+          var index = i;
+          <span class="mud-lookup-chip mud-lookup-chip--filter">⧩ @ChipText(_filters[index])
+            <button type="button" aria-label="@L["Remove"]" @onclick="() => RemoveFilterAsync(index)">✕</button>
+          </span>
+        }
+      </div>
+    }
+
+    <div class="mud-lookup-picker__search">
+      <div class="mud-input-wrapper">
+        <input class="mud-input-slot" type="search" placeholder="@L["Search in results…"]" value="@_q" @oninput="QueryChanged" />
+      </div>
+      <span class="mud-typography mud-typography-body2 mn-muted">@(_total is { } total ? L["{0} results", total] : "")</span>
+    </div>
+
+    <div class="mud-lookup-picker__results" role="listbox" aria-multiselectable="@Multiple">
+      @foreach (var item in _items)
+      {
+        var chosen = Selected.Any(s => s.Key == item.Key);
+        <label class="mud-lookup-picker__row @(chosen ? "selected" : "")" @key="item.Key">
+          <input type="@(Multiple ? "checkbox" : "radio")" name="@_group" checked="@chosen" disabled="@(!chosen && Full)" @onchange="() => ToggleAsync(item)" />
+          <span class="mud-lookup-picker__text">@item.Text</span>
+          @if (item.Extra is { } extra)
+          {
+            @foreach (var column in _descriptor.Columns)
+            {
+              <span class="mud-lookup-picker__cell">@extra.GetValueOrDefault(column)</span>
+            }
+          }
+        </label>
+      }
+      @if (_loading)
+      {
+        <div class="mud-autocomplete-status">@L["Loading…"]</div>
+      }
+      else if (_items.Count == 0)
+      {
+        <div class="mud-autocomplete-status">@(_error ?? L["No matches found"])</div>
+      }
+      else if (_hasMore)
+      {
+        <button type="button" class="mud-autocomplete-more" @onclick="() => LoadAsync(reset: false)">@L["Load more"]</button>
+      }
+    </div>
+
+    @if (Selected.Count > 0)
+    {
+      <div class="mud-lookup-picker__chips" aria-label="@L["Selected"]">
+        @foreach (var item in Selected)
+        {
+          <span class="mud-lookup-chip mud-lookup-chip--selected">@item.Text
+            <button type="button" aria-label="@L["Remove"]" @onclick="() => ToggleAsync(item)">✕</button>
+          </span>
+        }
+      </div>
+    }
+  }
+</div>
+
+@code {
+  [Parameter, EditorRequired] public string Lookup { get; set; } = "";
+  [Parameter] public bool Multiple { get; set; }
+  [Parameter] public int? MaxSelections { get; set; }
+
+  /// <summary>Locked chips: every query applies them and the user cannot remove them.</summary>
+  [Parameter] public IReadOnlyList<LookupFilter> PresetFilters { get; set; } = [];
+
+  [Parameter] public bool AllowUserFilters { get; set; } = true;
+  [Parameter] public int PageSize { get; set; } = 25;
+
+  [Parameter] public IReadOnlyList<LookupItem> Selected { get; set; } = [];
+  [Parameter] public EventCallback<IReadOnlyList<LookupItem>> SelectedChanged { get; set; }
+
+  private readonly string _group = "lookup-" + Guid.NewGuid().ToString("n");
+  private LookupDescriptor? _descriptor;
+  private readonly List<LookupFilter> _filters = [];
+  private List<LookupItem> _items = [];
+  private bool _hasMore;
+  private int? _total;
+  private bool _loading;
+  private string? _error;
+  private string? _filterError;
+  private string _q = "";
+  private string _field = "";
+  private string _op = "eq";
+  private string? _value;
+  private string? _value2;
+  private LookupItem? _valueItem;
+  private IReadOnlyList<LookupItem> _valueItems = [];
+  private CancellationTokenSource? _pending;
+  private string? _loadedLookup;
+
+  private LookupFilterField? Field => _descriptor?.FilterFields.FirstOrDefault(f => f.Name == _field);
+  private bool Full => Multiple && MaxSelections is { } max && Selected.Count >= max;
+  private string? ValueHint => _op == "in" ? L["Values, separated by commas"] : null;
+
+  protected override async Task OnParametersSetAsync()
+  {
+    if (_loadedLookup == Lookup) return;
+    _loadedLookup = Lookup;
+    _descriptor = await Lookups.FindAsync(Lookup);
+    if (_descriptor is null) { _error = L["This list is not available."]; return; }
+    var first = _descriptor.FilterFields.FirstOrDefault();
+    if (first is not null) (_field, _op) = (first.Name, first.Ops[0]);
+    await LoadAsync(reset: true);
+  }
+
+  private void FieldChanged(ChangeEventArgs e)
+  {
+    _field = e.Value?.ToString() ?? "";
+    _op = Field?.Ops.FirstOrDefault() ?? "eq";
+    (_value, _value2, _valueItem, _valueItems, _filterError) = (null, null, null, [], null);
+  }
+
+  private async Task AddOnEnter(KeyboardEventArgs e)
+  {
+    if (e.Key == "Enter") await AddFilterAsync();
+  }
+
+  private async Task AddFilterAsync()
+  {
+    if (Field is not { } field) return;
+    _filterError = null;
+    LookupFilter filter;
+    if (LookupOps.TakesNoValue(_op)) filter = new(field.Name, _op);
+    else if (field.ValueLookup is not null)
+    {
+      if (_op == "in")
+      {
+        if (_valueItems.Count == 0) { _filterError = L["Choose at least one value."]; return; }
+        filter = new(field.Name, _op, Values: _valueItems.Select(v => v.Key).ToList()) { Display = string.Join(", ", _valueItems.Select(v => v.Text)) };
+      }
+      else
+      {
+        if (_valueItem is null) { _filterError = L["Choose a value."]; return; }
+        filter = new(field.Name, _op, _valueItem.Key) { Display = _valueItem.Text };
+      }
+    }
+    else if (_op == "between")
+    {
+      if (string.IsNullOrWhiteSpace(_value) || string.IsNullOrWhiteSpace(_value2)) { _filterError = L["Enter both values."]; return; }
+      filter = new(field.Name, _op, Values: [_value.Trim(), _value2.Trim()]);
+    }
+    else if (_op == "in")
+    {
+      var values = (_value ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+      if (values.Length == 0) { _filterError = L["Enter at least one value."]; return; }
+      filter = new(field.Name, _op, Values: values);
+    }
+    else
+    {
+      var value = field.Type == "bool" ? (_value ?? "true") : _value?.Trim();
+      if (string.IsNullOrEmpty(value)) { _filterError = L["Enter a value."]; return; }
+      filter = new(field.Name, _op, value);
+    }
+
+    _filters.Add(filter);
+    (_value, _value2, _valueItem, _valueItems) = (null, null, null, []);
+    await LoadAsync(reset: true);
+    if (_error is not null) // the server refused the chip (e.g. not a number): take it back and say why
+    {
+      _filters.Remove(filter);
+      _filterError = _error;
+      await LoadAsync(reset: true);
+    }
+  }
+
+  private Task RemoveFilterAsync(int index)
+  {
+    _filters.RemoveAt(index);
+    return LoadAsync(reset: true);
+  }
+
+  private async Task QueryChanged(ChangeEventArgs e)
+  {
+    _q = e.Value?.ToString() ?? "";
+    _pending?.Cancel();
+    var pending = _pending = new CancellationTokenSource();
+    try { await Task.Delay(300, pending.Token); }
+    catch (TaskCanceledException) { return; }
+    await LoadAsync(reset: true);
+  }
+
+  private async Task LoadAsync(bool reset)
+  {
+    if (_descriptor is null) return;
+    _loading = true;
+    _error = null;
+    if (reset) _items = [];
+    try
+    {
+      var page = await Lookups.SearchAsync(Lookup, new LookupQuery
+      {
+        Q = string.IsNullOrWhiteSpace(_q) ? null : _q.Trim(),
+        Filters = [.. PresetFilters, .. _filters],
+        Skip = reset ? 0 : _items.Count,
+        Take = PageSize,
+        IncludeTotal = reset
+      });
+      _items = reset ? page.Items.ToList() : [.. _items, .. page.Items];
+      _hasMore = page.HasMore;
+      if (reset) _total = page.Total;
+    }
+    catch (Exception e) when (e is HttpRequestException or InvalidOperationException or ArgumentException)
+    {
+      _error = e.Message;
+      _hasMore = false;
+    }
+    finally { _loading = false; }
+  }
+
+  private async Task ToggleAsync(LookupItem item)
+  {
+    var chosen = Selected.Any(s => s.Key == item.Key);
+    IReadOnlyList<LookupItem> next = Multiple
+      ? chosen ? Selected.Where(s => s.Key != item.Key).ToList() : [.. Selected, item with { Extra = null }]
+      : chosen ? [] : [item with { Extra = null }];
+    await SelectedChanged.InvokeAsync(next);
+  }
+
+  private string ChipText(LookupFilter f)
+  {
+    var label = _descriptor?.FilterFields.FirstOrDefault(x => x.Name == f.Field)?.Label ?? f.Field;
+    var value = f.Display ?? (f.Values is { Count: > 0 } values
+      ? f.Op == "between" ? $"{values[0]} – {values[^1]}" : string.Join(", ", values)
+      : f.Value);
+    return LookupOps.TakesNoValue(f.Op) ? $"{label} {L[LookupOps.Symbol(f.Op)]}" : $"{label} {L[LookupOps.Symbol(f.Op)]} {value}";
+  }
+
+  private static string InputType(string type) => type switch { "number" => "number", "date" => "date", _ => "text" };
+
+  public void Dispose() => _pending?.Cancel();
+}

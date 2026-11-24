@@ -1,0 +1,97 @@
+@namespace soft.square.net.ModularBlazor.Abstractions.Lookups
+@using Microsoft.Extensions.Localization
+@inject ILookupService Lookups
+@inject IStringLocalizer<LookupCascade> L
+
+@*
+  A cascade over a tree lookup (one with Hierarchy(...)): one autocomplete per level, each filtered by the item
+  selected in the level before it.
+    <LookupCascade Lookup="content.categories" RootKey="3" MaxDepth="4" @bind-Path="model.CategoryPath" />
+  - Selecting at level i drops the levels after it and opens level i + 1 when the item has children.
+  - Clearing level i drops the levels after it; the value is the path down to level i - 1.
+  - A further level does not exist until the level before it has a value.
+  The value is the path, root first; its last item is the selected one.
+*@
+
+<div class="mud-lookup-cascade">
+  @for (var i = 0; i < _levels.Count; i++)
+  {
+    var level = i;
+    <div class="mud-lookup-cascade__level" @key="_levels[level].Id">
+      <LookupAutocomplete Lookup="@Lookup"
+                          Label="@(level == 0 ? Label : null)"
+                          Parent="@_levels[level].Parent"
+                          Value="@_levels[level].Selected"
+                          ValueChanged="item => SelectAsync(level, item)"
+                          Disabled="Disabled"
+                          MinChars="MinChars" />
+    </div>
+  }
+  @if (LeafOnly && Path.Count > 0 && _lastHasChildren == true)
+  {
+    <div class="mud-input-helper-text">@L["Choose a more specific item."]</div>
+  }
+</div>
+
+@code {
+  [Parameter, EditorRequired] public string Lookup { get; set; } = "";
+  [Parameter] public string? Label { get; set; }
+
+  /// <summary>The first level lists the children of this item; null lists the roots.</summary>
+  [Parameter] public string? RootKey { get; set; }
+
+  /// <summary>How many levels at most.</summary>
+  [Parameter] public int MaxDepth { get; set; } = 5;
+
+  /// <summary>Shows a hint until the selected item has no children.</summary>
+  [Parameter] public bool LeafOnly { get; set; }
+
+  [Parameter] public bool Disabled { get; set; }
+  [Parameter] public int MinChars { get; set; }
+
+  [Parameter] public IReadOnlyList<LookupItem> Path { get; set; } = [];
+  [Parameter] public EventCallback<IReadOnlyList<LookupItem>> PathChanged { get; set; }
+
+  private sealed record Level(int Id, string? Parent, LookupItem? Selected);
+
+  private List<Level> _levels = [];
+  private IReadOnlyList<LookupItem>? _shown;
+  private bool? _lastHasChildren;
+  private int _ids;
+
+  protected override async Task OnParametersSetAsync()
+  {
+    if (ReferenceEquals(_shown, Path) && _levels.Count > 0) return;
+    _shown = Path;
+    var path = Path.Take(MaxDepth).ToList();
+    _levels = [new Level(++_ids, RootKey, path.FirstOrDefault())];
+    for (var i = 1; i < path.Count; i++) _levels.Add(new Level(++_ids, path[i - 1].Key, path[i]));
+
+    // A saved path has keys and texts only: ask whether its last item has children, to show the next level.
+    _lastHasChildren = null;
+    if (path.Count > 0)
+    {
+      try
+      {
+        var last = (await Lookups.ResolveAsync(Lookup, [path[^1].Key])).FirstOrDefault();
+        _lastHasChildren = last?.HasChildren;
+      }
+      catch (HttpRequestException) { } // the owner is not reachable: show the path as it is
+      if (_lastHasChildren == true && path.Count < MaxDepth) _levels.Add(new Level(++_ids, path[^1].Key, null));
+    }
+  }
+
+  private async Task SelectAsync(int level, LookupItem? item)
+  {
+    var current = _levels[level];
+    _levels = _levels.Take(level).ToList(); // the levels after this one go
+    _levels.Add(current with { Selected = item }); // same id: the control keeps its state and focus
+    _lastHasChildren = item?.HasChildren;
+    if (item?.HasChildren == true && level + 1 < MaxDepth) _levels.Add(new Level(++_ids, item.Key, null));
+
+    var path = _levels.Where(l => l.Selected is not null).Select(l => l.Selected!).ToList();
+    _shown = path;
+    if (item is null && level > 0) _lastHasChildren = true; // the level above has children: this one was among them
+    await PathChanged.InvokeAsync(path);
+  }
+}
