@@ -1,7 +1,7 @@
 # Hybird: hybrid architecture lab (Aspire)
 
 A runnable model of the research **combined target architecture**. One image (`src/WebApi/WebApi`) is deployed as several
-**module pools**, each configured by `Modules__Pool`, `Modules__Role` and `Modules__Enabled__N`. The pools sit behind a
+**module pools**, each configured by `Modules__Pool`, `Modules__Role`, `Modules__Enabled__N` and `Modules__Excluded__N`. The pools sit behind a
 **YARP gateway** and share **RabbitMQ**, **Redis** and **PostgreSQL** (tenant store plus per-tenant databases). Every
 replica exports OpenTelemetry to the Aspire dashboard.
 
@@ -40,7 +40,7 @@ running; they then keep the data volumes in use, and the next run needs them sto
 |---|---|
 | `gateway` (http://localhost:5080) | YARP. `/api/sales/**` and `/api/greeting/**` go to the sales pool; everything else goes to core. `/pools/{core\|sales\|worker}/**` reaches one pool directly (lab only). |
 | `identity` (http://localhost:5090) | Identity service (`src/WebApi/Identity/WebApi.Identity.Server`): OpenIddict + ASP.NET Core Identity, database `identity` on `tenant-data` (resource `identity-db`). Issuer `http://localhost:5090/`, audience `modular-webapi`, JWKS `/.well-known/jwks`. Clients `blazor-client` (Code + PKCE) and `elsa-workflows` (client credentials). Not routed through the gateway. See its README for flows, claims and dev accounts. |
-| `core-1..2` | Core pool, Role=Api, modules: identity, tenancy (both core modules, active by default), workflow, inventory |
+| `core-1..2` | Core pool, Role=Api: every module except the extracted ones (sales pool, workflow pool), including the core modules identity, tenancy and client-modules (active by default) and any module you upload |
 | `sales-1..4` | Sales pool, Role=Api, modules: sales, greeting (the sample module stands in for Sales) |
 | `worker-1..2` | Worker pool, Role=Worker: modules load (services, consumers) but get no routes, and there is no public route |
 | `broker` | RabbitMQ with the management UI |
@@ -201,7 +201,9 @@ admin call ─► any replica ─► catalog (modules.json + packages, cross-pro
   - `Inactive`: loaded, no routes.
   - `Installed`: unloaded.
   - Removed: unloaded.
-- **Only enabled modules:** a pool applies only the modules in `Modules__Enabled`.
+- **Only enabled modules:** a pool applies only the modules in `Modules__Enabled` (empty: every module), never those in
+  `Modules__Excluded`. The core pool takes every module except the extracted ones, so an uploaded module (e.g. a module
+  repo's `dynamicfields`) is served without editing `AppHost.cs`.
 - **Core modules come by default:** every replica seeds the core modules its release ships (`identity`, `tenancy`) into the catalog as `Active` on startup, once under the catalog lock, then broadcasts `core-seeded`. Only the core pool enables them here. See `src/WebApi/WebApi/README.md`, "Core modules".
 - **Swap instead of restart:** a newer `InstalledAt` (re-install) or changed settings makes a replica load a fresh copy. The fresh copy's routes replace the old ones in one update, and only then is the old copy released, so there is no 404 window.
 - **The catalog is the source of truth:** the message only says "something changed", so a lost message is repaired by the next one, or by the sync on startup and on subscribe.

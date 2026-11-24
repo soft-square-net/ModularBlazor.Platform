@@ -59,6 +59,10 @@
         <span class="blz-chip">@L["Role"] <strong>@_poolInfo.Role</strong></span>
         <span class="blz-chip">@L["Instance"] <strong>@_poolInfo.Instance</strong></span>
         <span class="blz-chip">@L["Enabled"] <strong>@(_poolInfo.EnabledModules.Count == 0 ? L["all"] : string.Join(", ", _poolInfo.EnabledModules))</strong></span>
+        @if (_poolInfo.ExcludedModules?.Count > 0)
+        {
+          <span class="blz-chip">@L["Excluded"] <strong>@string.Join(", ", _poolInfo.ExcludedModules)</strong></span>
+        }
         @if (_unloading.Count > 0)
         {
           <span class="blz-chip blz-chip-warning">@L["Unloading"] <strong>@string.Join(", ", _unloading)</strong></span>

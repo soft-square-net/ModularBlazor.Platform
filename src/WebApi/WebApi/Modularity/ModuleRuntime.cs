@@ -29,6 +29,13 @@ public sealed class ModuleRuntimeOptions
     /// <summary>Module ids this pool may activate; empty = every module.</summary>
     public string[] Enabled { get; set; } = [];
 
+    /// <summary>
+    /// Module ids this pool never activates, even when <see cref="Enabled"/> is empty (every module). A pool that takes
+    /// "every module except the ones extracted to other pools" leaves Enabled empty and lists the extracted ones here, so
+    /// a newly uploaded module is served without editing the pool's configuration.
+    /// </summary>
+    public string[] Excluded { get; set; } = [];
+
     /// <summary>Core module packages shipped with this release (one folder per module), relative to the app base directory.</summary>
     public string CorePath { get; set; } = "CoreModules";
 
@@ -49,7 +56,8 @@ public sealed class ModuleRuntimeOptions
     public TimeSpan HostedServiceTimeout { get; set; } = TimeSpan.FromSeconds(10);
 
     public bool IsEnabled(string moduleId) =>
-        Enabled.Length == 0 || Enabled.Contains(moduleId, StringComparer.OrdinalIgnoreCase);
+        (Enabled.Length == 0 || Enabled.Contains(moduleId, StringComparer.OrdinalIgnoreCase))
+        && !Excluded.Contains(moduleId, StringComparer.OrdinalIgnoreCase);
 }
 
 public enum ModuleRole { Api, Worker }

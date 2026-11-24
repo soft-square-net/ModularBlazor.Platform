@@ -146,6 +146,7 @@
   "Managing host modules needs the <code>{0}</code> role.": "تتطلب إدارة وحدات الخادم الدور <code>{0}</code>.",
   "Instance": "النسخة",
   "all": "الكل",
+  "Excluded": "مستبعدة",
   "Unloading": "جارٍ إلغاء التحميل",
   "Install a module": "تثبيت وحدة",
   "Upload a module package (.nupkg). It is installed inactive; activate it to load it and map its routes.": "ارفع حزمة وحدة (.nupkg). تُثبَّت غير نشطة؛ فعّلها لتحميلها وربط مساراتها.",

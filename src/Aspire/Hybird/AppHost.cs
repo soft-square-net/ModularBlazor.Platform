@@ -100,18 +100,23 @@ deploy.ConfigureIdentity(identity);
 
 // ---------------------------------------------------------------- module pools (same image, different config)
 
-// Core pool: every module except the extracted ones. "identity", "tenancy" and "client-modules" are core modules: they
-// ship with every WebApi release (CoreModules folder) and are seeded into the catalog as Active on first start.
-// "client-modules" serves the Blazor client's module manifest and files (/api/client-modules, via the catch-all route).
-var core = AddPool("core", role: "Api", replicas: 2, "identity", "tenancy", "client-modules", "inventory");
-
+// Extracted modules: each runs in its own Api pool, and the gateway routes its prefix there (see the YARP routes below).
 // Sales pool: the module that needed independent scaling. The sample "greeting" module stands in for Sales here.
-var sales = AddPool("sales", role: "Api", replicas: 4, "sales", "greeting", "shifts", "content");
+string[] salesModules = ["sales", "greeting", "shifts", "content"];
+string[] workflowModules = ["elsa"];
+
+// Core pool: every module except the extracted ones, so a module uploaded on the Host Modules page (e.g. a module
+// repo's dynamicfields) is served through the gateway's catch-all route without editing this file. "identity",
+// "tenancy" and "client-modules" are core modules: they ship with every WebApi release (CoreModules folder) and are
+// seeded into the catalog as Active on first start. "client-modules" serves the Blazor client's module manifest and
+// files (/api/client-modules, via the catch-all route).
+var core = AddPool("core", role: "Api", replicas: 2, enabled: [], excluded: [.. salesModules, .. workflowModules]);
+var sales = AddPool("sales", role: "Api", replicas: 4, enabled: salesModules);
 
 // Worker pool: loads modules for their consumers and jobs, gets no public HTTP routes. In production it scales on
 // queue lag (e.g. KEDA on the RabbitMQ queue length); locally it is a fixed count.
-var worker = AddPool("worker", role: "Worker", replicas: 2, "sales", "greeting");
-var workflow = AddPool("workflow", role: "Api", replicas: 2, "elsa");
+var worker = AddPool("worker", role: "Worker", replicas: 2, enabled: ["sales", "greeting"]);
+var workflow = AddPool("workflow", role: "Api", replicas: 2, enabled: workflowModules);
 foreach (var replica in workflow)
     replica.WithReference(elsaDatabase, connectionName: "elsa").WaitFor(elsaDatabase)
         .WithEnvironment("Identity__ElsaClient__ClientId", "elsa-workflows")
@@ -187,8 +192,9 @@ builder.Build().Run();
 
 // A pool is N replicas of the same WebApi project; the pool, its role and the modules it may activate are
 // configuration only. Each replica is its own resource so the gateway can address it directly (Aspire's
-// WithReplicas only offers a shared proxied address).
-IResourceBuilder<ProjectResource>[] AddPool(string name, string role, int replicas, params string[] modules) =>
+// WithReplicas only offers a shared proxied address). enabled: the modules the pool may activate (empty: every module);
+// excluded: the modules it never activates, even when enabled is empty.
+IResourceBuilder<ProjectResource>[] AddPool(string name, string role, int replicas, string[] enabled, string[]? excluded = null) =>
     Enumerable.Range(1, replicas).Select(n =>
     {
         var replica = builder.AddProject<Projects.WebApi>($"{name}-{n}", launchProfileName: null)
@@ -212,8 +218,10 @@ IResourceBuilder<ProjectResource>[] AddPool(string name, string role, int replic
 
         deploy.ConfigurePoolReplica(replica); // environment; publish mode: the shared module catalog volume
         foreach (var server in databaseServers) server(replica); // tenant-data plus the Lab:Engines servers
-        for (var i = 0; i < modules.Length; i++)
-            replica.WithEnvironment($"Modules__Enabled__{i}", modules[i]);
+        for (var i = 0; i < enabled.Length; i++)
+            replica.WithEnvironment($"Modules__Enabled__{i}", enabled[i]);
+        for (var i = 0; i < (excluded?.Length ?? 0); i++)
+            replica.WithEnvironment($"Modules__Excluded__{i}", excluded![i]);
         return replica;
     }).ToArray();
 

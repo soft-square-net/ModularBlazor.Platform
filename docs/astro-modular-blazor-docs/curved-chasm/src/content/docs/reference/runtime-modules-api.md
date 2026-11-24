@@ -43,7 +43,7 @@ Module endpoints are served under `/api/{RoutePrefix}`.
 | `module` | The catalog record: id, name, version, route prefix, entry assembly, settings, `desiredState`, `installedAt` |
 | `pool` | `Modules:Pool` of the replica that answered |
 | `instance` | `machine:process` of that replica |
-| `enabledInPool` | Whether that pool applies this module (`Modules:Enabled`) |
+| `enabledInPool` | Whether that pool applies this module (`Modules:Enabled`, `Modules:Excluded`) |
 | `loaded` | Whether the module is loaded on that replica |
 | `routes` | Its live routes on that replica, e.g. `GET /api/greeting/{name}` |
 | `loadedVersion` | Version of the copy loaded on that replica; differs from `module.version` while a restart is pending |
@@ -110,6 +110,7 @@ Tenant rules (headers, status codes) are in [Tenancy and tenant data](/backend/t
 | `Modules:Pool` | `all` | Pool name |
 | `Modules:Role` | `Api` | `Api` maps routes; `Worker` loads modules without routes |
 | `Modules:Enabled` | empty (all) | Module ids this pool applies, e.g. `Modules__Enabled__0=sales` |
+| `Modules:Excluded` | empty | Module ids this pool never applies, even when `Modules:Enabled` is empty, e.g. `Modules__Excluded__0=sales` |
 | `ConnectionStrings:broker` | none | RabbitMQ connection; when set, lifecycle changes are broadcast on the `modules.state` fanout exchange |
 | `OpenApi:Enabled` | `false` (on in Development) | Serves the OpenAPI documents and Scalar outside Development |
 | `Modules:CorePath` | `CoreModules` | Folder of the core-module packages shipped with the release |

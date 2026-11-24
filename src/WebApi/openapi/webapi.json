@@ -520,6 +520,7 @@
           "pool",
           "role",
           "enabledModules",
+          "excludedModules",
           "instance",
           "connections"
         ],
@@ -532,6 +533,12 @@
             "type": "string"
           },
           "enabledModules": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "excludedModules": {
             "type": "array",
             "items": {
               "type": "string"

@@ -12,6 +12,7 @@ public sealed class PoolEndpoints : ICarterModule
                 options.Value.Pool,
                 options.Value.Role.ToString(),
                 options.Value.Enabled.Length == 0 ? ["*"] : options.Value.Enabled,
+                options.Value.Excluded,
                 ModuleInstance.Id,
                 // Names only, never the values: which infrastructure this instance was wired to.
                 configuration.GetSection("ConnectionStrings").GetChildren().Select(c => c.Key).Order().ToArray()))
@@ -21,4 +22,5 @@ public sealed class PoolEndpoints : ICarterModule
 }
 
 /// <summary>A named type (not an anonymous one) so the OpenAPI document and the generated client get a schema.</summary>
-public sealed record PoolInfo(string Pool, string Role, IReadOnlyList<string> EnabledModules, string Instance, IReadOnlyList<string> Connections);
+public sealed record PoolInfo(string Pool, string Role, IReadOnlyList<string> EnabledModules,
+    IReadOnlyList<string> ExcludedModules, string Instance, IReadOnlyList<string> Connections);
