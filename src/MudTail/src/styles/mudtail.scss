@@ -26,6 +26,7 @@
 @use "tree" as *;
 @use "stat-hero" as *;
 @use "image-editor" as *;
+@use "explorer" as *;
 
 // Global resets & typography baseline
 *, *::before, *::after {
