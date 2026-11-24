@@ -87,6 +87,22 @@ public sealed class ClientModulesEndpoints : ICarterModule
             .ExcludeFromDescription()
             .WithName("ClientModules_GetFile");
 
+        // A module's static files (css, js and its chunks, fonts...) from the URL the manifest gives (assetBase + path).
+        // Without the user's token: browsers import() scripts and load stylesheets with plain requests. The token in
+        // the path changes with the files, so a copy is valid for good.
+        root.MapGet("/files/{id}/{version}/{token}/{**path}", (string id, string version, string token, string path, HttpContext http, ClientModuleCatalog catalog) =>
+            {
+                if (catalog.ResolveAsset(id, version, token, path) is not { } found)
+                    return Results.NotFound();
+                http.Response.Headers.CacheControl = $"{(found.Public ? "public" : "private")}, max-age=31536000, immutable";
+                http.Response.Headers.XContentTypeOptions = "nosniff";
+                return Results.File(found.Path, ClientModuleAssets.ContentType(found.Asset.Path),
+                    entityTag: new EntityTagHeaderValue($"\"{found.Asset.Sha256}\""));
+            })
+            .AllowAnonymous()
+            .ExcludeFromDescription()
+            .WithName("ClientModules_GetAsset");
+
         // Development only, with ClientModules:Local (404 otherwise): Server-Sent Events for the client app's dev reload.
         // "hello" on connect (the client checks the manifest: it may have missed a change), then "changed" with the ids of
         // the local client modules installed again after a rebuild. The stream ends after a few minutes; the client

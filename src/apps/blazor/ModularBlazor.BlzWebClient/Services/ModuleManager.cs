@@ -332,6 +332,8 @@ public sealed class ModuleManager : IModuleNavigation
         entries = await ReadCachedManifestAsync();
         Source = entries is null ? ModuleCatalogSource.None : ModuleCatalogSource.Cached;
         entries ??= [];
+        // The WebApi cannot be reached, so neither can the asset URLs: use the files inside the cached packages.
+        foreach (var entry in entries) entry.Module.AssetBase = null;
         _etag = null;
       }
 
@@ -528,7 +530,8 @@ public sealed class ModuleManager : IModuleNavigation
         assemblies.Add(context.LoadFromStream(new MemoryStream(image)));
       }
 
-      _assets.Set(d.Id, package.Assets);
+      // Served from real URLs (ActiveModuleService): the bytes need not stay in the WASM heap.
+      _assets.Set(d.Id, d.AssetBase is null ? package.Assets : ModuleAssetSet.Empty);
 
       foreach (var assembly in assemblies)
       {
