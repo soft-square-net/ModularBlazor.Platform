@@ -1,8 +1,13 @@
 # Layouts.Public
 
 The public site's layout (layout key `public`): masthead, mega-nav, reading progress and footer, built from MudTail's
-`mud-site` classes. It has no assets of its own: the classes and the `data-mud` behaviours (`mega-nav`,
-`reading-progress`, `theme-toggle`) come with **UI.MudTail**, which it depends on.
+`mud-site` classes. Its one asset is `css/site.min.css`, MudTail's **site pack** (editorial, sports, gallery and the
+`mud-site` shell), which UI.MudTail's core stylesheet leaves out. The tokens, components and `data-mud` behaviours
+(`mega-nav`, `reading-progress`, `theme-toggle`) come with **UI.MudTail**, which it depends on.
+
+`node-app` copies the pack: `npm run build` there builds MudTail and copies `src/MudTail/dist/packs/site.css` to
+`wwwroot/css/site.min.css` (`npm run copy` copies only). A module page that uses the editorial or sport classes
+outside this layout can list the same file in its own `Styles`.
 
 It is not a startup module. A page asks for the layout with `[UseLayout("public")]`, or its module's settings say
 `Layout = "public"`; the host sees in the manifest that this module provides `public` (`ProvidesLayouts`), loads it,

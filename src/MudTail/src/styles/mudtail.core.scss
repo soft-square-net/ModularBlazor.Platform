@@ -1,0 +1,27 @@
+// MudTail: the core stylesheet (compiled to dist/mudtail.core.css): tokens, base, and the components every app uses.
+// Not in it, each in its own pack (dist/packs/<name>.css):
+//   site          editorial, sports, gallery and the public-site shell (mud-site): the public layout loads it
+//   dock, tree, image-editor, explorer   the large components: the Blazor build loads each with its component
+// mudtail.scss is all of them together.
+
+@use "variables" as *;
+@use "mixins" as *;
+@use "elevation" as *;
+@use "rounded" as *;
+@use "typography" as *;
+@use "buttons" as *;
+@use "forms" as *;
+@use "cards" as *;
+@use "dialogs" as *;
+@use "drawers" as *;
+@use "tabs" as *;
+@use "appbar" as *;
+@use "accordion" as *;
+@use "grid" as *;
+@use "datatable" as *;
+@use "loading" as *;
+@use "progress" as *;
+@use "edit-form" as *;
+@use "stat-hero" as *;
+@use "lookups" as *;
+@use "base" as *;

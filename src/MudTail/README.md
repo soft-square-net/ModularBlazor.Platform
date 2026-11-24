@@ -41,7 +41,10 @@ dist/                 build output (git-ignored)
 | --- | --- |
 | `dist/mudtail.js` | ES module for apps that bundle (gsap and lucide stay external, resolved from its dependencies) |
 | `dist/mudtail.blazor.js` | Self-contained ES module (gsap bundled) for Blazor's `JS.InvokeAsync("import", ...)` |
-| `dist/mudtail.css` | Component styles and `--mud-palette-*` tokens, light and dark |
+| `dist/mudtail.css` | Component styles and `--mud-palette-*` tokens, light and dark: everything, in one sheet |
+| `dist/mudtail.core.css` | The same without the packs below: what an app loads up front |
+| `dist/packs/*.css` | `site` (editorial, sports, gallery, the `mud-site` shell), `dock`, `tree`, `image-editor`, `explorer`; each needs the core sheet |
+| `dist/chunks/*.js` | The code of `dock`, `tree`, `image-editor` and `explorer`, which `mudtail.blazor.js` imports on first use |
 | `dist/tailwind.css` | Tailwind v4 preset mapping the tokens to utilities |
 
 ## Theme tokens
@@ -684,6 +687,22 @@ Component events come back to .NET as one callback:
 ```csharp
 [JSInvokable] public Task OnMudEvent(string name, JsonElement payload) { ... }
 ```
+
+### Code loaded on first use
+
+`mudtail.blazor.js` leaves its four largest components out of the entry: **dock**, **tree**, **image-editor** and
+**explorer** (which uses the tree) sit in `chunks/` next to it, with a stylesheet each in `packs/`. `create('dock', …)`
+and the other three return a promise of the handle the first time, while the chunk loads; Blazor's `InvokeAsync`
+awaits it either way. Everything else, including the data table, is in the entry.
+
+| Call | What it does |
+| --- | --- |
+| `load(area)` | Imports one of `dock`, `tree`, `image-editor`, `explorer` and its pack; resolves to its exports (`MudDock`, `MudTreeView`, …). `areaNames()` lists them. |
+| `setPackBase(url)` | Where the packs are: `<url><name>.min.css`. Call it before `init`; `null` (the default) loads no pack, for when the app ships the full `mudtail.css`. |
+| `loadPack(name)` | Adds one pack's `<link data-mud-pack>` once; resolves when it has loaded. `removePacks()` takes them all out. |
+
+Plugins get `load` and `loadPack` on the host object too. An app that bundles `dist/mudtail.js` gets everything in its
+own bundle; `src/index.js` still exports the four components.
 
 ### Lifecycle
 

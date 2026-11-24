@@ -12,6 +12,8 @@
     "./animator": "./dist/mudtail.animator.js",
     "./animator/player": "./dist/mudtail.animator.player.js",
     "./mudtail.css": "./dist/mudtail.css",
+    "./mudtail.core.css": "./dist/mudtail.core.css",
+    "./packs/*": "./dist/packs/*",
     "./tailwind.css": "./dist/tailwind.css",
     "./scss/*": "./src/styles/*",
     "./package.json": "./package.json"
@@ -34,7 +36,7 @@
     "build:lib": "vite build --mode lib",
     "build:blazor": "vite build --mode blazor",
     "build:animator": "vite build --mode animator && vite build --mode animator-player",
-    "build:css": "sass --no-source-map --style=compressed src/styles/mudtail.scss dist/mudtail.css && node -e \"require('fs').copyFileSync('src/styles/tailwind.css','dist/tailwind.css')\"",
+    "build:css": "sass --no-source-map --style=compressed src/styles/mudtail.scss:dist/mudtail.css src/styles/mudtail.core.scss:dist/mudtail.core.css src/styles/packs:dist/packs && node -e \"require('fs').copyFileSync('src/styles/tailwind.css','dist/tailwind.css')\"",
     "build:demo": "vite build",
     "preview": "vite preview",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",

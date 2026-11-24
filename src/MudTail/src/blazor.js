@@ -28,8 +28,6 @@ import {
   MudAccordion,
   MudDrawer,
   MudDialog,
-  MudDock,
-  DockModel,
   MudDataTable,
   toPaginationFilter,
   setDirection,
@@ -43,22 +41,20 @@ import {
   pageLoader,
   MudProgressLinear,
   MudProgressCircular,
-  MudTreeView,
   createStatCard,
-  MudImageEditor,
-  renderRecipe,
-  MudExplorer,
-  fileKind,
   loadPlugin as libLoadPlugin,
   removePlugin as libRemovePlugin,
   getPlugin,
   hasPlugin,
   listPlugins,
   pluginComponentNames,
-} from './index.js';
-import { buildComponent, hasComponent, setHandleTracker, reserveComponentNames } from './core/plugins.js';
+} from './core-api.js';
+import * as coreApi from './core-api.js';
+import { buildComponent, hasComponent, setHandleTracker, reserveComponentNames, setPluginHost } from './core/plugins.js';
 
-export * from './index.js';
+// The core API. The large components (dock, tree view, image editor, file explorer) are not in this file: create()
+// loads them on first use, and load(area) hands a module their classes. See src/areas/.
+export * from './core-api.js';
 
 const EVENT_METHOD = 'OnMudEvent';
 
@@ -224,7 +220,8 @@ const factories = {
 
   // Tree view. Events: move ({ id, from: { parentId, index }, to: { parentId, index }, source }), select (node),
   // toggle ({ id, expanded }), change (the whole tree, in order: save it, or apply the single move).
-  tree(host, options, emit) {
+  async tree(host, options, emit) {
+    const { MudTreeView } = await load('tree');
     const tree = new MudTreeView({
       ...options,
       onMove: ({ node, from, to, source }) => emit('move', { id: node.id, from, to, source }),
@@ -253,7 +250,8 @@ const factories = {
   // Image editor. Events: opened, change (the edit state), exported (file list), uploaded, error.
   // Bytes come back to .NET as a stream: InvokeAsync<IJSStreamReference>("exportImage", "webp", 0.86) or
   // ("getFile", "thumbnail"), then OpenReadStreamAsync(maxBytes) and store it (e.g. POST it with your HttpClient).
-  imageEditor(host, options, emit) {
+  async imageEditor(host, options, emit) {
+    const { MudImageEditor, renderRecipe } = await load('image-editor');
     const meta = (f) => ({ name: f.name, fileName: f.fileName, width: f.width, height: f.height, type: f.type, size: f.size });
     const editor = new MudImageEditor({
       ...options,
@@ -322,7 +320,8 @@ const factories = {
    * Rights are data: an item's or the folder's deny list (see MudExplorer); it also hides menuItems / newItems by id.
    * Other events: navigate ({ location, folder, path }), selection ([ids]), pinned ([{ id, name }]), view (name).
    */
-  explorer(host, options, emit) {
+  async explorer(host, options, emit) {
+    const { MudExplorer, fileKind } = await load('explorer');
     const pending = new Map();
     let seq = 0;
     const ask = (kind, args = {}) => new Promise((resolve, reject) => {
@@ -604,7 +603,8 @@ const factories = {
    * }
    * Events: OnMudEvent("layout", json) after every change.
    */
-  dock(host, options, emit) {
+  async dock(host, options, emit) {
+    const { MudDock, DockModel } = await load('dock');
     const blazor = globalThis.Blazor;
     const definitions = (options.definitions ?? []).map(({ component, ...def }) => ({
       ...def,
@@ -683,7 +683,11 @@ export function pageLoading(state = true) {
  */
 export function create(name, host, options = {}, dotNetRef = null) {
   const factory = factories[name];
-  if (factory) return track(factory(host, options || {}, emitter(dotNetRef), dotNetRef));
+  if (factory) {
+    // The large components come back as a promise (their code loads first); JS interop awaits it like a value.
+    const handle = factory(host, options || {}, emitter(dotNetRef), dotNetRef);
+    return typeof handle?.then === 'function' ? handle.then(track) : track(handle);
+  }
   if (hasComponent(name)) return track(buildComponent(name, host, options || {}, emitter(dotNetRef))); // from a plugin
   throw new Error(`MudTail: unknown component "${name}". Known: ${componentNames().join(', ')}`);
 }
@@ -694,6 +698,72 @@ export function componentNames() {
 }
 
 reserveComponentNames(Object.keys(factories));
+
+// ───────────── large components, loaded on first use ─────────────
+//
+// Each area is its own chunk (JS) and, where it has one, its own stylesheet pack (css/packs/<area>.css next to the
+// core stylesheet). A host that serves the packs says where with setPackBase(url); without it the area's styles are
+// expected to be on the page already (e.g. the full mudtail.css).
+
+const AREAS = {
+  dock: () => import('./areas/dock.js'),
+  tree: () => import('./areas/tree.js'),
+  'image-editor': () => import('./areas/image-editor.js'),
+  explorer: () => import('./areas/explorer.js'),
+};
+
+// The stylesheet packs each area needs (the explorer uses the tree view).
+const AREA_PACKS = { dock: ['dock'], tree: ['tree'], 'image-editor': ['image-editor'], explorer: ['tree', 'explorer'] };
+
+let packBase = null;
+const packLinks = new Map(); // pack -> Promise<void>
+
+/** Where the stylesheet packs are served ('…/css/packs/'); null: they are already on the page. */
+export function setPackBase(url) {
+  packBase = url ? String(url).replace(/\/?$/, '/') : null;
+}
+
+/** Adds a stylesheet pack to the page once (resolves when it has loaded, or failed: the component still works). */
+export function loadPack(name) {
+  if (!packBase) return Promise.resolve();
+  if (!packLinks.has(name)) {
+    packLinks.set(name, new Promise((resolve) => {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = `${packBase}${name}.min.css`;
+      link.dataset.mudPack = name;
+      link.addEventListener('load', () => resolve(), { once: true });
+      link.addEventListener('error', () => { console.warn(`MudTail: stylesheet pack "${name}" could not be loaded`); resolve(); }, { once: true });
+      document.head.appendChild(link);
+    }));
+  }
+  return packLinks.get(name);
+}
+
+/** Removes the stylesheet packs this module added (module teardown). */
+export function removePacks() {
+  document.querySelectorAll('link[data-mud-pack]').forEach((l) => l.remove());
+  packLinks.clear();
+}
+
+/**
+ * Loads a large component's code (and its styles): 'dock' | 'tree' | 'image-editor' | 'explorer'. Resolves to its
+ * exports (MudDock, MudTreeView, MudImageEditor, MudExplorer, …), for module scripts that use the classes directly.
+ */
+export async function load(area) {
+  const loader = AREAS[area];
+  if (!loader) throw new Error(`MudTail: unknown area "${area}". Known: ${Object.keys(AREAS).join(', ')}`);
+  const [mod] = await Promise.all([loader(), ...(AREA_PACKS[area] ?? []).map(loadPack)]);
+  return mod;
+}
+
+/** The areas load() accepts. */
+export function areaNames() {
+  return Object.keys(AREAS);
+}
+
+// Runtime-loaded plugins get the core API as ctx.mudtail, plus load() for the large components.
+setPluginHost({ ...coreApi, load, loadPack });
 
 // ───────────── plugins ─────────────
 //

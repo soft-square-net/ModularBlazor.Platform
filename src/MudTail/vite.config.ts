@@ -7,7 +7,8 @@ const lib = path.resolve(root, 'src');
 
 // The outputs of one config, picked with --mode:
 //   lib    -> dist/mudtail.js         ES module for bundler consumers (gsap and lucide stay external)
-//   blazor -> dist/mudtail.blazor.js  self-contained ES module for Blazor's JS.InvokeAsync("import", ...)
+//   blazor -> dist/mudtail.blazor.js  ES module for Blazor's JS.InvokeAsync("import", ...), with the large components
+//             (dock, tree, image editor, explorer) in dist/chunks/, loaded on first use
 //   animator -> dist/mudtail.animator.js  the Animator Studio plugin (GSAP plugins inside, GSAP core from MudTail)
 //   animator-player -> dist/mudtail.animator.player.js  the same plugin without the Studio, for sites that only play scenes
 //   (none) -> the demo/showcase app in demo/ (dev server, or `build:demo` into dist-demo/)
@@ -49,6 +50,8 @@ export default defineConfig(({ mode }) => {
         },
         rolldownOptions: {
           external: isBlazor ? [] : [/^gsap($|\/)/, /^lucide($|\/)/],
+          // The Blazor build loads the large components (src/areas) on first use: each is a chunk next to it.
+          output: { chunkFileNames: 'chunks/[name]-[hash].js' },
         },
       },
     };

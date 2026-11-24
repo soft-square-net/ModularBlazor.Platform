@@ -15,11 +15,13 @@
 /* MudTail tokens -> Tailwind utilities (bg-primary, text-ink-muted, border-line, rounded-mud, dark: on [data-theme]) */
 @import "mudtail/tailwind.css";
 
-/* MudTail tokens, components, editorial / sports / gallery / site styles, grid and RTL support.
+/* MudTail's core: tokens, base, the everyday components, grid and RTL support. The public-site styles (editorial,
+   sports, gallery, mud-site) are Layouts.Public's; the large components' styles are packs (css/packs/), loaded with
+   the component.
    Unlayered on purpose: the host's app.css is unlayered, and unlayered rules always beat layered ones, so a layered
    MudTail would lose to plain host rules such as `a { color }` and `h1 { margin }`.
    (Tailwind utilities stay layered, so a utility on a mud-* element loses to the component's own rule.) */
-@import "mudtail/mudtail.css";
+@import "mudtail/mudtail.core.css";
 
 /* The host app's own variables follow the MudTail tokens. */
 @import "./_host.css";

@@ -1,0 +1,92 @@
+// MudTail Material UI Framework: the core of the public JavaScript API.
+// Everything except the large components (dock, tree view, image editor, file explorer), which live in src/areas/
+// so the Blazor build can load them on first use. index.js exports both; anything else in src/ is internal.
+
+// Theme: runtime palette, dark mode, and export of the current tokens
+export {
+  DEFAULT_THEME,
+  initTheme,
+  getTheme,
+  updateTheme,
+  applyTheme,
+  generateScssExport,
+  generateCssExport,
+} from './core/theme.js';
+
+// Design tokens: palette presets, elevation shadows, contrast and colour helpers
+export {
+  PALETTE_PRESETS,
+  getElevationShadow,
+  generateExportableCss,
+  generateTailwindConfigSnippet,
+  hexToRgb,
+  isValidHex,
+  normalizeHex,
+  getContrastRatio,
+  createCustomPalette,
+} from './core/theme-tokens.ts';
+
+// Form validation rules
+export * from './core/form-validators.ts';
+
+// GSAP animation helpers
+export {
+  createRipple,
+  animateDrawer,
+  animateDialog,
+  animateTabSlider,
+  animateAccordion,
+  showToast,
+} from './core/animations.js';
+
+// Internationalisation: messages, locale (sets lang + dir), plural forms, formatting, data-i18n markup
+export {
+  t, addMessages, setLocale, getLocale, preferredLocale, availableLocales, isRtlLocale, hasMessage, onLocaleChange,
+  formatNumber, formatDate, formatRelativeTime, translateElement, setNumerals, getNumerals, intlLocale, localizeDigits,
+} from './core/i18n.js';
+import { addMessages as registerMessages } from './core/i18n.js';
+import arabic from './locales/ar.js';
+registerMessages('ar', arabic); // MudTail's own UI in Arabic
+
+// Writing direction (LTR / RTL)
+export { getDirection, isRtl, setDirection, toPhysicalSide } from './core/direction.js';
+
+// Declarative behaviours for rendered markup (data-mud="…", data-mud-reveal)
+export { autoInit, registerBehavior, unregisterBehavior, attachBehavior, behaviorNames } from './behaviors/autoInit.js';
+export { openLightbox } from './behaviors/lightbox.js';
+export { prefersReducedMotion } from './behaviors/motion.js';
+
+// Data table (client-side or server-side; server queries match the .NET PaginationFilter + Ardalis specs)
+export { MudDataTable } from './datatable/MudDataTable.js';
+export {
+  applyQuery, createQuery, toPaginationFilterParams, toPaginationFilter, fromPagedResponse, OPERATORS, OPERATORS_BY_TYPE,
+} from './datatable/query.js';
+
+// Icons
+export { getIconSvg, registerIcons, unregisterIcons, hasIcon } from './core/icons.js';
+
+// Components
+export { createMudButton } from './components/MudButton.js';
+export { MudDialog } from './components/MudDialog.js';
+export { MudDrawer } from './components/MudDrawer.js';
+export { MudTabs } from './components/MudTabs.js';
+export { MudAccordion } from './components/MudAccordion.js';
+export { attachTooltip } from './components/MudTooltip.js';
+export { createAutocomplete } from './components/MudAutocomplete.js';
+
+// Loading and progress: spinners, overlay, busy buttons, page loader; linear and circular progress
+export { createSpinner, showLoading, setButtonLoading, pageLoader } from './components/MudLoading.js';
+export { MudProgressLinear, MudProgressCircular, toneColor, colorForValue } from './components/MudProgress.js';
+
+// Forms: EditForm (fields, model, validation, async submit with server errors), in a dialog, and confirmations
+export { MudEditForm, validateField, openEditDialog, confirmDialog } from './components/MudEditForm.js';
+
+// Stat hero card: a "how we compare" block of horizontal bars, one highlighted (markup + data-mud="stat-bars")
+export { createStatCard } from './components/MudStatCard.js';
+
+// Plugins: your own components, behaviours, icons, texts, styles and tokens, for vanilla JS and Blazor alike
+export {
+  MUDTAIL_VERSION, PluginError, definePlugin, use, usePlugins, loadPlugin, removePlugin, getPlugin, hasPlugin, listPlugins,
+  registerComponent, createComponent, hasComponent, componentNames as pluginComponentNames, pluginTailwindCss,
+  setPluginStyleLayer, satisfies,
+} from './core/plugins.js';
