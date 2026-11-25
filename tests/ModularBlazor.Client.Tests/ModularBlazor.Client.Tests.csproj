@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!-- The Blazor client's live channel (its re-subscribe and resync logic, over a fake transport) and the Default
+       layout's connection badge (bUnit). The channel's source is linked from the BlzWebClient app, which is a
+       WebAssembly executable and cannot be referenced. -->
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="bunit" Version="2.15.2" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" PrivateAssets="all" />
+    <PackageReference Include="Shouldly" Version="4.3.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ModularBlazor.Abstractions\ModularBlazor.Abstractions.csproj" />
+    <ProjectReference Include="..\..\modules\client\Layouts.Default\Layouts.Default.csproj" />
+    <Compile Include="..\..\src\apps\blazor\ModularBlazor.BlzWebClient\Services\Live\LiveChannel.cs" Link="Linked\LiveChannel.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Shouldly" />
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

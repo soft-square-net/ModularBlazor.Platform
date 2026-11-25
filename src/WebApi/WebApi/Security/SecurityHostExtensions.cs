@@ -49,6 +49,7 @@ public static class SecurityHostExtensions
 
         services.AddSingleton<PlatformRolePermissions>();
         services.AddSingleton<GrantCache>();
+        services.AddScoped<ScopeUser>();
         services.AddScoped<IAccessScopes, AccessScopes>();
         services.AddScoped<IGrantStore, GrantStore>();
         services.AddSingleton<IPermissionCatalog, PermissionCatalog>();

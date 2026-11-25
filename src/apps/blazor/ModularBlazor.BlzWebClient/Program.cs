@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using soft.square.net.ModularBlazor.BlzWebClient;
 using soft.square.net.ModularBlazor.BlzWebClient.Auth;
 using soft.square.net.ModularBlazor.BlzWebClient.Services;
+using soft.square.net.ModularBlazor.BlzWebClient.Services.Live;
 using soft.square.net.ModularBlazor.Abstractions.MudTail;
 using Microsoft.Extensions.Localization;
 using soft.square.net.ModularBlazor.Abstractions.Localization;
@@ -34,6 +35,8 @@ var gateway = builder.Configuration["WebApi:BaseUrl"];
 if (string.IsNullOrWhiteSpace(gateway)) gateway = "http://localhost:5080/";
 builder.Services.AddWebApiClient(gateway);
 builder.Services.AddScoped<HostModulesApi>();
+// Live: ILiveChannel on the gateway's live hub (hubs/live), connected while the user is signed in.
+builder.Services.AddLiveChannel(gateway);
 
 // MudTail's runtime, shared through the UI.MudTail module (tables, toasts, behaviours on this app's pages).
 builder.Services.AddScoped<MudTailRuntime>();
@@ -102,6 +105,9 @@ await host.Services.GetRequiredService<BrandingService>().InitializeAsync();
 
 // The language, before the first render: the saved choice or the default (MudTail is active by now, so it follows).
 await host.Services.GetRequiredService<LocaleService>().InitializeAsync();
+
+// Live updates: connect now if the user is signed in, and follow sign-in and sign-out (never blocks the first render).
+await host.Services.StartLiveChannelAsync();
 
 // Development: listen for rebuilt local client modules (the WebApi answers 404 when it has none, and this stops).
 if (builder.HostEnvironment.IsDevelopment()) host.Services.GetRequiredService<DevModuleReloader>().Start();
