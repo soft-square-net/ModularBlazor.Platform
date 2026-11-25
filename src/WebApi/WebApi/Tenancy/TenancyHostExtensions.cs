@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using soft.square.net.WebApi.Contracts.Tenancy;
 using soft.square.net.WebApi.Data;
+using soft.square.net.WebApi.Messaging;
 using soft.square.net.WebApi.Modularity;
 using soft.square.net.WebApi.Tenancy.Seeds;
 
@@ -60,7 +61,8 @@ public static class TenancyHostExtensions
     /// <c>Platform:DeploymentId</c> from the loaded modules that serve them (<see cref="ITenantSeedSource"/>) and
     /// reconciles them into the store, one replica at a time (Redis <c>Tenancy:Seeds:LockConnectionName</c>, default
     /// <c>redis</c>, or the tenant store's database lock). Placement: <see cref="ITenantPlacementPolicy"/>, by default
-    /// <see cref="AcceptAsIsPlacementPolicy"/> (register another one before this call to replace it).
+    /// <see cref="AcceptAsIsPlacementPolicy"/> (register another one before this call to replace it). A cycle also runs
+    /// on every replica when <c>tenancy.seed-changed.v1</c> arrives (a host integration subscription).
     /// </summary>
     private static void AddTenantSeeds(IHostApplicationBuilder builder)
     {
@@ -80,6 +82,7 @@ public static class TenancyHostExtensions
 
         services.AddSingleton<TenantSeedReconciler>();
         services.AddHostedService(sp => sp.GetRequiredService<TenantSeedReconciler>());
+        services.AddHostIntegrationHandler<SeedChangedTrigger>(TenantSeedNames.SeedChangedEvent);
     }
 
     /// <summary>Resolves the tenant of every request (after routing, so it can read the endpoint's metadata).</summary>

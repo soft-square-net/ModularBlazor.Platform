@@ -3,9 +3,11 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using soft.square.net.WebApi.Contracts.Messaging;
 using soft.square.net.WebApi.Contracts.Security;
 using soft.square.net.WebApi.Contracts.Tenancy;
 using soft.square.net.WebApi.Data;
+using soft.square.net.WebApi.Messaging;
 using soft.square.net.WebApi.Security;
 using soft.square.net.WebApi.Tenancy;
 using soft.square.net.WebApi.Tenancy.Seeds;
@@ -62,6 +64,8 @@ public sealed class TenantSeedReconcilerTests : IAsyncLifetime
         .AddSingleton<ITenantPlacementPolicy>(new Forward(() => _policy))
         .AddSingleton<TenantSeedSources>()
         .AddSingleton<TenantSeedReconciler>()
+        .AddHostIntegrationHandler<SeedChangedTrigger>(TenantSeedNames.SeedChangedEvent)
+        .AddSingleton<HostIntegrationHandlers>()
         .AddOptions<TenantSeedOptions>().Services
         .BuildServiceProvider();
 
@@ -272,6 +276,29 @@ public sealed class TenantSeedReconcilerTests : IAsyncLifetime
             _source.Seeds = [Seed()];
 
             reconciler.Trigger();
+
+            await Eventually(() => _source.Reports.Any(r => r.Status == SeedStatus.Provisioned));
+            (await RecordAsync("acme"))!.SeedVersion.ShouldBe(1);
+        }
+        finally { await reconciler.StopAsync(CancellationToken.None); }
+    }
+
+    [Fact]
+    public async Task The_seed_changed_integration_event_runs_a_cycle_through_the_host_subscription()
+    {
+        var reconciler = _host.GetRequiredService<TenantSeedReconciler>();
+        _host.GetRequiredService<Microsoft.Extensions.Options.IOptions<TenantSeedOptions>>().Value.Interval = TimeSpan.FromHours(1);
+        LoadSourceModule();
+        await reconciler.StartAsync(CancellationToken.None);
+        try
+        {
+            await Eventually(() => _source.Lists == 1);
+            _source.Seeds = [Seed()];
+
+            // As the broker or the local bus hand it over: a seed belongs to no tenant yet, so the envelope has none.
+            var envelope = new IntegrationEnvelope(Guid.NewGuid(), TenantSeedNames.SeedChangedEvent, "", "seed:seed-acme",
+                DateTimeOffset.UtcNow, "corr", "organization", System.Text.Json.JsonSerializer.SerializeToElement(new { }));
+            await _host.GetRequiredService<HostIntegrationHandlers>().DispatchAsync(envelope, CancellationToken.None);
 
             await Eventually(() => _source.Reports.Any(r => r.Status == SeedStatus.Provisioned));
             (await RecordAsync("acme"))!.SeedVersion.ShouldBe(1);

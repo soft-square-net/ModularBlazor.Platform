@@ -6,10 +6,11 @@ namespace soft.square.net.WebApi.Messaging;
 /// <summary>
 /// Integration events without a broker (a single local instance): a publish is delivered in the background to every
 /// subscriber module loaded on this process, with the same retries, and kept in memory as a dead letter when every
-/// attempt failed. Nothing is durable: an event for a module that is not loaded at that moment is not delivered.
+/// attempt failed, and to the host's own handlers (<see cref="IHostIntegrationHandler"/>). Nothing is durable: an event
+/// for a module that is not loaded at that moment is not delivered.
 /// </summary>
 internal sealed class LocalIntegrationBus(
-    IntegrationConsumers consumers, IntegrationDelivery delivery, LocalDeadLetters deadLetters, IOptions<IntegrationOptions> options,
+    IntegrationConsumers consumers, HostIntegrationHandlers host, IntegrationDelivery delivery, LocalDeadLetters deadLetters, IOptions<IntegrationOptions> options,
     ILogger<LocalIntegrationBus> log) : IBrokerPublisher, IIntegrationTransport
 {
     public Task PublishAsync(IntegrationMessage message, CancellationToken ct)
@@ -17,6 +18,8 @@ internal sealed class LocalIntegrationBus(
         var envelope = IntegrationEnvelope.Parse(message.Body.Span);
         foreach (var module in consumers.Subscribers.Where(m => m.Matches(envelope.Type)))
             _ = Task.Run(() => DeliverAsync(module, envelope, attempt: 0));
+        if (host.Matches(envelope.Type))
+            _ = Task.Run(() => host.DispatchAsync(envelope, CancellationToken.None));
         return Task.CompletedTask;
     }
 
