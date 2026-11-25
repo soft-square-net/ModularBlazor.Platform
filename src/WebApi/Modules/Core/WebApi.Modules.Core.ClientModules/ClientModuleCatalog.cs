@@ -276,8 +276,7 @@ internal sealed class ClientModuleCatalog
             Directory.CreateDirectory(Path.GetDirectoryName(file)!);
             File.WriteAllBytes(file, content);
         }
-        DeleteFolder(target);
-        Directory.Move(staging, target);
+        FolderSwap.Replace(staging, target);
         return assets.Select(a => ClientModuleAssets.Describe(a.Path, a.Content)).ToList();
     }
 
@@ -669,8 +668,7 @@ internal sealed class ClientModuleCatalog
             foreach (var file in package.Files) File.WriteAllBytes(Path.Combine(staging, file.Name), file.Content);
             var described = WriteAssets(staging, extracted);
             (assets, assetsHash) = (described, described.Count > 0 ? ClientModuleAssets.SetHash(described) : null);
-            DeleteFolder(target);
-            Directory.Move(staging, target);
+            FolderSwap.Replace(staging, target);
         }
 
         var version = new ClientModuleVersion
@@ -768,7 +766,7 @@ internal sealed class ClientModuleCatalog
 
     private static void DeleteFolder(string folder)
     {
-        if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
+        FolderSwap.Delete(folder);
     }
 
     /// <summary>Reads the records fresh, applies the change and saves, all under the lock.</summary>
