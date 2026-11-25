@@ -14,6 +14,8 @@ public static class IntegrationHostExtensions
     /// consumed by one consumer per replica while the module is loaded, with retries and a dead-letter exchange;</item>
     /// <item>without it: an in-process bus delivers to the subscriber modules loaded on this process.</item>
     /// </list>
+    /// The host itself subscribes with <see cref="HostIntegrationServiceCollectionExtensions.AddHostIntegrationHandler{THandler}"/>
+    /// (every replica, no tenant scope; see <see cref="IHostIntegrationHandler"/>).
     /// Modules publish through their own outbox (<c>AddIntegrationEvents&lt;TDbContext&gt;()</c>). Register after the
     /// tenancy and the runtime modules (and after <c>AddRuntimeModuleBroadcast</c>, which adds the RabbitMQ client).
     /// </summary>
@@ -24,6 +26,7 @@ public static class IntegrationHostExtensions
         services.AddSingleton<ModuleSubscriptions>();
         services.AddSingleton<IntegrationDelivery>();
         services.AddSingleton<IntegrationConsumers>();
+        services.AddSingleton<HostIntegrationHandlers>();
         services.AddSingleton<IModuleLifecycleObserver>(sp => sp.GetRequiredService<IntegrationConsumers>());
 
         if (!string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString(brokerConnectionName)))
@@ -35,6 +38,7 @@ public static class IntegrationHostExtensions
             services.AddSingleton<IBrokerPublisher>(sp => sp.GetRequiredService<RabbitMqBrokerPublisher>());
             services.AddSingleton<IIntegrationTransport, RabbitMqIntegrationTransport>();
             services.AddSingleton<IDeadLetters, RabbitMqDeadLetters>();
+            services.AddHostedService<RabbitMqHostIntegrationSubscriber>();
         }
         else
         {

@@ -1,9 +1,11 @@
 using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Options;
+using soft.square.net.WebApi.Contracts.Messaging;
 using soft.square.net.WebApi.Contracts.Security;
 using soft.square.net.WebApi.Contracts.Tenancy;
 using soft.square.net.WebApi.Data;
+using soft.square.net.WebApi.Messaging;
 using soft.square.net.WebApi.Security;
 
 namespace soft.square.net.WebApi.Tenancy.Seeds;
@@ -89,12 +91,8 @@ internal sealed partial class TenantSeedReconciler(
 
     /// <summary>
     /// Runs a cycle now instead of at the next tick (also on the leader lock's terms: a replica that does not lead skips it).
-    /// TODO(host integration subscription): call this when <see cref="TenantSeedNames.SeedChangedEvent"/> arrives.
-    /// The integration events (P0-1) deliver only to subscriber modules, in a tenant scope of the module's container,
-    /// so the host cannot subscribe yet. It needs a host-level subscription: with the broker, a per-replica exclusive
-    /// queue bound to the <c>integration</c> exchange with the event type as routing key; without it, a hook in the
-    /// local bus. That subscription must accept an envelope without a tenant, because a seed belongs to no tenant yet.
-    /// Until then the timer (<see cref="TenantSeedOptions.Interval"/>) picks the change up.
+    /// Called on every replica when <see cref="TenantSeedNames.SeedChangedEvent"/> arrives (<see cref="SeedChangedTrigger"/>,
+    /// a host integration subscription); the timer (<see cref="TenantSeedOptions.Interval"/>) still picks up a missed event.
     /// </summary>
     public void Trigger()
     {
@@ -289,4 +287,17 @@ internal sealed partial class TenantSeedReconciler(
 
     [GeneratedRegex("^[a-z0-9][a-z0-9-]{0,39}$")]
     private static partial Regex Slug();
+}
+
+/// <summary>
+/// The host subscription to <see cref="TenantSeedNames.SeedChangedEvent"/>: runs a reconciliation cycle now. The event
+/// carries nothing the reconciler needs (it pulls the seeds), so its tenant and data are ignored.
+/// </summary>
+internal sealed class SeedChangedTrigger(TenantSeedReconciler reconciler) : IHostIntegrationHandler
+{
+    public Task HandleAsync(IntegrationEnvelope envelope, CancellationToken ct)
+    {
+        reconciler.Trigger();
+        return Task.CompletedTask;
+    }
 }
