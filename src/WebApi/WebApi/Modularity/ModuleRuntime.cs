@@ -172,6 +172,7 @@ internal sealed partial class ModuleRuntime
                         Settings = settings,
                         DesiredState = previous?.DesiredState ?? ModuleState.Installed, // an upgrade keeps the module's state
                         Permissions = manifest.Permissions.ToList(),
+                        LiveTopics = manifest.LiveTopics.ToList(),
                         Lookups = lookups,
                         InstalledAt = DateTimeOffset.UtcNow
                     };
@@ -419,6 +420,7 @@ internal sealed partial class ModuleRuntime
                     Core = core,
                     PackageHash = hash,
                     Permissions = manifest.Permissions.ToList(),
+                    LiveTopics = manifest.LiveTopics.ToList(),
                     Lookups = lookups
                 };
                 _store.Save(_records.Values);

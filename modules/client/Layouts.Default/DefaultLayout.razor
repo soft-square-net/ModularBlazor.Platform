@@ -83,6 +83,8 @@
 
     <div class="shell-header-actions"><HeaderActions /></div>
 
+    <LiveBadge />
+
     @if (Contributions.Of(ShellContributionKinds.ContextPanel).Count > 0)
     {
       <button type="button" class="shell-icon-button" aria-pressed="@(ContextOpen ? "true" : "false")"

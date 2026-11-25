@@ -42,6 +42,9 @@ public sealed class ModuleRecord
     /// <summary>Permissions the manifest declares (the permission catalog).</summary>
     public List<Contracts.Security.PermissionDefinition> Permissions { get; init; } = [];
 
+    /// <summary>The live topic kinds the manifest declares: the live hub authorizes subscriptions from them.</summary>
+    public List<Contracts.Live.LiveTopic> LiveTopics { get; init; } = [];
+
     /// <summary>From the manifest: false refuses unload/uninstall (409) and defers swaps to the next restart.</summary>
     public bool HotUnload { get; init; } = true;
 

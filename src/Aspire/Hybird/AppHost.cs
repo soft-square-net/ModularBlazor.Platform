@@ -145,6 +145,10 @@ var gateway = builder.AddYarp("gateway")
         yarp.AddRoute("/api/shifts/{**catch-all}", salesCluster);
         yarp.AddRoute("/api/content/{**catch-all}", salesCluster);
         yarp.AddRoute("/api/elsa/{**catch-all}", workflowCluster);
+        // The live hub (WebSockets; YARP upgrades and proxies them as they come). Any core replica serves any client:
+        // the client skips negotiation, so one connection is one request and needs no sticky session, and every
+        // replica receives every live message over the broker fanout "live", from whichever pool published it.
+        yarp.AddRoute("/hubs/live", coreCluster);
         yarp.AddRoute("/{**catch-all}", coreCluster);
 
         // Lab only: reach one pool directly (its admin API, /api/pool, /openapi, /scalar) through the gateway.

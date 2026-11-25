@@ -49,19 +49,38 @@ internal sealed class GrantCache(IServiceScopeFactory scopes, TimeProvider clock
         return grants;
     }
 
+    /// <summary>
+    /// Raised on this replica after the cached grants of users were dropped (the tenant, and the users or null for all):
+    /// whoever holds rights checked earlier (the live hub's subscriptions) checks them again.
+    /// </summary>
+    public event Action<string, IReadOnlyCollection<string>?>? Invalidated;
+
     /// <summary>Drops cached grants of the users (all users of the tenant when null). Local only; see <see cref="IGrantChangeBus"/>.</summary>
     public void Invalidate(string tenantId, IReadOnlyCollection<string>? userIds)
     {
         foreach (var key in _entries.Keys.Where(k => k.Tenant == tenantId && (userIds is null || userIds.Contains(k.User))))
             _entries.TryRemove(key, out _);
+        Invalidated?.Invoke(tenantId, userIds);
     }
 }
 
-/// <summary>The scoped <see cref="IAccessScopes"/>: the caller from the request, the tenant from <see cref="ITenantContext"/>.</summary>
-internal sealed class AccessScopes(IHttpContextAccessor http, ITenantContext tenant, GrantCache cache, PlatformRolePermissions roles,
-    TimeProvider clock) : IAccessScopes
+/// <summary>
+/// The caller of a scope that is not a request, or whose request is not the caller's current one (a live hub
+/// connection checked again after a grant change). Scoped; set it before resolving <see cref="IAccessScopes"/>.
+/// </summary>
+internal sealed class ScopeUser
 {
-    private ClaimsPrincipal? User => http.HttpContext?.User is { Identity.IsAuthenticated: true } user ? user : null;
+    public ClaimsPrincipal? Principal { get; set; }
+}
+
+/// <summary>
+/// The scoped <see cref="IAccessScopes"/>: the caller from <see cref="ScopeUser"/> when set, else from the request; the
+/// tenant from <see cref="ITenantContext"/>.
+/// </summary>
+internal sealed class AccessScopes(IHttpContextAccessor http, ITenantContext tenant, GrantCache cache, PlatformRolePermissions roles,
+    TimeProvider clock, ScopeUser scopeUser) : IAccessScopes
+{
+    private ClaimsPrincipal? User => (scopeUser.Principal ?? http.HttpContext?.User) is { Identity.IsAuthenticated: true } user ? user : null;
 
     public string? UserId => User?.FindFirst(PlatformClaims.Subject)?.Value;
 
