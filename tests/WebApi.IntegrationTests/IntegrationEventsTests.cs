@@ -47,6 +47,26 @@ public sealed class EventsInfrastructure : IAsyncLifetime
 
     public Replica StartReplica(bool broker = true) => new(this, broker);
 
+    /// <summary>
+    /// Waits until both test modules are migrated in the tenant database. Replicas initialize tenants in the background
+    /// after start, so a test that reads the modules' tables first (on a fresh database) must wait for it.
+    /// </summary>
+    public async Task WaitForModulesAsync()
+    {
+        const string sql = """
+            SELECT (to_regclass('evt_publisher.integration_outbox') IS NOT NULL
+                AND to_regclass('evt_publisher.orders') IS NOT NULL
+                AND to_regclass('evt_subscriber.integration_inbox') IS NOT NULL
+                AND to_regclass('evt_subscriber.received') IS NOT NULL)::int
+            """;
+        var deadline = DateTime.UtcNow.AddSeconds(60);
+        while (await ScalarAsync(sql) == 0)
+        {
+            if (DateTime.UtcNow > deadline) throw new TimeoutException("The test modules were not migrated for tenant acme in time.");
+            await Task.Delay(250);
+        }
+    }
+
     public async Task<long> ScalarAsync(string sql)
     {
         await using var connection = new NpgsqlConnection(TenantConnection);
@@ -136,11 +156,11 @@ public sealed class IntegrationEventsTests(EventsInfrastructure infrastructure) 
     private Replica _first = null!;
     private Replica _second = null!;
 
-    public ValueTask InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _first = infrastructure.StartReplica();
         _second = infrastructure.StartReplica();
-        return ValueTask.CompletedTask;
+        await infrastructure.WaitForModulesAsync();
     }
 
     public async ValueTask DisposeAsync()
@@ -258,6 +278,7 @@ public sealed class LocalIntegrationBusTests(EventsInfrastructure infrastructure
     public async Task Without_a_broker_events_reach_the_modules_of_the_same_instance()
     {
         await using var single = infrastructure.StartReplica(broker: false);
+        await infrastructure.WaitForModulesAsync();
         single.Services.GetRequiredService<IBrokerPublisher>().ShouldBeOfType<LocalIntegrationBus>();
 
         (await single.PlaceOrderAsync(4000)).ShouldBe(HttpStatusCode.OK);
