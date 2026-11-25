@@ -105,10 +105,56 @@ types; it reads the result into a record of its own.
 | `DialogResult.Canceled` | True after ✕, Escape, an overlay click, `Cancel()`, a navigation away from the page, or the cancellation token |
 | `DialogResult.As<T>()` / `Data` | The result in the caller's type, or as a `JsonElement` |
 | `DialogOptions` | `Title`, `MaxWidth` (a CSS length), `CloseOnOverlayClick`, `CloseOnEscape`; unset values come from `[ClientDialog]` |
-| `IsAvailable(id)` | Whether the owning module is in the user's catalog, to hide a button that cannot work. Nothing is downloaded |
+| `IsAvailable(id)` | Whether the owning module is in the user's catalog (and lists that dialog), to hide a button that cannot work. Nothing is downloaded |
+| `FindProvider(capability)` / `FindProviders(capability)` | The dialog(s) that provide a capability, read from the catalog ([below](#find-a-dialog-by-capability)) |
 | `ModuleDialogException` | Unknown id, a module the user may not use, a module that failed to load, or a module without that dialog |
 
 A dialog may open another one: they stack, the newest on top, and only the top one takes clicks.
+
+## Find a dialog by capability
+
+Some callers don't care which module provides a dialog, only what it does: "let the user pick an image" works with
+whichever module stores files. Such a dialog says what it provides with `Provides`, and the caller asks for the
+capability, not the id:
+
+```razor
+@attribute [ClientDialog("Module.Storage/pick-asset", Title = "Pick a file", Provides = new[] { PickerCapabilities.Asset })]
+```
+
+```csharp
+var id = Dialogs.FindProvider(PickerCapabilities.Asset);   // "Module.Storage/pick-asset", or null: hide the button
+var picked = await Dialogs.PickAsync(PickerCapabilities.Asset, new PickerParameters(Multiple: true, Accept: "image/*"));
+if (picked is not null) Use(picked.Items);                 // null: the user canceled
+```
+
+The catalog reads `Provides` from the module's metadata on upload (each value `"{kind}:{name}"` in lower case; others
+are dropped with a warning), so `FindProvider` and `FindProviders` (all of them, in module id order) work before the
+module is downloaded. A module listed by an older server has no capability list and is found by id only.
+
+### The picker contract
+
+Every `picker:*` dialog takes the same parameters and closes with the same result, so a caller can use any provider.
+`PickerParameters`, `PickerResult` and `PickedItem` (in ModularBlazor.Abstractions) are these shapes in C#:
+
+```json
+// parameters
+{ "multiple": false, "selected": ["12"], "accept": "image/*", "publicOnly": true }
+// result
+{ "ids": ["12"], "items": [{ "id": "12", "text": "logo.png", "thumbnailUrl": "…", "url": "…" }] }
+```
+
+| Field | Meaning |
+| --- | --- |
+| `multiple` | The user may pick several items |
+| `selected` | Ids already picked, shown as selected |
+| `accept` | Assets only: what may be picked, like an HTML `accept` attribute (`"image/*"`, `".pdf,.docx"`) |
+| `publicOnly` | Assets only: files with a public URL (for published content) |
+| `ids` | The picked ids, as text, in the order picked |
+| `items` | Enough to show each one without asking its module: `text`, and `thumbnailUrl` / `url` when it has them |
+
+A picker ignores fields that don't apply to it. The standard capabilities are `picker:asset` (Storage),
+`picker:keyword`, `picker:term` and `picker:concept` (`PickerCapabilities`). Any other capability follows the same
+`"{kind}:{name}"` form, and the module that defines it documents its shapes.
 
 ## The contract
 

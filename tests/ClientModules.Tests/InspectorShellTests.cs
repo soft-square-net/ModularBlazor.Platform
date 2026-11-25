@@ -18,7 +18,8 @@ public sealed class InspectorShellTests
     [Fact]
     public void Reads_header_actions_docks_and_context_panels()
     {
-        Fixture.Contributions.Select(c => c.Id).ShouldBe(["Module.Fixture:bell", "Module.Fixture:chat", "Module.Fixture:comments"], ignoreOrder: true);
+        Fixture.Contributions.Where(c => c.Kind != "dock-panel").Select(c => c.Id)
+            .ShouldBe(["Module.Fixture:bell", "Module.Fixture:chat", "Module.Fixture:comments"], ignoreOrder: true);
 
         var bell = Fixture.Contributions.Single(c => c.Id == "Module.Fixture:bell");
         bell.Kind.ShouldBe("header-action");
@@ -33,6 +34,56 @@ public sealed class InspectorShellTests
         chat.Badge.ShouldBe("api/fixture/unread");
         chat.BadgeRefresh.ShouldBe(15); // clamped
         chat.Permissions.ShouldBe(["fixture.chat"]);
+    }
+
+    [Fact]
+    public void Reads_studio_dock_panels()
+    {
+        Fixture.Contributions.Where(c => c.Kind == "dock-panel").Select(c => c.Id)
+            .ShouldBe(["Module.Fixture:status", "Module.Fixture:preview", "Module.Fixture:tools"], ignoreOrder: true);
+
+        var status = Fixture.Contributions.Single(c => c.Id == "Module.Fixture:status");
+        status.ForStudio.ShouldBe("fixture-studio");
+        status.Component.ShouldBe("soft.square.net.ClientModules.Fixture.Panels.Status");
+        status.ForContext.ShouldBe(["fixture.post"]);
+        status.Area.ShouldBe("bottom"); // lower-cased
+        status.Document.ShouldBeFalse();
+        status.Permissions.ShouldBe(["fixture.status"]);
+        status.Order.ShouldBe(5);
+        status.Badge.ShouldBeNull();
+        Fixture.Warnings.ShouldContain(w => w.StartsWith("DockPanel 'status'") && w.Contains("'Not A Key'"));
+
+        var preview = Fixture.Contributions.Single(c => c.Id == "Module.Fixture:preview");
+        preview.Component.ShouldBe("soft.square.net.ClientModules.Fixture.Panels.Outer+Nested");
+        preview.Document.ShouldBeTrue();
+        preview.Area.ShouldBeNull(); // a document opens in the centre
+        preview.ForContext.ShouldBeNull();
+        Fixture.Warnings.ShouldContain(w => w.StartsWith("DockPanel 'preview'") && w.Contains("centre"));
+
+        var tools = Fixture.Contributions.Single(c => c.Id == "Module.Fixture:tools");
+        tools.Area.ShouldBe("right");
+        Fixture.Warnings.ShouldContain(w => w.StartsWith("DockPanel 'tools'") && w.Contains("'top'"));
+    }
+
+    [Fact]
+    public void A_dock_panel_without_a_studio_is_left_out()
+    {
+        Fixture.Contributions.ShouldNotContain(c => c.Id == "Module.Fixture:nostudio");
+        Fixture.Warnings.ShouldContain(w => w.StartsWith("DockPanel 'nostudio'") && w.Contains("ForStudio"));
+    }
+
+    [Fact]
+    public void Reads_dialogs_and_their_capabilities()
+    {
+        Fixture.Dialogs.Select(d => d.Id).ShouldBe(["Module.Fixture/pick-file", "Module.Fixture/confirm"], ignoreOrder: true);
+
+        var pick = Fixture.Dialogs.Single(d => d.Id == "Module.Fixture/pick-file");
+        pick.Title.ShouldBe("Pick a file");
+        pick.Provides.ShouldBe(["picker:asset"]);
+        Fixture.Warnings.ShouldContain(w => w.Contains("'Not A Capability'"));
+
+        Fixture.Dialogs.Single(d => d.Id == "Module.Fixture/confirm").Provides.ShouldBeNull();
+        Fixture.Warnings.ShouldContain(w => w.StartsWith("ClientDialog 'Module.Other/steal'"));
     }
 
     [Fact]

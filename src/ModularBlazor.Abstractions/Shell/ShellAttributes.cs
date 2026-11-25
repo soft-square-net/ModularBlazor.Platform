@@ -69,6 +69,36 @@ public sealed class ContextPanelAttribute(string id, string title, Type componen
 }
 
 /// <summary>
+/// A pane another module's studio shows (a MudDock workspace such as the Content Designer), so a module can add to a
+/// studio without referencing it:
+/// <c>[assembly: DockPanel("workflow-status", "Workflow", typeof(WorkflowStatus), ForStudio = "contentdesigner", ForContext = new[] { "content.post" }, Permissions = new[] { "elsa.read" })]</c>.
+/// <para>
+/// The studio lists the panels for its key (<see cref="IStudioPanels"/>) before their modules are downloaded, and the
+/// host mounts each one through its generic panel root component (<see cref="StudioPanels.RootComponent"/>), which loads
+/// the module when the panel is first shown. The component may take <c>[Parameter] ContributionContext Context</c>
+/// (the studio's context key and value, e.g. the open post) and MudDock's <c>PanelId</c>, <c>PanelKey</c>, <c>Title</c>.
+/// </para>
+/// </summary>
+[AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
+public sealed class DockPanelAttribute(string id, string title, Type component) : ShellContributionAttribute(id, title, component)
+{
+  /// <summary>The studio's key (lower case, e.g. "contentdesigner"); the studio module declares it as a constant.</summary>
+  public string ForStudio { get; set; } = "";
+
+  /// <summary>
+  /// Context keys ("{module}.{entity}", e.g. "content.post") it is for: the studio shows it only while its current item
+  /// has one of them. None: always, in that studio.
+  /// </summary>
+  public string[] ForContext { get; set; } = [];
+
+  /// <summary>Where a tool pane goes first: <c>DockPanelAreas.Left</c>, <c>Right</c> (the default) or <c>Bottom</c>.</summary>
+  public string? Area { get; set; }
+
+  /// <summary>True: it opens as a document tab in the centre, one per item (an editor, a preview), not as a tool pane.</summary>
+  public bool Document { get; set; }
+}
+
+/// <summary>
 /// What a layout offers, read from its metadata when the module is uploaded, so the catalog can warn about a module
 /// that fills a place no installed layout has. Put it next to [LayoutKey]:
 /// <c>@attribute [LayoutInfo(LayoutRoles.App, Zones = new[] { "main", "secondary", "user" }, Contributions = new[] { "header-action", "dock" })]</c>.

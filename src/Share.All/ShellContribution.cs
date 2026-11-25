@@ -15,7 +15,13 @@ public static class ShellContributionKinds
     /// <summary>A panel beside the page, shown for some pages or for the item a page has selected (comments, workflow).</summary>
     public const string ContextPanel = "context-panel";
 
-    public static readonly IReadOnlyList<string> All = [HeaderAction, Dock, ContextPanel];
+    /// <summary>
+    /// A pane of a module's studio (a MudDock workspace such as the Content Designer), contributed by another module:
+    /// a workflow status panel, an Elsa Studio iframe. Layouts do not show it; the studio lists it (IStudioPanels).
+    /// </summary>
+    public const string DockPanel = "dock-panel";
+
+    public static readonly IReadOnlyList<string> All = [HeaderAction, Dock, ContextPanel, DockPanel];
 }
 
 /// <summary>
@@ -48,6 +54,15 @@ public sealed record ShellContribution(
     IReadOnlyList<string>? ForRoutes = null,
     IReadOnlyList<string>? ForContext = null)
 {
+    /// <summary>Dock panels: the key of the studio it is for, e.g. "contentdesigner".</summary>
+    public string? ForStudio { get; init; }
+
+    /// <summary>Dock panels: where a tool pane goes first (<see cref="DockPanelAreas"/>); null for a document.</summary>
+    public string? Area { get; init; }
+
+    /// <summary>Dock panels: true when it opens as a document tab in the centre (one per item, e.g. per post).</summary>
+    public bool Document { get; init; }
+
     /// <summary>The module that declares it: the part of <see cref="Id"/> before ':'.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public string ModuleId => Id.Split(':', 2)[0];
@@ -70,9 +85,22 @@ public sealed record ShellContribution(
     /// </summary>
     public bool AppliesTo(string path, IEnumerable<string> contextKeys)
     {
+        if (Kind == ShellContributionKinds.DockPanel) return true; // the studio picks its panels (IsForStudio)
         if (Kind != ShellContributionKinds.ContextPanel) return true;
         if (ForContext is { Count: > 0 } keys && contextKeys.Any(k => keys.Contains(k, StringComparer.OrdinalIgnoreCase))) return true;
         return ForRoutes is { Count: > 0 } routes && routes.Any(r => RouteMatches(r, path));
+    }
+
+    /// <summary>
+    /// Whether a dock panel belongs in the studio <paramref name="studio"/> whose current item has the context keys
+    /// <paramref name="contextKeys"/>: same studio key, and no <see cref="ForContext"/> or one of its keys is set.
+    /// Null keys: every panel of the studio, whatever it shows.
+    /// </summary>
+    public bool IsForStudio(string studio, IEnumerable<string>? contextKeys = null)
+    {
+        if (Kind != ShellContributionKinds.DockPanel || !string.Equals(ForStudio, studio, StringComparison.OrdinalIgnoreCase)) return false;
+        if (contextKeys is null || ForContext is not { Count: > 0 } keys) return true;
+        return contextKeys.Any(k => keys.Contains(k, StringComparer.OrdinalIgnoreCase));
     }
 
     /// <summary>"content/posts/*" matches "content/posts/12"; "content/**" matches "content" and everything under it.</summary>
@@ -88,4 +116,30 @@ public sealed record ShellContribution(
         }
         return p.Length == s.Length;
     }
+}
+
+/// <summary>Where a studio first places a contributed tool pane (the user may move it; the studio keeps the arrangement).</summary>
+public static class DockPanelAreas
+{
+    public const string Left = "left";
+    public const string Right = "right";
+    public const string Bottom = "bottom";
+
+    public static readonly IReadOnlyList<string> All = [Left, Right, Bottom];
+}
+
+/// <summary>
+/// A dialog a module provides ([ClientDialog] on a component), read from its metadata when it is uploaded, so another
+/// module can find it by what it provides (<see cref="Provides"/>, e.g. "picker:asset") before it is downloaded.
+/// </summary>
+/// <param name="Id">"{module id}/{name}", e.g. "Module.Storage/pick-asset".</param>
+/// <param name="Title">Its default title (English).</param>
+/// <param name="Provides">Capabilities, "{kind}:{name}" in lower case: "picker:asset", "picker:term".</param>
+public sealed record ModuleDialogInfo(string Id, string? Title = null, IReadOnlyList<string>? Provides = null)
+{
+    /// <summary>The module that provides it: the part of <see cref="Id"/> before '/'.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string ModuleId => Id.Split('/', 2)[0];
+
+    public bool HasCapability(string capability) => Provides is { Count: > 0 } p && p.Contains(capability, StringComparer.OrdinalIgnoreCase);
 }

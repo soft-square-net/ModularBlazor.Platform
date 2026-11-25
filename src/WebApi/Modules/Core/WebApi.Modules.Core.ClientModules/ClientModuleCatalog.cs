@@ -161,7 +161,10 @@ internal sealed class ClientModuleCatalog
             s.Dependencies, s.Styles, s.Scripts, s.Nav, v.Menu, v.Contributions,
             served ? AssetBase(r.Id, v) : null,
             served ? AssetHashes(v.Assets!, s) : null,
-            v.Layouts.Count > 0 ? v.Layouts : null);
+            v.Layouts.Count > 0 ? v.Layouts : null)
+        {
+            Dialogs = v.Dialogs
+        };
     }
 
     /// <summary>
@@ -332,6 +335,7 @@ internal sealed class ClientModuleCatalog
         var package = new InspectedPackage(u.Kind, u.Id, u.Version, u.Detected, files, u.Routes, u.Layouts, u.Menu, u.Warnings)
         {
             Contributions = u.Contributions,
+            Dialogs = u.Dialogs,
             LayoutDetails = u.LayoutDetails,
             PlatformVersion = u.PlatformVersion
         };
@@ -366,6 +370,7 @@ internal sealed class ClientModuleCatalog
             Layouts = package.Layouts,
             Menu = package.Menu,
             Contributions = package.Contributions,
+            Dialogs = package.Dialogs,
             LayoutDetails = package.LayoutDetails,
             PlatformVersion = package.PlatformVersion,
             Warnings = package.Warnings,
@@ -682,6 +687,7 @@ internal sealed class ClientModuleCatalog
             Layouts = package.Layouts,
             Menu = package.Menu,
             Contributions = package.Contributions,
+            Dialogs = package.Dialogs,
             LayoutDetails = package.LayoutDetails,
             PlatformVersion = package.PlatformVersion,
             Assets = assets,

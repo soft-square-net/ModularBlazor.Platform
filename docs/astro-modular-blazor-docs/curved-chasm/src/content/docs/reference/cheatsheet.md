@@ -21,6 +21,8 @@ sidebar:
 | — | `[HeaderAction]`, `[Dock]`, `[ContextPanel]`, `IPageContext`, `IBranding`, `IUserPermissions` ([layouts](/guides/layouts/#what-modules-add-to-the-shell)) | — |
 | `dir="rtl"` on `<html>` | same | follows `dir`, logical properties |
 | — | `[ClientDialog("Module.X/name")]`, `IModuleDialogs.ShowAsync` ([dialogs](/guides/module-dialogs/)) | `mud-dialog-*` frame |
+| — | `[ClientDialog(Provides = …)]`, `IModuleDialogs.FindProvider`, `PickAsync` ([pickers](/guides/module-dialogs/#find-a-dialog-by-capability)) | — |
+| Dock panels | `[DockPanel(ForStudio = …)]`, `IStudioPanels`, `mb-module-panel` ([studio panels](/guides/studio-panels/)) | `create('dock', …)` |
 
 ## Island loading
 

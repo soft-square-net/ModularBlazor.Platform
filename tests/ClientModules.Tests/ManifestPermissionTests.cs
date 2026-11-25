@@ -74,4 +74,22 @@ public sealed class ManifestPermissionTests
         ClientModuleCatalog.FilterByPermissions(modules, new HashSet<string> { "chat.moderate" })[0].Contributions.Count
             .ShouldBe(2);
     }
+
+    [Fact]
+    public void Studio_dock_panels_need_one_of_their_permissions_and_keep_their_studio()
+    {
+        var status = new ClientModuleContribution("elsa:status", "dock-panel", "Workflow", "Elsa.Status", Permissions: ["elsa.read"])
+            { ForStudio = "contentdesigner", Area = "right" };
+        var modules = new List<ClientModuleDescriptor>
+        {
+            Module("elsa", [], [status, Dock("elsa.dock")]) with { Dialogs = [new("elsa/pick", null, ["picker:workflow"])] }
+        };
+
+        var anonymous = ClientModuleCatalog.FilterByPermissions(modules, new HashSet<string>())[0];
+        anonymous.Contributions.Select(c => c.Id).ShouldBe(["elsa.dock"]);
+        anonymous.Dialogs.ShouldHaveSingleItem().Id.ShouldBe("elsa/pick"); // `with` keeps the dialog list
+
+        var granted = ClientModuleCatalog.FilterByPermissions(modules, new HashSet<string> { "elsa.read" })[0];
+        granted.Contributions.Single(c => c.Id == "elsa:status").ForStudio.ShouldBe("contentdesigner");
+    }
 }

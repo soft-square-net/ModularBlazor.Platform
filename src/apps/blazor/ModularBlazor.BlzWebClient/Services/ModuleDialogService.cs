@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Routing;
 using soft.square.net.ModularBlazor.Abstractions;
+using soft.square.net.Share.All;
 
 namespace soft.square.net.ModularBlazor.BlzWebClient.Services;
 
@@ -33,7 +34,22 @@ public sealed class ModuleDialogService : IModuleDialogs, IDisposable
     public event Action? Changed;
 
     public bool IsAvailable(string dialogId)
-        => DialogIds.ModuleOf(dialogId) is { } moduleId && _modules.GetDescriptor(moduleId) is not null;
+        => DialogIds.ModuleOf(dialogId) is { } moduleId && _modules.GetDescriptor(moduleId) is { } module
+           // A module listed by an older server has no dialog list: any id under it may exist.
+           && (module.Dialogs.Length == 0 || module.Dialogs.Any(d => string.Equals(d.Id, dialogId, StringComparison.OrdinalIgnoreCase)));
+
+    public IReadOnlyList<ModuleDialogInfo> FindProviders(string capability)
+    {
+        if (string.IsNullOrWhiteSpace(capability)) return [];
+        return _modules.Catalog
+            .SelectMany(m => m.Dialogs)
+            .Where(d => d.HasCapability(capability))
+            .OrderBy(d => d.ModuleId, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(d => d.Id, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    public string? FindProvider(string capability) => FindProviders(capability).FirstOrDefault()?.Id;
 
     public async Task<DialogResult> ShowAsync(string dialogId, object? parameters = null, DialogOptions? options = null,
         CancellationToken cancellationToken = default)

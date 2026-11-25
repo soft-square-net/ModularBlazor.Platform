@@ -34,6 +34,53 @@ public sealed class ShellContributionTests
     }
 
     [Fact]
+    public void A_dock_panel_is_for_its_studio_and_context()
+    {
+        var panel = new ShellContribution("Module.Elsa:workflow-status", ShellContributionKinds.DockPanel, "Workflow", "Elsa.Status",
+            ForContext: ["content.post"]) { ForStudio = "contentdesigner", Area = DockPanelAreas.Right };
+
+        panel.IsForStudio("contentdesigner").ShouldBeTrue();
+        panel.IsForStudio("ContentDesigner", ["content.post"]).ShouldBeTrue();
+        panel.IsForStudio("contentdesigner", ["content.category"]).ShouldBeFalse();
+        panel.IsForStudio("other").ShouldBeFalse();
+        panel.AppliesTo("anything", []).ShouldBeTrue(); // layouts never list dock panels; the studio picks them
+
+        (panel with { ForContext = null }).IsForStudio("contentdesigner", ["content.category"]).ShouldBeTrue();
+
+        new ShellContribution("M:ctx", ShellContributionKinds.ContextPanel, "C", "M.C", ForContext: ["content.post"])
+            .IsForStudio("contentdesigner").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Dock_panel_fields_and_dialogs_travel_in_the_manifest_json()
+    {
+        var web = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);
+        var json = System.Text.Json.JsonSerializer.Serialize(
+            new soft.square.net.WebApi.Modules.Core.ClientModules.ClientModuleContribution("M:p", "dock-panel", "P", "M.P")
+                { ForStudio = "contentdesigner", Area = "bottom", Document = true }, web);
+        var read = System.Text.Json.JsonSerializer.Deserialize<ShellContribution>(json, web)!;
+        read.ForStudio.ShouldBe("contentdesigner");
+        read.Area.ShouldBe("bottom");
+        read.Document.ShouldBeTrue();
+
+        var dialog = System.Text.Json.JsonSerializer.Deserialize<ModuleDialogInfo>(System.Text.Json.JsonSerializer.Serialize(
+            new soft.square.net.WebApi.Modules.Core.ClientModules.ClientModuleDialog("M/pick", "Pick", ["picker:asset"]), web), web)!;
+        dialog.Id.ShouldBe("M/pick");
+        dialog.Provides.ShouldBe(["picker:asset"]);
+    }
+
+    [Fact]
+    public void Dialogs_are_found_by_capability()
+    {
+        var dialog = new ModuleDialogInfo("Module.Storage/pick-asset", "Pick", ["picker:asset"]);
+        dialog.ModuleId.ShouldBe("Module.Storage");
+        dialog.HasCapability("picker:asset").ShouldBeTrue();
+        dialog.HasCapability("Picker:Asset").ShouldBeTrue();
+        dialog.HasCapability("picker:term").ShouldBeFalse();
+        new ModuleDialogInfo("M/x").HasCapability("picker:asset").ShouldBeFalse();
+    }
+
+    [Fact]
     public void Titles_follow_the_culture()
     {
         var dock = new ShellContribution("M:chat", ShellContributionKinds.Dock, "Chat", "M.Chat",

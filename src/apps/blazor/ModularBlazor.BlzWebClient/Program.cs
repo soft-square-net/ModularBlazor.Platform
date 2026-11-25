@@ -11,6 +11,11 @@ using soft.square.net.Share.All.Localization;
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
+// The one JS root component studios mount contributed dock panels with (MudDock: component "mb-module-panel", the
+// panel's id as its key). A lazily loaded module cannot register root components itself, so this renders the module's
+// component by its contribution id, loading the module on demand (Components/ModulePanelHost).
+builder.RootComponents.RegisterForJavaScript<soft.square.net.ModularBlazor.BlzWebClient.Components.ModulePanelHost>(
+    soft.square.net.ModularBlazor.Abstractions.Shell.StudioPanels.RootComponent);
 
 // Two kinds of HttpClient, on purpose:
 //   * "LocalHttpClient" (this site's own origin): app files; modules come from the WebApi, not from this site.
@@ -64,11 +69,13 @@ builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Lookups.IL
 builder.Services.AddScoped<ModuleDialogService>();
 builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.IModuleDialogs>(sp => sp.GetRequiredService<ModuleDialogService>());
 // The layout contract (Abstractions/Shell): page context, module contributions (header actions, docks, context
-// panels), the tenant's brand (branding core module) and the user's permissions (identity core module's api/identity/me).
+// panels, studio dock panels), the tenant's brand (branding core module) and the user's permissions (identity core module's api/identity/me).
 builder.Services.AddScoped<PageContextService>();
 builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Shell.IPageContext>(sp => sp.GetRequiredService<PageContextService>());
 builder.Services.AddScoped<ShellContributionService>();
 builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Shell.IShellContributions>(sp => sp.GetRequiredService<ShellContributionService>());
+builder.Services.AddScoped<StudioPanelService>();
+builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Shell.IStudioPanels>(sp => sp.GetRequiredService<StudioPanelService>());
 builder.Services.AddScoped<BrandingService>();
 builder.Services.AddScoped<soft.square.net.ModularBlazor.Abstractions.Shell.IBranding>(sp => sp.GetRequiredService<BrandingService>());
 builder.Services.AddScoped<UserPermissionsService>();

@@ -16,6 +16,14 @@ using soft.square.net.ModularBlazor.Abstractions.Shell;
 [assembly: ContextPanel("nowhere", "Nowhere", typeof(soft.square.net.ClientModules.Fixture.Bell))]
 [assembly: Dock("missing", "Missing", typeof(string))]
 
+// Studio dock panels (DockPanelAttribute) for a studio keyed "fixture-studio".
+[assembly: DockPanel("status", "Status", typeof(soft.square.net.ClientModules.Fixture.Panels.Status), ForStudio = "fixture-studio",
+    ForContext = new[] { "fixture.post", "Not A Key" }, Area = "Bottom", Permissions = new[] { "fixture.status" }, Order = 5)]
+[assembly: DockPanel("preview", "Preview", typeof(soft.square.net.ClientModules.Fixture.Panels.Outer.Nested), ForStudio = "fixture-studio",
+    Document = true, Area = "left")]
+[assembly: DockPanel("tools", "Tools", typeof(soft.square.net.ClientModules.Fixture.Bell), ForStudio = "fixture-studio", Area = "top")]
+[assembly: DockPanel("nostudio", "No studio", typeof(soft.square.net.ClientModules.Fixture.Bell))]
+
 namespace soft.square.net.ClientModules.Fixture
 {
   public sealed class Bell : ComponentBase;
@@ -38,4 +46,21 @@ namespace soft.square.net.ClientModules.Fixture.Panels
   }
 
   public sealed class Comments : ComponentBase;
+
+  public sealed class Status : ComponentBase;
+}
+
+namespace soft.square.net.ClientModules.Fixture.Dialogs
+{
+  // A picker found by capability; the bad capability is dropped with a warning.
+  [ClientDialog("Module.Fixture/pick-file", Title = "Pick a file", Provides = new[] { "picker:asset", "Not A Capability" })]
+  public sealed class PickFile : ComponentBase;
+
+  // No capabilities: listed, found by id only.
+  [ClientDialog("Module.Fixture/confirm")]
+  public sealed class Confirm : ComponentBase;
+
+  // Another module's id: left out.
+  [ClientDialog("Module.Other/steal", Provides = new[] { "picker:asset" })]
+  public sealed class Steal : ComponentBase;
 }
