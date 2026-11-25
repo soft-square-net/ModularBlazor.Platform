@@ -1,4 +1,5 @@
 using System.Text.Json;
+using soft.square.net.Share.All;
 
 namespace soft.square.net.ModularBlazor.Abstractions;
 
@@ -30,6 +31,19 @@ public interface IModuleDialogs
 
     /// <summary>Whether a module in the signed-in user's catalog may provide this dialog (its module is not loaded for this).</summary>
     bool IsAvailable(string dialogId);
+
+    /// <summary>
+    /// The dialogs in the signed-in user's catalog that provide a capability (<see cref="ClientDialogAttribute.Provides"/>,
+    /// e.g. <see cref="PickerCapabilities.Asset"/>), in module id order. Read from the catalog: no module is loaded.
+    /// </summary>
+    IReadOnlyList<ModuleDialogInfo> FindProviders(string capability) => [];
+
+    /// <summary>
+    /// The id of a dialog that provides <paramref name="capability"/> (the first of <see cref="FindProviders"/>), or null
+    /// when no module in the user's catalog provides it. Pass the id to <see cref="ShowAsync"/>:
+    /// <c>if (Dialogs.FindProvider(PickerCapabilities.Asset) is { } id) await Dialogs.ShowAsync(id, ...)</c>.
+    /// </summary>
+    string? FindProvider(string capability) => FindProviders(capability).FirstOrDefault()?.Id;
 }
 
 /// <summary>How the host shows a dialog. Unset values come from the dialog's <see cref="ClientDialogAttribute"/>.</summary>
@@ -100,6 +114,14 @@ public sealed class ClientDialogAttribute(string id) : Attribute
 
     /// <summary>Default maximum width, a CSS length.</summary>
     public string? MaxWidth { get; set; }
+
+    /// <summary>
+    /// What the dialog provides, so callers find it by capability rather than by id
+    /// (<see cref="IModuleDialogs.FindProvider"/>): "{kind}:{name}" in lower case, e.g. <c>Provides = new[] { "picker:asset" }</c>.
+    /// A dialog that provides a <see cref="PickerCapabilities">picker</see> takes <see cref="PickerParameters"/> and
+    /// closes with a <see cref="PickerResult"/>. Read from the module's metadata when it is uploaded.
+    /// </summary>
+    public string[] Provides { get; set; } = [];
 }
 
 /// <summary>

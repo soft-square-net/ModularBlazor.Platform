@@ -25,6 +25,38 @@ public interface IShellContributions
 }
 
 /// <summary>
+/// The dock panels other modules contribute to a studio (<see cref="DockPanelAttribute"/>), for the studio that hosts
+/// them. The list comes from the user's catalog (the server has left out the panels the user may not see), so it is
+/// known before the contributing modules are downloaded. The studio mounts a panel with MudDock, using the host's
+/// <see cref="StudioPanels.RootComponent"/> as the component and the panel's id as the dock definition key.
+/// </summary>
+public interface IStudioPanels
+{
+  /// <summary>
+  /// The panels for the studio <paramref name="studio"/> in order (<c>Order</c>, module id, id). With
+  /// <paramref name="contextKeys"/>: only those whose <c>ForContext</c> is empty or holds one of the keys.
+  /// </summary>
+  IReadOnlyList<ShellContribution> For(string studio, IEnumerable<string>? contextKeys = null);
+
+  /// <summary>One panel by its id ("{moduleId}:{localId}"), or null when the user's catalog has no such dock panel.</summary>
+  ShellContribution? Find(string id);
+
+  /// <summary>Raised when the list may have changed: sign-in, sign-out, a module loaded, unloaded or replaced.</summary>
+  event Action? Changed;
+}
+
+/// <summary>Names the host gives studios for mounting contributed panels.</summary>
+public static class StudioPanels
+{
+  /// <summary>
+  /// The host's generic JS root component (<c>Blazor.rootComponents.add(element, "mb-module-panel", { panelKey })</c>).
+  /// It renders the dock panel whose id is its <c>PanelKey</c> (or <c>Contribution</c>) parameter, loading its module
+  /// first, inside an error boundary and the cascades a page gets (sign-in state, culture, direction).
+  /// </summary>
+  public const string RootComponent = "mb-module-panel";
+}
+
+/// <summary>
 /// What the current page is showing, for the context panels other modules add (<see cref="ContextPanelAttribute.ForContext"/>).
 /// A page sets it when it opens, and a list page when a row is selected:
 /// <c>PageContext.Set(ContentContext.Post, post.Id.ToString())</c>. Everything is cleared on navigation.

@@ -81,6 +81,12 @@ public sealed class ModuleDescriptor
     public ShellContribution[] Contributions { get; set; } = [];
 
     /// <summary>
+    /// The dialogs the module provides ([ClientDialog]), with their capabilities, so IModuleDialogs can find one by
+    /// capability before the module is downloaded. Empty from a server older than this list.
+    /// </summary>
+    public ModuleDialogInfo[] Dialogs { get; set; } = [];
+
+    /// <summary>
     /// Where the server serves the module's static files (relative to the WebApi base address; a path under the
     /// module's wwwroot is appended). Null: the files are taken from the module's own package and handed to the
     /// browser from memory (an older server, or the cached manifest while the WebApi cannot be reached).

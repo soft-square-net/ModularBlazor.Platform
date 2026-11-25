@@ -32,6 +32,10 @@ code { background: #eef0f4; padding: 1px 5px; border-radius: 4px; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ---------- studio dock panels (Components/ModulePanelHost, "mb-module-panel") ---------- */
+.mb-module-panel { height: 100%; min-height: 0; overflow: auto; }
+.mb-module-panel__unavailable, .mb-module-panel__error { padding: 1rem; color: var(--muted); }
+
 /* ---------- default layout: sidebar ---------- */
 .shell-default { display: flex; min-height: 100vh; }
 .shell-default .shell-sidebar {

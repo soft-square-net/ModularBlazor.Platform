@@ -103,10 +103,54 @@ sequenceDiagram
 | `DialogResult.Canceled` | صحيح بعد ✕، أو Escape، أو نقرة على الغطاء، أو `Cancel()`، أو الانتقال من الصفحة، أو رمز الإلغاء |
 | `DialogResult.As<T>()` / `Data` | النتيجة بنوع الطالب، أو بصيغة `JsonElement` |
 | `DialogOptions` | `Title`، و`MaxWidth` (طول CSS)، و`CloseOnOverlayClick`، و`CloseOnEscape`؛ وما لم يضبط يؤخذ من `[ClientDialog]` |
-| `IsAvailable(id)` | هل الوحدة المالكة في كتالوج المستخدم، لإخفاء زر لن يعمل. لا ينزل شيء |
+| `IsAvailable(id)` | هل الوحدة المالكة في كتالوج المستخدم (وتسرد تلك النافذة)، لإخفاء زر لن يعمل. لا ينزل شيء |
+| `FindProvider(capability)` / `FindProviders(capability)` | النافذة (أو النوافذ) التي توفر قدرة، من الكتالوج ([أدناه](#البحث-عن-نافذة-حوار-بقدرتها)) |
 | `ModuleDialogException` | معرف مجهول، أو وحدة لا يحق للمستخدم استخدامها، أو وحدة فشل تحميلها، أو وحدة بلا تلك النافذة |
 
 قد تفتح نافذة نافذة أخرى: تتراكب، والأحدث في الأعلى، والعليا وحدها تتلقى النقرات.
+
+## البحث عن نافذة حوار بقدرتها
+
+بعض الطالبين لا يهمهم أي وحدة توفر النافذة، بل ما تفعله: "دع المستخدم يختار صورة" تصلح مع أي وحدة تخزن الملفات. تعلن
+نافذة كهذه ما توفره بـ `Provides`، ويطلب الطالب القدرة لا المعرف:
+
+```razor
+@attribute [ClientDialog("Module.Storage/pick-asset", Title = "Pick a file", Provides = new[] { PickerCapabilities.Asset })]
+```
+
+```csharp
+var id = Dialogs.FindProvider(PickerCapabilities.Asset);   // "Module.Storage/pick-asset"، أو null: أخف الزر
+var picked = await Dialogs.PickAsync(PickerCapabilities.Asset, new PickerParameters(Multiple: true, Accept: "image/*"));
+if (picked is not null) Use(picked.Items);                 // null: ألغى المستخدم
+```
+
+يقرأ الكتالوج `Provides` من بيانات الوحدة الوصفية عند رفعها (كل قيمة بالشكل `"{kind}:{name}"` بأحرف صغيرة، وتسقط غيرها
+بتحذير)، فيعمل `FindProvider` و`FindProviders` (كلها، بترتيب معرف الوحدة) قبل تنزيل الوحدة. والوحدة التي يسردها خادم أقدم
+بلا قائمة قدرات، فلا يعثر عليها إلا بمعرفها.
+
+### عقد أدوات الاختيار
+
+كل نافذة `picker:*` تأخذ المعاملات نفسها وتغلق بالنتيجة نفسها، فيستطيع الطالب استخدام أي مزود. و`PickerParameters`
+و`PickerResult` و`PickedItem` (في ModularBlazor.Abstractions) هي هذه الأشكال بلغة C#:
+
+```json
+// المعاملات
+{ "multiple": false, "selected": ["12"], "accept": "image/*", "publicOnly": true }
+// النتيجة
+{ "ids": ["12"], "items": [{ "id": "12", "text": "logo.png", "thumbnailUrl": "…", "url": "…" }] }
+```
+
+| الحقل | معناه |
+| --- | --- |
+| `multiple` | يجوز للمستخدم اختيار عدة عناصر |
+| `selected` | المعرفات المختارة سلفا، تعرض مختارة |
+| `accept` | للأصول فقط: ما يجوز اختياره، كخاصية `accept` في HTML (`"image/*"`، `".pdf,.docx"`) |
+| `publicOnly` | للأصول فقط: الملفات ذات الرابط العام (للمحتوى المنشور) |
+| `ids` | المعرفات المختارة، نصا، بترتيب اختيارها |
+| `items` | ما يكفي لعرض كل عنصر دون سؤال وحدته: `text`، و`thumbnailUrl` / `url` إن وجدا |
+
+تتجاهل أداة الاختيار ما لا يخصها من الحقول. القدرات القياسية هي `picker:asset` (التخزين) و`picker:keyword` و`picker:term`
+و`picker:concept` (‏`PickerCapabilities`). وأي قدرة أخرى تتبع الشكل نفسه `"{kind}:{name}"`، وتوثق الوحدة التي تعرّفها أشكالها.
 
 ## العقد
 

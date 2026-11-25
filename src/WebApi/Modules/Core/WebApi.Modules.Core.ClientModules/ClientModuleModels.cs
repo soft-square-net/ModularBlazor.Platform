@@ -54,7 +54,8 @@ public sealed record ClientModuleMenuItem(
     IReadOnlyList<string>? Permissions = null);
 
 /// <summary>
-/// A header action, dock or context panel the module declares ([assembly: HeaderAction / Dock / ContextPanel]), read
+/// A header action, dock, context panel or studio dock panel the module declares ([assembly: HeaderAction / Dock /
+/// ContextPanel / DockPanel]), read
 /// when it is uploaded and kept per version like its menu. The client app's ShellContribution has the same shape.
 /// </summary>
 /// <param name="Id">"{moduleId}:{localId}".</param>
@@ -74,7 +75,20 @@ public sealed record ClientModuleContribution(
     string? Badge = null,
     int BadgeRefresh = 0,
     IReadOnlyList<string>? ForRoutes = null,
-    IReadOnlyList<string>? ForContext = null);
+    IReadOnlyList<string>? ForContext = null)
+{
+    /// <summary>Dock panels: the studio key ("contentdesigner").</summary>
+    public string? ForStudio { get; init; }
+
+    /// <summary>Dock panels: "left", "right" or "bottom" for a tool pane; null for a document.</summary>
+    public string? Area { get; init; }
+
+    /// <summary>Dock panels: opens as a document tab in the centre.</summary>
+    public bool Document { get; init; }
+}
+
+/// <summary>A dialog the module provides ([ClientDialog]): its id, default title and capabilities ("picker:asset").</summary>
+public sealed record ClientModuleDialog(string Id, string? Title = null, IReadOnlyList<string>? Provides = null);
 
 /// <summary>What a layout of the module offers ([LayoutInfo] next to its [LayoutKey]).</summary>
 /// <param name="Role">"app", "admin", "public", "auth" or "blank"; null when it did not say.</param>
@@ -157,6 +171,9 @@ public sealed record ClientModuleVersion
     /// <summary>The header actions, docks and context panels the module declares.</summary>
     public IReadOnlyList<ClientModuleContribution> Contributions { get; init; } = [];
 
+    /// <summary>The dialogs the module provides ([ClientDialog]), with their capabilities.</summary>
+    public IReadOnlyList<ClientModuleDialog> Dialogs { get; init; } = [];
+
     /// <summary>What the module's layouts offer ([LayoutInfo]); layouts without it are only in <see cref="Layouts"/>.</summary>
     public IReadOnlyList<ClientModuleLayout> LayoutDetails { get; init; } = [];
 
@@ -225,7 +242,11 @@ public sealed record ClientModuleDescriptor(
     IReadOnlyList<ClientModuleContribution> Contributions,
     string? AssetBase = null,
     IReadOnlyDictionary<string, string>? AssetHashes = null,
-    IReadOnlyList<string>? ProvidesLayouts = null);
+    IReadOnlyList<string>? ProvidesLayouts = null)
+{
+    /// <summary>The dialogs it provides, so a caller can find one by capability before the module is downloaded.</summary>
+    public IReadOnlyList<ClientModuleDialog> Dialogs { get; init; } = [];
+}
 
 /// <summary>The modules the caller may use; <see cref="ETag"/> changes whenever the list does.</summary>
 public sealed record ClientModuleManifest(string ETag, IReadOnlyList<ClientModuleDescriptor> Modules);
@@ -264,6 +285,9 @@ public sealed record ClientModuleUpload
 
     /// <summary>The header actions, docks and context panels the module declares.</summary>
     public IReadOnlyList<ClientModuleContribution> Contributions { get; init; } = [];
+
+    /// <summary>The dialogs the module provides ([ClientDialog]), with their capabilities.</summary>
+    public IReadOnlyList<ClientModuleDialog> Dialogs { get; init; } = [];
 
     /// <summary>What the module's layouts offer ([LayoutInfo]).</summary>
     public IReadOnlyList<ClientModuleLayout> LayoutDetails { get; init; } = [];

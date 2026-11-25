@@ -21,6 +21,8 @@ sidebar:
 | — | `[HeaderAction]`، `[Dock]`، `[ContextPanel]`، `IPageContext`، `IBranding`، `IUserPermissions` ([التخطيطات](/ar/guides/layouts/)) | — |
 | `dir="rtl"` على `<html>` | كذلك | يتبع `dir`، بخصائص منطقية |
 | — | `[ClientDialog("Module.X/name")]`، `IModuleDialogs.ShowAsync` ([نوافذ الحوار](/ar/guides/module-dialogs/)) | إطار `mud-dialog-*` |
+| — | `[ClientDialog(Provides = …)]`، `IModuleDialogs.FindProvider`، `PickAsync` ([أدوات الاختيار](/ar/guides/module-dialogs/#البحث-عن-نافذة-حوار-بقدرتها)) | — |
+| لوحات الإرساء | `[DockPanel(ForStudio = …)]`، `IStudioPanels`، `mb-module-panel` ([لوحات الاستوديو](/ar/guides/studio-panels/)) | `create('dock', …)` |
 
 ## تحميل الجزر
 

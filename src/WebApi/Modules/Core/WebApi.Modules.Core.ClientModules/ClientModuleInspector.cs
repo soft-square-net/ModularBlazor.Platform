@@ -33,6 +33,9 @@ internal sealed record InspectedPackage(
     /// <summary>What the module adds to the layout besides menus ([assembly: HeaderAction / Dock / ContextPanel]).</summary>
     public IReadOnlyList<ClientModuleContribution> Contributions { get; init; } = [];
 
+    /// <summary>The dialogs the module provides ([ClientDialog] on its components), with their capabilities.</summary>
+    public IReadOnlyList<ClientModuleDialog> Dialogs { get; init; } = [];
+
     /// <summary>What each of the module's layouts offers ([LayoutInfo] next to [LayoutKey]).</summary>
     public IReadOnlyList<ClientModuleLayout> LayoutDetails { get; init; } = [];
 
@@ -83,6 +86,7 @@ internal static partial class ClientModuleInspector
 {
     private const string ClientAttribute = "soft.square.net.ModularBlazor.Abstractions.ClientModuleAttribute";
     private const string LayoutKeyAttribute = "soft.square.net.ModularBlazor.Abstractions.LayoutKeyAttribute";
+    private const string ClientDialogAttribute = "soft.square.net.ModularBlazor.Abstractions.ClientDialogAttribute";
     private const string MenuLinkAttribute = "soft.square.net.ModularBlazor.Abstractions.MenuLinkAttribute";
     private const string MenuGroupAttribute = "soft.square.net.ModularBlazor.Abstractions.MenuGroupAttribute";
     private const string ShellNamespace = "soft.square.net.ModularBlazor.Abstractions.Shell.";
@@ -95,6 +99,7 @@ internal static partial class ClientModuleInspector
         [ShellNamespace + "HeaderActionAttribute"] = "header-action",
         [ShellNamespace + "DockAttribute"] = "dock",
         [ShellNamespace + "ContextPanelAttribute"] = "context-panel",
+        [ShellNamespace + "DockPanelAttribute"] = "dock-panel",
     };
 
     /// <summary>
@@ -241,6 +246,7 @@ internal static partial class ClientModuleInspector
 
         var menu = Menu(id, primary.Info.Menu, detected.RoutePrefixes, primary.Info.Texts, warnings);
         var contributions = Contributions(id, primary.Info.Contributions, primary.Info.Types, primary.Info.Texts, warnings);
+        var dialogs = Dialogs(id, primary.Info.Dialogs, warnings);
 
         var ordered = new List<PackageFile> { primary.File };
         ordered.AddRange(files.Where(f => f != primary.File).OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase));
@@ -249,6 +255,7 @@ internal static partial class ClientModuleInspector
             primary.Info.Routes, primary.Info.Layouts, menu, warnings)
         {
             Contributions = contributions,
+            Dialogs = dialogs,
             LayoutDetails = primary.Info.LayoutDetails,
             PlatformVersion = primary.Info.PlatformVersion?.ToString(3)
         };
@@ -461,7 +468,7 @@ internal static partial class ClientModuleInspector
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var d in declarations)
         {
-            var what = d.Kind switch { "header-action" => "HeaderAction", "dock" => "Dock", _ => "ContextPanel" };
+            var what = d.Kind switch { "header-action" => "HeaderAction", "dock" => "Dock", "dock-panel" => "DockPanel", _ => "ContextPanel" };
             var local = d.Arguments.ElementAtOrDefault(0)?.Trim() ?? "";
             var title = d.Arguments.ElementAtOrDefault(1)?.Trim() ?? "";
             var component = d.Arguments.ElementAtOrDefault(2)?.Split(',', 2)[0].Trim() ?? "";
@@ -472,7 +479,7 @@ internal static partial class ClientModuleInspector
             if (!ids.Add(local)) { warnings.Add($"{what} '{local}': another contribution of the module has this id; left out."); continue; }
             if (!types.Contains(component)) { warnings.Add($"{what} '{local}': its component '{component}' is not a type of the module's own assembly; left out."); continue; }
 
-            var badge = d.Kind == "header-action" ? null : BadgeUrl(what, local, Named("Badge"), warnings);
+            var badge = d.Kind is "header-action" or "dock-panel" ? null : BadgeUrl(what, local, Named("Badge"), warnings);
             var refresh = badge is null ? 0 : d.Named.GetValueOrDefault("BadgeRefresh") as int? ?? 0;
             if (refresh != 0) refresh = Math.Clamp(refresh, 15, 3600);
 
@@ -500,14 +507,95 @@ internal static partial class ClientModuleInspector
                 if (context.Count == 0) context = null;
             }
 
+            string? studio = null, area = null;
+            var document = false;
+            if (d.Kind == "dock-panel")
+            {
+                studio = Named("ForStudio");
+                if (studio is null || !StudioKeyPattern().IsMatch(studio))
+                {
+                    warnings.Add($"DockPanel '{local}': ForStudio must name a studio key like 'contentdesigner' (lower case letters, digits, '-', '.'); left out.");
+                    continue;
+                }
+                context = [];
+                foreach (var k in Strings(d.Named, "ForContext").Select(k => k.Trim()))
+                {
+                    if (ContextKeyPattern().IsMatch(k)) { if (!context.Contains(k, StringComparer.OrdinalIgnoreCase)) context.Add(k); }
+                    else warnings.Add($"DockPanel '{local}': '{k}' is not a context key like 'content.post'; it is ignored.");
+                }
+                if (context.Count == 0) context = null;
+                document = d.Named.GetValueOrDefault("Document") is true;
+                area = Named("Area")?.ToLowerInvariant();
+                if (document)
+                {
+                    if (area is not null) warnings.Add($"DockPanel '{local}': a document opens in the centre; its Area '{area}' is ignored.");
+                    area = null;
+                }
+                else if (area is null) area = "right";
+                else if (area is not ("left" or "right" or "bottom"))
+                {
+                    warnings.Add($"DockPanel '{local}': Area '{area}' is not left, right or bottom; it goes on the right.");
+                    area = "right";
+                }
+            }
+
             items.Add(new ClientModuleContribution($"{moduleId}:{local}", d.Kind, title, component, Named("Icon"),
                 d.Named.GetValueOrDefault("Order") as int? ?? 100, Translations(title, texts),
-                Permissions(what, local, d.Named, warnings), badge, refresh, routes, context));
+                Permissions(what, local, d.Named, warnings), badge, refresh, routes, context)
+            {
+                ForStudio = studio,
+                Area = area,
+                Document = document
+            });
         }
         return items;
     }
 
     private static string[] Strings(IReadOnlyDictionary<string, object?> named, string name) => named.GetValueOrDefault(name) as string[] ?? [];
+
+    // ---------------------------------------------------------------- dialogs
+
+    /// <summary>One [ClientDialog] as written on a component: the component's type, the id and the named arguments.</summary>
+    private sealed record DialogDeclaration(string Type, string? Id, IReadOnlyDictionary<string, object?> Named);
+
+    /// <summary>
+    /// The module's dialogs and what they provide. The id must be "{module id}/{name}" (the client refuses others too);
+    /// a capability must be "{kind}:{name}" in lower case. What does not fit is left out with a warning.
+    /// </summary>
+    private static List<ClientModuleDialog> Dialogs(string moduleId, IReadOnlyList<DialogDeclaration> declarations, List<string> warnings)
+    {
+        var items = new List<ClientModuleDialog>();
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var d in declarations)
+        {
+            var id = d.Id?.Trim() ?? "";
+            var slash = id.IndexOf('/');
+            if (slash <= 0 || slash == id.Length - 1 || !id[..slash].Equals(moduleId, StringComparison.OrdinalIgnoreCase))
+            {
+                warnings.Add($"ClientDialog '{id}' on {d.Type}: a dialog id must be \"{moduleId}/<name>\"; left out.");
+                continue;
+            }
+            if (!ids.Add(id)) { warnings.Add($"ClientDialog '{id}': another component of the module has this id; left out."); continue; }
+
+            var provides = new List<string>();
+            foreach (var c in Strings(d.Named, "Provides").Select(c => c.Trim()))
+            {
+                if (CapabilityPattern().IsMatch(c)) { if (!provides.Contains(c, StringComparer.Ordinal)) provides.Add(c); }
+                else warnings.Add($"ClientDialog '{id}': '{c}' is not a capability like 'picker:asset'; it is ignored.");
+            }
+            var title = d.Named.GetValueOrDefault("Title") is string { Length: > 0 } t ? t.Trim() : null;
+            items.Add(new ClientModuleDialog(id, title, provides.Count == 0 ? null : provides));
+        }
+        return items;
+    }
+
+    /// <summary>"contentdesigner", "elsa.studio": lower case, 1-64 characters.</summary>
+    [GeneratedRegex(@"^[a-z0-9][a-z0-9.-]{0,63}$")]
+    private static partial Regex StudioKeyPattern();
+
+    /// <summary>"{kind}:{name}" in lower case: "picker:asset", "picker:term", "editor:geo-point".</summary>
+    [GeneratedRegex(@"^[a-z][a-z0-9-]{0,31}:[a-z0-9][a-z0-9.-]{0,63}$")]
+    private static partial Regex CapabilityPattern();
 
     /// <summary>Page path patterns: up to 16 segments, each a literal, '*' or '**'.</summary>
     [GeneratedRegex(@"^(\*\*|\*|[A-Za-z0-9._~-]+)(/(\*\*|\*|[A-Za-z0-9._~-]+)){0,15}$")]
@@ -570,6 +658,7 @@ internal static partial class ClientModuleInspector
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> Texts, IReadOnlyList<MenuDeclaration> Menu)
     {
         public IReadOnlyList<ContributionDeclaration> Contributions { get; init; } = [];
+        public IReadOnlyList<DialogDeclaration> Dialogs { get; init; } = [];
         public IReadOnlyList<ClientModuleLayout> LayoutDetails { get; init; } = [];
 
         /// <summary>Full names of the types the assembly defines ("Ns.Type", nested "Ns.Outer+Inner").</summary>
@@ -614,10 +703,12 @@ internal static partial class ClientModuleInspector
             var layouts = new List<string>();
             var layoutDetails = new List<ClientModuleLayout>();
             var types = new HashSet<string>(StringComparer.Ordinal);
+            var dialogs = new List<DialogDeclaration>();
             foreach (var handle in md.TypeDefinitions)
             {
                 var type = md.GetTypeDefinition(handle);
-                types.Add(FullName(md, type));
+                var typeName = FullName(md, type);
+                types.Add(typeName);
                 string? key = null, role = null;
                 Dictionary<string, object?>? info = null;
                 foreach (var a in type.GetCustomAttributes())
@@ -628,6 +719,7 @@ internal static partial class ClientModuleInspector
                         case RouteAttribute when FirstString(attribute) is { } template: routes.Add(template); break;
                         case LayoutKeyAttribute when FirstString(attribute) is { } k: layouts.Add(key = k); break;
                         case LayoutInfoAttribute: (role, info) = (FirstString(attribute), Values(attribute)); break;
+                        case ClientDialogAttribute: dialogs.Add(new DialogDeclaration(typeName, FirstString(attribute), Values(attribute))); break;
                     }
                 }
                 if (key is not null && info is not null)
@@ -645,6 +737,7 @@ internal static partial class ClientModuleInspector
                 references.Select(r => md.GetString(r.Name)).ToList(), ReadTexts(pe, md), menu)
             {
                 Contributions = contributions,
+                Dialogs = dialogs,
                 LayoutDetails = layoutDetails,
                 Types = types,
                 PlatformVersion = platform

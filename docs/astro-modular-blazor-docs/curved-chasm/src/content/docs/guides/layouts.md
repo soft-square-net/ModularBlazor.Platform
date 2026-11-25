@@ -174,6 +174,9 @@ the value changes. Everything in the page context is cleared on navigation.
 A layout reads the entries from `IShellContributions` (`Of(ShellContributionKinds.Dock)`, `ResolveAsync(entry)` to load
 the module and get the component type). Modules never call it; they only declare.
 
+A fourth kind, `[DockPanel]`, adds a pane to another module's studio rather than to the layout; layouts don't show it.
+See [Studio panels](/guides/studio-panels/).
+
 ## Branding
 
 Each tenant has a brand: name, short name, logos for light and dark backgrounds, favicon, primary and secondary

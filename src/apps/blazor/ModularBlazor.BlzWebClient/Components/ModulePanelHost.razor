@@ -1,0 +1,211 @@
+@using System.Reflection
+@using soft.square.net.ModularBlazor.Abstractions.Shell
+@using soft.square.net.Share.All
+@implements IDisposable
+@inject ModuleManager Modules
+@inject ActiveModuleService Active
+@inject IStudioPanels Panels
+@inject IShellContributions Shell
+@inject IPageContext PageContext
+@inject ILocaleService Locale
+@inject IStringLocalizer<App> L
+
+@*
+  The generic JS root component ("mb-module-panel", registered in Program.cs) that studios mount contributed dock panels
+  with. A client module is loaded lazily and cannot register root components itself, so the studio's MudDock mounts this
+  one with the panel's contribution id as its PanelKey; it loads the module, renders its component, and gives it what a
+  page gets: sign-in state (AddCascadingAuthenticationState), the "Culture" cascade, lang/dir, and the app's services
+  (IModuleDialogs, IPageContext, ...), which a JS root component shares with the app in WebAssembly.
+
+  Collectible unload: the module's Type is held only while its module is loaded. When the module is unloaded (or
+  replaced, or leaves the user's catalog) the type is dropped and the panel re-renders without it.
+*@
+
+<CascadingValue Value="Locale.Culture" Name="Culture" @key="Locale.Culture">
+  <div class="mb-module-panel" data-contribution="@_contribution?.Id" lang="@Locale.Culture" dir="@(Locale.IsRightToLeft ? "rtl" : "ltr")">
+    @if (_type is not null)
+    {
+      <ErrorBoundary @ref="_boundary">
+        <ChildContent>
+          <DynamicComponent Type="_type" Parameters="Parameters()" />
+        </ChildContent>
+        <ErrorContent Context="error">
+          <div class="mb-module-panel__error" role="alert">
+            <p>@L["This panel failed: {0}", error.Message]</p>
+            <button type="button" class="mud-button-root mud-button-text mud-button-medium" @onclick="Recover">@L["Try again"]</button>
+          </div>
+        </ErrorContent>
+      </ErrorBoundary>
+    }
+    else if (_loading)
+    {
+      <div class="route-loading" role="status"><span class="spinner"></span> @L["Loading panel…"]</div>
+    }
+    else
+    {
+      <div class="mb-module-panel__unavailable" role="status">@L["This panel is not available."]</div>
+    }
+  </div>
+</CascadingValue>
+
+@code {
+  /// <summary>Given by MudDock: the dock panel's instance id.</summary>
+  [Parameter] public string PanelId { get; set; } = "";
+
+  /// <summary>Given by MudDock: the definition key, which a studio sets to the contribution id ("{moduleId}:{localId}").</summary>
+  [Parameter] public string PanelKey { get; set; } = "";
+
+  /// <summary>Given by MudDock: the panel's title.</summary>
+  [Parameter] public string Title { get; set; } = "";
+
+  /// <summary>The contribution id, when the panel is mounted without MudDock (it wins over <see cref="PanelKey"/>).</summary>
+  [Parameter] public string? Contribution { get; set; }
+
+  /// <summary>Optional: the context key and value the panel is for; otherwise taken from IPageContext (the studio sets it).</summary>
+  [Parameter] public string? ContextKey { get; set; }
+
+  [Parameter] public string? ContextValue { get; set; }
+
+  private ShellContribution? _contribution;
+  private Type? _type;
+  private Dictionary<string, Type> _accepts = [];
+  private bool _loading;
+  private bool _held;
+  private string? _heldModule;
+  private ErrorBoundary? _boundary;
+  private CancellationTokenSource? _load;
+
+  private string Id => string.IsNullOrWhiteSpace(Contribution) ? PanelKey : Contribution;
+
+  protected override void OnInitialized()
+  {
+    Modules.Changed += OnModulesChanged;
+    PageContext.Changed += OnContextChanged;
+    Locale.Changed += OnContextChanged;
+  }
+
+  protected override async Task OnParametersSetAsync()
+  {
+    if (_contribution is not null && string.Equals(_contribution.Id, Id, StringComparison.OrdinalIgnoreCase) && _type is not null) return;
+    await ResolveAsync();
+  }
+
+  /// <summary>Finds the contribution in the user's catalog and its component, loading the module when needed.</summary>
+  private async Task ResolveAsync()
+  {
+    _load?.Cancel();
+    var cts = _load = new CancellationTokenSource();
+    SetType(null);
+    _contribution = Panels.Find(Id);
+    if (_contribution is null) { _loading = false; return; }
+
+    _loading = true;
+    StateHasChanged();
+    Type? type;
+    try
+    {
+      type = await Shell.ResolveAsync(_contribution, cts.Token);
+    }
+    catch (OperationCanceledException)
+    {
+      return; // closed, or another contribution asked for, while the module was downloading
+    }
+    if (cts.IsCancellationRequested) return;
+    _loading = false;
+    SetType(type);
+    if (type is not null) await HoldAsync(_contribution.ModuleId);
+  }
+
+  private void SetType(Type? type)
+  {
+    _type = type;
+    // The component's own parameter names, read once per type (never cached statically: the type may be unloaded).
+    _accepts = type is null
+      ? []
+      : type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+          .Where(p => p.GetCustomAttribute<ParameterAttribute>() is not null)
+          .ToDictionary(p => p.Name, p => p.PropertyType, StringComparer.Ordinal);
+  }
+
+  /// <summary>Only the parameters the component declares (DynamicComponent throws on unknown ones).</summary>
+  private Dictionary<string, object?> Parameters()
+  {
+    var parameters = new Dictionary<string, object?>();
+    if (_accepts.TryGetValue("Context", out var context) && context.IsAssignableFrom(typeof(ContributionContext)))
+      parameters["Context"] = Context();
+    foreach (var (name, value) in new[] { (nameof(PanelId), PanelId), (nameof(PanelKey), PanelKey), (nameof(Title), Title) })
+      if (_accepts.TryGetValue(name, out var type) && type == typeof(string)) parameters[name] = value;
+    return parameters;
+  }
+
+  /// <summary>The context the panel is for: the given one, else the first of its ForContext keys the page has set.</summary>
+  private ContributionContext Context()
+  {
+    var id = _contribution!.Id;
+    if (!string.IsNullOrWhiteSpace(ContextKey)) return new ContributionContext(id, ContextKey, ContextValue ?? PageContext.Get(ContextKey));
+    foreach (var key in _contribution.ForContext ?? [])
+      if (PageContext.Get(key) is { } value) return new ContributionContext(id, key, value);
+    return new ContributionContext(id);
+  }
+
+  private async Task HoldAsync(string moduleId)
+  {
+    if (_held && _heldModule == moduleId) return;
+    await ReleaseAsync();
+    _held = true;
+    _heldModule = moduleId;
+    await Active.HoldAsync(moduleId); // the module's styles and scripts, whatever page the studio is
+  }
+
+  private Task ReleaseAsync()
+  {
+    if (!_held || _heldModule is null) return Task.CompletedTask;
+    _held = false;
+    return Active.ReleaseAsync(_heldModule);
+  }
+
+  /// <summary>
+  /// A module was loaded, unloaded or replaced, or the catalog changed: drop a type whose module is gone (so nothing
+  /// pins its load context), and pick up the new one when the module is loaded again.
+  /// </summary>
+  private void OnModulesChanged() => _ = InvokeAsync(async () =>
+  {
+    var current = Panels.Find(Id);
+    if (current is null)
+    {
+      if (_contribution is null && _type is null) return;
+      _contribution = null;
+      SetType(null);
+      _loading = false;
+      await ReleaseAsync();
+      StateHasChanged();
+      return;
+    }
+    _contribution = current;
+    if (_loading) return;
+    var type = Modules.IsLoaded(current.ModuleId) ? Modules.FindModuleType(current.ModuleId, current.Component) : null;
+    if (ReferenceEquals(type, _type)) return;
+    if (type is not null && !typeof(IComponent).IsAssignableFrom(type)) type = null;
+    SetType(type);
+    _boundary?.Recover();
+    StateHasChanged();
+  });
+
+  private void OnContextChanged() => _ = InvokeAsync(StateHasChanged);
+
+  private async Task Recover()
+  {
+    _boundary?.Recover();
+    if (_type is null) await ResolveAsync();
+  }
+
+  public void Dispose()
+  {
+    Modules.Changed -= OnModulesChanged;
+    PageContext.Changed -= OnContextChanged;
+    Locale.Changed -= OnContextChanged;
+    _load?.Cancel();
+    _type = null;
+    _ = ReleaseAsync();
+  }
+}
