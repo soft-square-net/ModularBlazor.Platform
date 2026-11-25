@@ -19,7 +19,7 @@ public interface ILiveTransport : IAsyncDisposable
     Task StopAsync(CancellationToken ct);
 
     /// <returns>The server's answer: <c>Error</c> is set when it refused.</returns>
-    Task<LiveJoinResult> SubscribeAsync(string topic, IReadOnlyCollection<string> scopes, CancellationToken ct);
+    Task<LiveJoinResult> SubscribeAsync(string topic, CancellationToken ct);
 
     Task UnsubscribeAsync(string topic, CancellationToken ct);
 }
@@ -112,7 +112,7 @@ public sealed class LiveChannel : ILiveChannel, IAsyncDisposable
         {
             if (!_topics.TryGetValue(topic, out var state))
             {
-                state = new TopicState((options?.Scopes ?? []).ToArray());
+                state = new TopicState();
                 _topics[topic] = state;
             }
             state.Subscriptions.Add(subscription);
@@ -120,7 +120,7 @@ public sealed class LiveChannel : ILiveChannel, IAsyncDisposable
             if (_connected && !state.Joined)
             {
                 LiveJoinResult result;
-                try { result = await _transport.SubscribeAsync(topic, state.Scopes, ct); }
+                try { result = await _transport.SubscribeAsync(topic, ct); }
                 catch (Exception e) when (e is not OperationCanceledException)
                 {
                     // The connection dropped meanwhile: the reconnect joins it.
@@ -203,7 +203,7 @@ public sealed class LiveChannel : ILiveChannel, IAsyncDisposable
     private async Task<bool> JoinAsync(string topic, TopicState state, CancellationToken ct)
     {
         LiveJoinResult result;
-        try { result = await _transport.SubscribeAsync(topic, state.Scopes, ct); }
+        try { result = await _transport.SubscribeAsync(topic, ct); }
         catch (Exception e) when (e is not OperationCanceledException)
         {
             // Dropped while joining (OnClosed starts the next round) or a server error: it stays unjoined until then.
@@ -324,9 +324,8 @@ public sealed class LiveChannel : ILiveChannel, IAsyncDisposable
         await _transport.DisposeAsync();
     }
 
-    private sealed class TopicState(string[] scopes)
+    private sealed class TopicState
     {
-        public string[] Scopes { get; } = scopes;
         public List<Subscription> Subscriptions { get; } = [];
         public bool Joined { get; set; }
     }

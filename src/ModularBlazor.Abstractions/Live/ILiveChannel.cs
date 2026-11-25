@@ -50,15 +50,12 @@ public sealed record LiveMessage(string Topic, string Type, JsonElement? Payload
 /// </summary>
 public sealed record LiveResync(string Topic, long? LastSequence, LiveResyncReason Reason);
 
-/// <summary>Options of one subscription.</summary>
+/// <summary>
+/// Options of one subscription. There are no scopes to send: the server authorizes a topic from its own data only (the
+/// resource's scopes come from the declaring module), so a page cannot widen what it may receive.
+/// </summary>
 public sealed class LiveSubscribeOptions
 {
-    /// <summary>
-    /// The resource's scopes as the page knows them (its press, category, the unit's ancestors: <c>unit:{id}</c>), for
-    /// topics whose permission may be held there rather than on the resource itself.
-    /// </summary>
-    public IReadOnlyCollection<string>? Scopes { get; init; }
-
     /// <summary>Called when this subscription must catch up (besides <see cref="ILiveChannel.Resync"/>).</summary>
     public Func<LiveResync, Task>? OnResync { get; init; }
 
@@ -81,7 +78,8 @@ public sealed class LiveSubscriptionException(string topic, string error)
 /// <para>Topics (never naming the tenant: the token's tenant applies):</para>
 /// <list type="bullet">
 /// <item><c>user:{id}</c>: the signed-in user's own messages;</item>
-/// <item><c>unit:{id}</c>: an organizational unit and everything below it;</item>
+/// <item><c>unit:{id}</c>: an organizational unit and everything below it (needs the Organization module, which
+/// declares the permission and gives each unit's ancestors);</item>
 /// <item><c>{moduleId}:{kind}:{key}</c>: a module's resource, e.g. <c>content:post:42</c> (the module declares the kind
 /// and its permission in its manifest's <c>LiveTopics</c>).</item>
 /// </list>

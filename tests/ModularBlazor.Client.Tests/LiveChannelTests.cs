@@ -31,7 +31,7 @@ public sealed class LiveChannelTests
     {
         var received = new List<LiveMessage>();
         await using var subscription = await _channel.SubscribeAsync("content:post:1", m => { received.Add(m); return Task.CompletedTask; },
-            fromSequence: 5, new LiveSubscribeOptions { Scopes = ["press:A"] });
+            fromSequence: 5);
         _channel.State.ShouldBe(LiveState.Offline);
         _hub.Joined.ShouldBeEmpty();
 
@@ -39,7 +39,6 @@ public sealed class LiveChannelTests
 
         _channel.State.ShouldBe(LiveState.Connected);
         _hub.Joined.ShouldBe(["content:post:1"]);
-        _hub.Scopes["content:post:1"].ShouldBe(["press:A"]);
         _resyncs.ShouldBe([new LiveResync("content:post:1", 5, LiveResyncReason.Subscribed)]);
 
         await _hub.SendAsync(Message("content:post:1", 6));
@@ -170,7 +169,6 @@ public sealed class LiveChannelTests
         public int FailStarts { get; set; }
         public List<string> Joined { get; } = [];
         public List<string> Left { get; } = [];
-        public Dictionary<string, IReadOnlyCollection<string>> Scopes { get; } = [];
         public Dictionary<string, string> Refuse { get; } = [];
 
         public Task StartAsync(CancellationToken ct)
@@ -186,11 +184,10 @@ public sealed class LiveChannelTests
             return Task.CompletedTask;
         }
 
-        public Task<LiveJoinResult> SubscribeAsync(string topic, IReadOnlyCollection<string> scopes, CancellationToken ct)
+        public Task<LiveJoinResult> SubscribeAsync(string topic, CancellationToken ct)
         {
             if (Refuse.TryGetValue(topic, out var error)) return Task.FromResult(new LiveJoinResult(false, error));
             Joined.Add(topic);
-            Scopes[topic] = scopes;
             return Task.FromResult(new LiveJoinResult(true));
         }
 

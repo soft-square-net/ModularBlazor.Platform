@@ -49,14 +49,28 @@ public sealed class LiveHubTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Client_scopes_count_unless_the_topic_kind_refuses_them()
+    public async Task A_module_topic_counts_the_scopes_its_module_resolves_for_the_resource()
     {
         await using var alice = await _host.ConnectAsync("alice");
         await _host.GrantAsync("acme", "alice", "content.view", "press:A");
-        await _host.GrantAsync("acme", "alice", "content.edit", "press:A");
 
-        (await alice.SubscribeAsync("content:post:42", "press:A")).Ok.ShouldBeTrue();
-        (await alice.SubscribeAsync("content:draft:42", "press:A")).ShouldBe(new LiveSubscribeResult(false, "forbidden"));
+        (await alice.SubscribeAsync("content:post:42")).Ok.ShouldBeTrue();  // post 42 is in press A (the module says so)
+        (await alice.SubscribeAsync("content:post:7")).Error.ShouldBe("forbidden"); // post 7 is not
+        (await alice.SubscribeAsync("content:draft:42")).Error.ShouldBe("forbidden"); // drafts need content.edit
+    }
+
+    [Fact]
+    public async Task Bypass_a_module_topic_cannot_be_opened_with_a_scope_the_client_sends()
+    {
+        await using var alice = await _host.ConnectAsync("alice");
+        await _host.GrantAsync("acme", "alice", "content.view", "press:A");
+
+        // The old (scopes) call shape is not a hub method any more...
+        await Should.ThrowAsync<Exception>(() => alice.InvokeSubscribeAsync("content:post:7", new[] { "press:A" }));
+        // ...and the topic stays closed: post 7 is not in press A on the server's word.
+        (await alice.SubscribeAsync("content:post:7")).Error.ShouldBe("forbidden");
+        await _host.PublishAsync("acme", n => n.PublishAsync("content:post:7", "post.updated"));
+        (await alice.QuietAsync()).ShouldBeTrue();
     }
 
     [Fact]
@@ -66,6 +80,7 @@ public sealed class LiveHubTests : IAsyncLifetime
         await _host.GrantAsync("acme", "alice", "content.view", "tenant");
         (await alice.SubscribeAsync("content:comment:1")).Error.ShouldBe("unknown-topic");
         (await alice.SubscribeAsync("shop:order:1")).Error.ShouldBe("unknown-topic");
+        (await alice.SubscribeAsync("org:unit:desk")).Error.ShouldBe("unknown-topic"); // the unit kind is the platform's unit: topic
         (await alice.SubscribeAsync("content")).Error.ShouldBe("invalid-topic");
         (await alice.SubscribeAsync("content:post")).Error.ShouldBe("invalid-topic");
         (await alice.SubscribeAsync("Content:post:1")).Error.ShouldBe("invalid-topic");
@@ -73,21 +88,43 @@ public sealed class LiveHubTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_unit_topic_needs_a_right_in_the_unit_or_an_ancestor_the_client_names()
+    public async Task A_unit_topic_needs_the_declared_permission_in_the_unit_or_a_server_resolved_ancestor()
     {
         await using var alice = await _host.ConnectAsync("alice");
-        await _host.GrantAsync("acme", "alice", "shifts.view", "unit:root");
+        await _host.GrantAsync("acme", "alice", "org.units.view", "unit:region");
 
-        (await alice.SubscribeAsync("unit:desk")).Error.ShouldBe("forbidden");
-        (await alice.SubscribeAsync("unit:desk", "unit:region", "unit:root")).Ok.ShouldBeTrue();
-        (await alice.SubscribeAsync("unit:root")).Ok.ShouldBeTrue();
+        (await alice.SubscribeAsync("unit:desk")).Ok.ShouldBeTrue();   // desk is below region
+        (await alice.SubscribeAsync("unit:region")).Ok.ShouldBeTrue();
+        (await alice.SubscribeAsync("unit:root")).Error.ShouldBe("forbidden"); // rights flow down, not up
+        (await alice.SubscribeAsync("unit:other")).Error.ShouldBe("forbidden");
     }
 
     [Fact]
-    public async Task A_platform_admin_may_subscribe_to_any_unit()
+    public async Task Bypass_a_unit_topic_cannot_be_opened_with_a_foreign_scope_or_an_unrelated_permission()
     {
-        // Platform roles hold platform permissions in every scope.
-        var hub = new Microsoft.AspNetCore.SignalR.Client.HubConnectionBuilder()
+        await using var alice = await _host.ConnectAsync("alice");
+        await _host.GrantAsync("acme", "alice", "org.units.view", "unit:A");
+        await _host.GrantAsync("acme", "alice", "shifts.view", "unit:B"); // a right in unit B, but not the unit topic's
+
+        await Should.ThrowAsync<Exception>(() => alice.InvokeSubscribeAsync("unit:B", new[] { "unit:A" }));
+        (await alice.SubscribeAsync("unit:B")).Error.ShouldBe("forbidden");
+        (await alice.SubscribeAsync("unit:A")).Ok.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Unit_topics_are_refused_when_no_module_provides_them()
+    {
+        await using var host = await LiveTestHost.StartAsync(unitProvider: false);
+        await using var alice = await host.ConnectAsync("alice");
+        await host.GrantAsync("acme", "alice", "org.units.view", "tenant");
+        (await alice.SubscribeAsync("unit:desk")).Error.ShouldBe("unknown-topic");
+    }
+
+    [Fact]
+    public async Task A_platform_role_alone_does_not_open_unit_topics()
+    {
+        // Platform roles hold platform permissions only; the unit topic needs the declared module permission.
+        var hub = new HubConnectionBuilder()
             .WithUrl(new Uri(new Uri(_host.Url), LiveHubMethods.Path), o =>
             {
                 o.SkipNegotiation = true;
@@ -97,7 +134,7 @@ public sealed class LiveHubTests : IAsyncLifetime
             .Build();
         await using var admin = new LiveTestClient(hub);
         await hub.StartAsync();
-        (await admin.SubscribeAsync("unit:anything")).Ok.ShouldBeTrue();
+        (await admin.SubscribeAsync("unit:desk")).Error.ShouldBe("forbidden");
     }
 
     [Fact]
@@ -125,8 +162,8 @@ public sealed class LiveHubTests : IAsyncLifetime
     {
         await using var desk = await _host.ConnectAsync("desk-editor");
         await using var chief = await _host.ConnectAsync("chief");
-        await _host.GrantAsync("acme", "desk-editor", "shifts.view", "unit:desk");
-        await _host.GrantAsync("acme", "chief", "shifts.view", "unit:root");
+        await _host.GrantAsync("acme", "desk-editor", "org.units.view", "unit:desk");
+        await _host.GrantAsync("acme", "chief", "org.units.view", "unit:root");
         (await desk.SubscribeAsync("unit:desk")).Ok.ShouldBeTrue();
         (await chief.SubscribeAsync("unit:root")).Ok.ShouldBeTrue();
 

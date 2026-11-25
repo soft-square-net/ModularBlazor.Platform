@@ -6,27 +6,36 @@ namespace soft.square.net.WebApi.Contracts.Live;
 /// A kind of live topic a module offers: <c>{moduleId}:{Kind}:{key}</c> (e.g. <c>content:post:42</c> for
 /// <c>new LiveTopic("post", "content.view")</c> in the module "content"). Declared in
 /// <see cref="ModuleManifest.LiveTopics"/>: the host reads it at install and authorizes subscriptions with it, so no
-/// module type is ever involved in the check.
+/// module type is ever involved in the decision. A subscriber needs <paramref name="Permission"/> for the scope
+/// <c>{Kind}:{key}</c>, or for one of the scopes the module's <see cref="ILiveScopeResolver"/> gives for the resource
+/// (its press, category, parent units). Scopes sent by clients never count.
+/// <para>The kind <see cref="LiveTopics.UnitKind"/> is special: the one active module that declares it (Organization)
+/// provides the permission for the platform's <c>unit:{id}</c> topics, and its resolver gives a unit's ancestors.
+/// Without such a module, <c>unit:</c> topics are refused.</para>
 /// </summary>
 /// <param name="Kind">Lowercase name of the topic kind (a-z, 0-9, '-').</param>
 /// <param name="Permission">The permission a subscriber must hold for the resource (see <see cref="Security.IAccessScopes"/>).</param>
-public sealed record LiveTopic(string Kind, string Permission)
+public sealed record LiveTopic(string Kind, string Permission);
+
+/// <summary>
+/// The scopes of a live topic's resource, beyond its own <c>{kind}:{key}</c>: e.g. a post's <c>press:A</c> and
+/// <c>category:sports</c>, or a unit's ancestors <c>unit:{parent}</c>... up to the root. Optional; a module registers it in
+/// its own services. The host resolves it per subscription from the declaring module's container, in a scope of the
+/// subscriber's tenant, and keeps nothing of it afterwards (the module stays unloadable). Without one, only the exact
+/// scope counts. Unknown keys: return no scopes.
+/// </summary>
+public interface ILiveScopeResolver
 {
-    /// <summary>
-    /// True (default): the scopes the client sends with the subscription (the resource's press, category, unit and its
-    /// ancestors, ...) count, besides the topic's own scope <c>{Kind}:{key}</c>. They come from the client, so a module
-    /// that sets this must treat live messages as hints and keep its data behind its authorized endpoints (the client
-    /// re-reads them). False: only the topic scope and tenant-wide grants count.
-    /// </summary>
-    public bool AcceptClientScopes { get; init; } = true;
+    Task<IReadOnlyList<string>> ScopesAsync(string kind, string key, CancellationToken ct);
 }
 
 /// <summary>
 /// Topic names. A topic is scoped to the caller's tenant by the hub; it never names the tenant.
 /// <list type="bullet">
 /// <item><c>user:{id}</c>: messages for one user; only that user may subscribe.</item>
-/// <item><c>unit:{id}</c>: messages about an organizational unit; any permission held for the unit (or its ancestors,
-/// sent by the client as scopes) allows it. Publishing to a unit path fans out to every ancestor.</item>
+/// <item><c>unit:{id}</c>: messages about an organizational unit; the permission of the <see cref="LiveTopic"/> of kind
+/// <c>unit</c> its providing module declares, held for the unit or one of its ancestors (from that module's
+/// <see cref="ILiveScopeResolver"/>). Publishing to a unit path fans out to every ancestor.</item>
 /// <item><c>{moduleId}:{kind}:{key}</c>: a module's resource, authorized by its <see cref="LiveTopic"/>.</item>
 /// </list>
 /// </summary>
@@ -79,7 +88,7 @@ public interface ILiveNotifier
 public sealed record LiveEnvelope(string Topic, string Type, JsonElement? Payload, long? Sequence, DateTimeOffset At);
 
 /// <summary>The answer to a subscription.</summary>
-/// <param name="Error">Why it was refused: <c>forbidden</c>, <c>unknown-topic</c> or <c>invalid-topic</c>.</param>
+/// <param name="Error">Why it was refused: <c>forbidden</c>, <c>unknown-topic</c>, <c>invalid-topic</c> or <c>too-many-topics</c>.</param>
 public sealed record LiveSubscribeResult(bool Ok, string? Error = null);
 
 /// <summary>Names on the wire between the hub (<see cref="Path"/>) and its clients.</summary>
@@ -87,7 +96,7 @@ public static class LiveHubMethods
 {
     public const string Path = "/hubs/live";
 
-    /// <summary>Server: <c>Subscribe(string topic, string[]? scopes) → LiveSubscribeResult</c>.</summary>
+    /// <summary>Server: <c>Subscribe(string topic) → LiveSubscribeResult</c>.</summary>
     public const string Subscribe = "Subscribe";
 
     /// <summary>Server: <c>Unsubscribe(string topic)</c>.</summary>

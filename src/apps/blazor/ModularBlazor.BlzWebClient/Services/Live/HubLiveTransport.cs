@@ -38,8 +38,8 @@ public sealed class HubLiveTransport : ILiveTransport
 
     public Task StopAsync(CancellationToken ct) => _hub.StopAsync(ct);
 
-    public Task<LiveJoinResult> SubscribeAsync(string topic, IReadOnlyCollection<string> scopes, CancellationToken ct) =>
-        _hub.InvokeAsync<LiveJoinResult>("Subscribe", topic, scopes.ToArray(), ct);
+    public Task<LiveJoinResult> SubscribeAsync(string topic, CancellationToken ct) =>
+        _hub.InvokeAsync<LiveJoinResult>("Subscribe", topic, ct);
 
     public Task UnsubscribeAsync(string topic, CancellationToken ct) => _hub.InvokeAsync("Unsubscribe", topic, ct);
 

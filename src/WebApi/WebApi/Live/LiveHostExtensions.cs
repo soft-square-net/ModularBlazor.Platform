@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using soft.square.net.WebApi.Contracts.Live;
+using soft.square.net.WebApi.Modularity;
 
 namespace soft.square.net.WebApi.Live;
 
@@ -23,6 +24,10 @@ public static class LiveHostExtensions
         services.AddSingleton<LiveDispatcher>();
         services.AddSingleton<LiveTopicAuthorizer>();
         services.TryAddSingleton<ILiveTopicCatalog, ModuleLiveTopicCatalog>();
+        // The modules' ILiveScopeResolver, per call from their own containers (follows load and release like the tenant initializer).
+        services.AddSingleton<ModuleLiveScopeSource>();
+        services.AddSingleton<IModuleLifecycleObserver>(sp => sp.GetRequiredService<ModuleLiveScopeSource>());
+        services.TryAddSingleton<ILiveScopeSource>(sp => sp.GetRequiredService<ModuleLiveScopeSource>());
         services.AddSingleton<LiveRevalidator>();
         services.AddHostedService(sp => sp.GetRequiredService<LiveRevalidator>());
         services.AddScoped<ILiveNotifier, LiveNotifier>();

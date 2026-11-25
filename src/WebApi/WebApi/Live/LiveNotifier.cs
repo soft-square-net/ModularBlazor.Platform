@@ -79,11 +79,11 @@ internal sealed class LiveRevalidator(GrantCache grants, LiveConnections connect
     internal async Task RecheckAsync(IReadOnlyList<LiveConnection> affected, CancellationToken ct)
     {
         foreach (var connection in affected)
-        foreach (var (topic, scopes) in connection.Topics.ToArray())
+        foreach (var topic in connection.Topics.Keys.ToArray())
         {
             try
             {
-                var result = await authorizer.AuthorizeAsync(connection.Tenant, connection.User, topic, scopes, ct);
+                var result = await authorizer.AuthorizeAsync(connection.Tenant, connection.User, topic, ct);
                 if (result.Ok || !connection.Topics.TryRemove(topic, out _)) continue;
                 await hub.Groups.RemoveFromGroupAsync(connection.Id, LiveGroups.Of(connection.Tenant.Id, topic), ct);
                 await hub.Clients.Client(connection.Id).SendAsync(LiveHubMethods.Revoked, topic, ct);

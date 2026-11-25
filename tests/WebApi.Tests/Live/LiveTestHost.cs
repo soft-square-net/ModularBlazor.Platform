@@ -44,7 +44,8 @@ internal sealed class LiveTestHost : IAsyncDisposable
     public IServiceProvider Services => _app.Services;
 
     /// <param name="url">A fixed address (a replica that comes back where it was); a free port by default.</param>
-    public static async Task<LiveTestHost> StartAsync(string? broker = null, string? url = null)
+    /// <param name="unitProvider">Whether a module ("org") declares the <c>unit</c> topic kind and resolves unit ancestors.</param>
+    public static async Task<LiveTestHost> StartAsync(string? broker = null, string? url = null, bool unitProvider = true)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Production" });
         builder.WebHost.UseUrls(url ?? "http://127.0.0.1:0");
@@ -64,7 +65,8 @@ internal sealed class LiveTestHost : IAsyncDisposable
         builder.AddPlatformTenancy("broker");
         builder.AddPlatformSecurity("broker");
         builder.AddPlatformLive("broker");
-        builder.Services.AddSingleton<ILiveTopicCatalog>(new FakeTopicCatalog());
+        builder.Services.AddSingleton<ILiveTopicCatalog>(new FakeTopicCatalog(unitProvider));
+        builder.Services.AddSingleton<ILiveScopeSource>(new FakeScopeSource());
 
         var app = builder.Build();
         app.UseRouting();
@@ -141,15 +143,37 @@ internal sealed class LiveTestHost : IAsyncDisposable
         await _app.DisposeAsync();
     }
 
-    private sealed class FakeTopicCatalog : ILiveTopicCatalog
+    /// <summary>"content" offers post and draft topics; "org" provides unit topics (when asked to).</summary>
+    private sealed class FakeTopicCatalog(bool unitProvider) : ILiveTopicCatalog
     {
-        private static readonly Dictionary<string, LiveTopic[]> Topics = new()
+        private readonly Dictionary<string, LiveTopic[]> _topics = new()
         {
-            ["content"] = [new LiveTopic("post", "content.view"), new LiveTopic("draft", "content.edit") { AcceptClientScopes = false }]
+            ["content"] = [new LiveTopic("post", "content.view"), new LiveTopic("draft", "content.edit")],
+            ["org"] = unitProvider ? [new LiveTopic(LiveTopics.UnitKind, "org.units.view")] : []
         };
 
-        public Task<LiveTopic?> FindAsync(string moduleId, string kind, CancellationToken ct) =>
-            Task.FromResult(Topics.GetValueOrDefault(moduleId)?.FirstOrDefault(t => t.Kind == kind));
+        public Task<DeclaredLiveTopic?> FindAsync(string moduleId, string kind, CancellationToken ct) =>
+            Task.FromResult(_topics.GetValueOrDefault(moduleId)?.FirstOrDefault(t => t.Kind == kind) is { } topic
+                ? new DeclaredLiveTopic(moduleId, topic)
+                : null);
+
+        public Task<DeclaredLiveTopic?> FindUnitAsync(CancellationToken ct) => FindAsync("org", LiveTopics.UnitKind, ct);
+    }
+
+    /// <summary>
+    /// The modules' resolvers: post 42 is in press A; the unit tree is root / region / desk. Anything else has no other scope.
+    /// </summary>
+    private sealed class FakeScopeSource : ILiveScopeSource
+    {
+        public Task<IReadOnlyList<string>> ScopesAsync(string moduleId, TenantInfo tenant, string kind, string key, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<string>>((moduleId, kind, key) switch
+            {
+                ("content", "post", "42") => ["press:A"],
+                ("content", "draft", "42") => ["press:A"],
+                ("org", "unit", "desk") => ["unit:region", "unit:root"],
+                ("org", "unit", "region") => ["unit:root"],
+                _ => []
+            });
     }
 }
 
@@ -168,8 +192,12 @@ internal sealed class LiveTestClient : IAsyncDisposable
 
     public Channel<string> Revoked { get; } = Channel.CreateUnbounded<string>();
 
-    public Task<LiveSubscribeResult> SubscribeAsync(string topic, params string[] scopes) =>
-        _hub.InvokeAsync<LiveSubscribeResult>(LiveHubMethods.Subscribe, topic, scopes);
+    public Task<LiveSubscribeResult> SubscribeAsync(string topic) =>
+        _hub.InvokeAsync<LiveSubscribeResult>(LiveHubMethods.Subscribe, topic);
+
+    /// <summary>Calls the hub with any arguments (an old or hostile client).</summary>
+    public Task<LiveSubscribeResult> InvokeSubscribeAsync(params object?[] arguments) =>
+        _hub.InvokeCoreAsync<LiveSubscribeResult>(LiveHubMethods.Subscribe, arguments);
 
     public Task UnsubscribeAsync(string topic) => _hub.InvokeAsync(LiveHubMethods.Unsubscribe, topic);
 

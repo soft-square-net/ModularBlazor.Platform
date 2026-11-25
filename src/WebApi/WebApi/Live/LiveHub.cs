@@ -41,16 +41,14 @@ internal sealed class LiveHub(LiveConnections connections, LiveTopicAuthorizer a
         return base.OnDisconnectedAsync(exception);
     }
 
-    /// <param name="topic">See <see cref="LiveTopics"/>; never names the tenant.</param>
-    /// <param name="scopes">The resource's scopes as the client knows them (its press, category, unit ancestors).</param>
-    public async Task<LiveSubscribeResult> Subscribe(string topic, string[]? scopes)
+    /// <param name="topic">See <see cref="LiveTopics"/>; never names the tenant. Authorized from server-side data only.</param>
+    public async Task<LiveSubscribeResult> Subscribe(string topic)
     {
         if (connections.Get(Context.ConnectionId) is not { } connection) return new(false, LiveErrors.Forbidden);
         if (!connection.Topics.ContainsKey(topic) && connection.Topics.Count >= MaxTopicsPerConnection)
             return new(false, LiveErrors.TooMany);
 
-        var clientScopes = (scopes ?? []).Where(s => !string.IsNullOrWhiteSpace(s)).Take(32).ToArray();
-        var result = await authorizer.AuthorizeAsync(connection.Tenant, connection.User, topic, clientScopes, Context.ConnectionAborted);
+        var result = await authorizer.AuthorizeAsync(connection.Tenant, connection.User, topic, Context.ConnectionAborted);
         if (!result.Ok)
         {
             log.LogDebug("Live subscription of {User} to {Topic} refused: {Error}", connection.UserId, topic, result.Error);
@@ -58,7 +56,7 @@ internal sealed class LiveHub(LiveConnections connections, LiveTopicAuthorizer a
         }
 
         await Groups.AddToGroupAsync(Context.ConnectionId, LiveGroups.Of(connection.Tenant.Id, topic), Context.ConnectionAborted);
-        connection.Topics[topic] = clientScopes;
+        connection.Topics[topic] = 0;
         return result;
     }
 
@@ -82,14 +80,14 @@ internal static class LiveGroups
     public static string Of(string tenantId, string topic) => $"t:{tenantId.ToLowerInvariant()}:{topic}";
 }
 
-/// <summary>One open hub connection: who, which tenant, and the topics it joined with the scopes it sent.</summary>
+/// <summary>One open hub connection: who, which tenant, and the topics it joined.</summary>
 internal sealed class LiveConnection(string id, TenantInfo tenant, string userId, ClaimsPrincipal user)
 {
     public string Id { get; } = id;
     public TenantInfo Tenant { get; } = tenant;
     public string UserId { get; } = userId;
     public ClaimsPrincipal User { get; } = user;
-    public ConcurrentDictionary<string, string[]> Topics { get; } = new(StringComparer.Ordinal);
+    public ConcurrentDictionary<string, byte> Topics { get; } = new(StringComparer.Ordinal);
 }
 
 /// <summary>The hub connections of this replica (each replica only knows its own).</summary>
