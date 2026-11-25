@@ -50,6 +50,9 @@ public sealed class ModuleRecord
 
     /// <summary>The module's lookups (metadata only), read when it was installed: the lookup catalog.</summary>
     public List<Contracts.Lookups.LookupDescriptor> Lookups { get; init; } = [];
+
+    /// <summary>Integration event patterns the manifest subscribes to; the pool's queue is bound to them.</summary>
+    public List<string> Subscriptions { get; init; } = [];
 }
 
 /// <summary>A module as seen by the replica that answered.</summary>
@@ -73,6 +76,9 @@ public sealed class SyncResult
 
     /// <summary>Copies released by the sync whose load contexts are waited on after it (see ModuleRuntime.SyncAsync).</summary>
     internal List<ReleasedCopy> Released { get; } = [];
+
+    /// <summary>The catalog as the sync saw it (for <see cref="IModuleCatalogObserver"/>s).</summary>
+    internal List<ModuleRecord> Catalog { get; } = [];
 }
 
 /// <summary>A released module copy: only a weak reference to its load context, so holding this never keeps it alive.</summary>

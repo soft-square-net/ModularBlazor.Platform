@@ -5,6 +5,7 @@ using OpenTelemetry.Trace;
 using soft.square.net.WebApi.Live;
 using soft.square.net.WebApi.Localization;
 using soft.square.net.WebApi.Lookups;
+using soft.square.net.WebApi.Messaging;
 using soft.square.net.WebApi.Modularity;
 using soft.square.net.WebApi.OpenApi;
 using soft.square.net.WebApi.Security;
@@ -26,6 +27,9 @@ builder.AddPlatformTenancy("broker");
 builder.Services.AddRuntimeModules(builder.Configuration);
 // Several replicas: broadcast lifecycle changes over the broker so every replica converges (needs ConnectionStrings:broker).
 builder.AddRuntimeModuleBroadcast("broker");
+// Integration events between modules: each module's outbox -> topic exchange "integration" -> a durable queue per
+// subscriber module and pool (retries, dead letters). Without the broker, an in-process bus on this instance.
+builder.AddPlatformIntegrationEvents("broker");
 // Lookups: key/text lists over modules' entities, served under each module's prefix; the catalog at /api/lookups and
 // ILookupClient for server-side checks by other modules (in process, or over Lookups:RemoteBaseUrl).
 builder.Services.AddPlatformLookups();

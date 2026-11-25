@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="$(SoftSquarePrefix).WebApi.Tests" />
+    <InternalsVisibleTo Include="$(SoftSquarePrefix).WebApi.IntegrationTests" />
   </ItemGroup>
 
   <ItemGroup>

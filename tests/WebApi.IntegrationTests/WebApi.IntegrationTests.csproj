@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Host integration tests against real infrastructure in Docker (Testcontainers: RabbitMQ, PostgreSQL): several WebApi
+    replicas in one process (WebApplicationFactory), sharing a module catalog, loading the EventsFixture modules at
+    runtime (collectible load contexts) exactly like uploaded modules. Needs Docker; run with
+      dotnet test tests/WebApi.IntegrationTests -p:BuildClientModules=false
+  -->
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" PrivateAssets="all" />
+    <PackageReference Include="Shouldly" Version="4.3.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.3" />
+    <PackageReference Include="Testcontainers.RabbitMq" Version="4.17.0" />
+    <PackageReference Include="Testcontainers.PostgreSql" Version="4.17.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\WebApi\WebApi\WebApi.csproj" />
+  </ItemGroup>
+
+  <!-- The test modules: built, not referenced (they are loaded at runtime), copied to EventModules/<name>/. -->
+  <ItemGroup>
+    <EventFixtureProject Include="..\EventsFixture.Publisher\EventsFixture.Publisher.csproj" />
+    <EventFixtureProject Include="..\EventsFixture.Subscriber\EventsFixture.Subscriber.csproj" />
+    <ProjectReference Include="@(EventFixtureProject)" ReferenceOutputAssembly="false" Private="false" />
+  </ItemGroup>
+
+  <Target Name="CopyEventFixtureModules" AfterTargets="Build">
+    <MSBuild Projects="@(EventFixtureProject)" Targets="GetTargetPath" Properties="Configuration=$(Configuration)">
+      <Output TaskParameter="TargetOutputs" ItemName="_EventFixtureTarget" />
+    </MSBuild>
+    <ItemGroup>
+      <_EventFixtureFile Include="%(_EventFixtureTarget.RootDir)%(_EventFixtureTarget.Directory)**\*">
+        <ModuleFolder>%(_EventFixtureTarget.Filename)</ModuleFolder>
+      </_EventFixtureFile>
+    </ItemGroup>
+    <RemoveDir Directories="$(OutDir)EventModules" />
+    <Copy SourceFiles="@(_EventFixtureFile)" DestinationFiles="@(_EventFixtureFile->'$(OutDir)EventModules\%(ModuleFolder)\%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
+
+  <ItemGroup>
+    <Using Include="Shouldly" />
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

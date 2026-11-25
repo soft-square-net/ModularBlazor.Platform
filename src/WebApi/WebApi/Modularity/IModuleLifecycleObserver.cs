@@ -11,3 +11,12 @@ internal interface IModuleLifecycleObserver
 
     Task ReleasingAsync(string moduleId, IServiceProvider moduleServices);
 }
+
+/// <summary>
+/// Host services told after every sync of this replica with the catalog, with the catalog's modules (data only, nothing
+/// loaded), e.g. to keep broker queues for modules that are installed but not loaded.
+/// </summary>
+internal interface IModuleCatalogObserver
+{
+    Task CatalogSyncedAsync(IReadOnlyList<ModuleRecord> records, CancellationToken ct);
+}
