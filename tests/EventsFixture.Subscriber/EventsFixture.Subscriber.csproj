@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- A runtime module used only as test input by WebApi.IntegrationTests (integration events between two modules). -->
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <Import Project="..\..\src\WebApi\WebApi.Data\SharedData.props" />
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Carter" Version="10.0.0" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\..\src\WebApi\WebApi.Contracts\WebApi.Contracts.csproj" Private="false" />
+    <Compile Include="..\EventsFixture.Shared\*.cs" LinkBase="Shared" />
+  </ItemGroup>
+
+</Project>

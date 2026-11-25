@@ -37,6 +37,20 @@ public abstract class TenantDbContext : DbContext
     /// <summary>The tenant this context works for; null outside a tenant scope (queries on tenant-owned rows then return nothing).</summary>
     public string? CurrentTenantId => _tenant.Tenant?.Id;
 
+    /// <summary>The module schema (or table prefix), for the platform's own helpers.</summary>
+    internal string SchemaName => Schema;
+
+    /// <summary>
+    /// True: the context also maps the integration outbox and inbox (<see cref="Messaging.OutboxMessage"/>,
+    /// <see cref="Messaging.InboxMessage"/>) in the module's schema. Required by
+    /// <see cref="IntegrationEventsServiceCollectionExtensions.AddIntegrationEvents{TContext}"/>. Turning it on changes the
+    /// model: add a migration (one per engine) that creates the two tables.
+    /// <para>Opt-in, so modules built against an earlier platform keep a model that matches their migrations.</para>
+    /// </summary>
+    protected virtual bool UsesIntegrationEvents => false;
+
+    internal bool MapsIntegrationTables => UsesIntegrationEvents;
+
     protected abstract void ConfigureModel(ModelBuilder modelBuilder);
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) =>
@@ -47,6 +61,7 @@ public abstract class TenantDbContext : DbContext
         var schemas = ModuleIsolation.UsesSchemas(Database.ProviderName);
         if (schemas) modelBuilder.HasDefaultSchema(Schema);
         ConfigureModel(modelBuilder);
+        if (UsesIntegrationEvents) Messaging.IntegrationTables.Map(modelBuilder);
         if (!schemas) ModuleIsolation.PrefixTables(modelBuilder, Schema);
         if (DatabaseProviderAdapter.ForEfProvider(Database.ProviderName)?.Provider == DatabaseProvider.MySql) StoreDateTimeOffsetAsUtc(modelBuilder);
 

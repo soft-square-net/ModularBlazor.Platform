@@ -173,6 +173,7 @@ internal sealed partial class ModuleRuntime
                         DesiredState = previous?.DesiredState ?? ModuleState.Installed, // an upgrade keeps the module's state
                         Permissions = manifest.Permissions.ToList(),
                         Lookups = lookups,
+                        Subscriptions = manifest.Subscriptions.ToList(),
                         InstalledAt = DateTimeOffset.UtcNow
                     };
                     _records[record.Id] = record;
@@ -419,7 +420,8 @@ internal sealed partial class ModuleRuntime
                     Core = core,
                     PackageHash = hash,
                     Permissions = manifest.Permissions.ToList(),
-                    Lookups = lookups
+                    Lookups = lookups,
+                    Subscriptions = manifest.Subscriptions.ToList()
                 };
                 _store.Save(_records.Values);
                 _log.LogInformation("Installed {Kind} module {Id} {Version} ({Mode})", kind.ToLowerInvariant(), manifest.Id, manifest.Version,
@@ -445,6 +447,11 @@ internal sealed partial class ModuleRuntime
         // held the copies in its hoisted locals (the foreach over _loaded), and its callers' frames would too, so a GC
         // loop inside it could never collect them.
         await CollectReleasedAsync(result);
+        foreach (var observer in _hostRoot.GetServices<IModuleCatalogObserver>())
+        {
+            try { await observer.CatalogSyncedAsync(result.Catalog, ct); }
+            catch (Exception e) when (e is not OperationCanceledException) { _log.LogError(e, "Catalog observer {Observer} failed", observer.GetType().Name); }
+        }
         return result;
     }
 
@@ -456,6 +463,7 @@ internal sealed partial class ModuleRuntime
             using (await _store.LockAsync(ct)) ReloadRecords();
 
             var result = new SyncResult();
+            result.Catalog.AddRange(_records.Values);
             foreach (var (id, module) in _loaded.ToArray())
             {
                 _records.TryGetValue(id, out var record);
@@ -816,6 +824,8 @@ internal sealed partial class ModuleRuntime
                 Pipeline = module as IModulePipeline,
                 HostedServices = new ModuleHostedServices(record.Id, container, _log)
             };
+            // Integration event subscriptions as the manifest declares them now (strings only).
+            _hostRoot.GetService<Messaging.ModuleSubscriptions>()?.Set(record.Id, module.Manifest.Subscriptions);
             // Tenancy (per-tenant initialization) and other host observers; they let go in ReleaseAsync.
             foreach (var observer in _hostRoot.GetServices<IModuleLifecycleObserver>()) observer.Loaded(record.Id, container.Root);
             return loaded;
@@ -864,7 +874,9 @@ internal sealed partial class ModuleRuntime
     private static async Task<(WeakReference Context, string? StopNote)> ReleaseAsync(LoadedModule module, IServiceProvider hostRoot, IServiceCollection hostServices, TimeSpan hostedServiceTimeout)
     {
         var stopNote = await module.HostedServices.StopAsync(hostedServiceTimeout); // before anything is disposed
-        foreach (var observer in hostRoot.GetServices<IModuleLifecycleObserver>())
+        // In reverse order of Loaded: an observer that depends on an earlier one (integration consumers wait for the
+        // tenant initialization) lets go first.
+        foreach (var observer in hostRoot.GetServices<IModuleLifecycleObserver>().Reverse())
             await observer.ReleasingAsync(module.Id, module.Container.Root);
         await module.Container.DisposeAsync();
         FrameworkCaches.Evict(module.Context, hostRoot, hostServices);
@@ -949,6 +961,9 @@ internal sealed partial class ModuleRuntime
         if (!Slug().IsMatch(manifest.Id)) throw new ModuleException($"Invalid module id '{manifest.Id}'.");
         if (!Slug().IsMatch(manifest.RoutePrefix.Trim('/'))) throw new ModuleException($"Invalid route prefix '{manifest.RoutePrefix}'.");
         if (!VersionText().IsMatch(manifest.Version)) throw new ModuleException($"Invalid version '{manifest.Version}'.");
+        foreach (var pattern in manifest.Subscriptions)
+            if (!Contracts.Messaging.IntegrationTypes.IsValidPattern(pattern))
+                throw new ModuleException($"Invalid integration event subscription '{pattern}': lowercase words separated by dots, '*' inside a word, '#' as a whole word.");
     }
 
     /// <summary>SHA-256 over every file's relative path and content, in a stable order.</summary>

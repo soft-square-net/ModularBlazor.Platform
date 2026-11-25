@@ -49,4 +49,12 @@ public sealed record ModuleManifest(string Id, string Name, string Version, stri
     /// reports <c>restartRequired</c>. Activate and deactivate still work.
     /// </summary>
     public bool HotUnload { get; init; } = true;
+
+    /// <summary>
+    /// Integration event type patterns the module handles (<see cref="Messaging.IntegrationTypes"/>), e.g.
+    /// <c>["org.unit-*.v1", "shifts.checked-in.v1"]</c>. Data read at install, without loading the module: the host
+    /// binds the module's durable queue (<c>integration.{id}.{pool}</c>) to them, so events wait there while the module
+    /// is unloaded. Register a handler for each with <c>services.AddIntegrationHandler&lt;T&gt;(pattern)</c>.
+    /// </summary>
+    public IReadOnlyList<string> Subscriptions { get; init; } = [];
 }

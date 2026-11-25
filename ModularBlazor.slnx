@@ -58,6 +58,9 @@
   <Folder Name="/tests/">
     <Project Path="tests/ClientModules.Fixture/ClientModules.Fixture.csproj" />
     <Project Path="tests/ClientModules.Tests/ClientModules.Tests.csproj" />
+    <Project Path="tests/EventsFixture.Publisher/EventsFixture.Publisher.csproj" />
+    <Project Path="tests/EventsFixture.Subscriber/EventsFixture.Subscriber.csproj" />
+    <Project Path="tests/WebApi.IntegrationTests/WebApi.IntegrationTests.csproj" />
     <Project Path="tests/WebApi.Tests/WebApi.Tests.csproj" />
   </Folder>
 </Solution>
