@@ -32,9 +32,10 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "npm run clean && npm run build:lib && npm run build:blazor && npm run build:animator && npm run build:css",
+    "build": "npm run clean && npm run build:lib && npm run build:blazor && npm run build:monaco-workers && npm run build:animator && npm run build:css",
     "build:lib": "vite build --mode lib",
     "build:blazor": "vite build --mode blazor",
+    "build:monaco-workers": "vite build --mode monaco-workers",
     "build:animator": "vite build --mode animator && vite build --mode animator-player",
     "build:css": "sass --no-source-map --style=compressed src/styles/mudtail.scss:dist/mudtail.css src/styles/mudtail.core.scss:dist/mudtail.core.css src/styles/packs:dist/packs && node -e \"require('fs').copyFileSync('src/styles/tailwind.css','dist/tailwind.css')\"",
     "build:demo": "vite build",
@@ -45,7 +46,8 @@
   },
   "dependencies": {
     "gsap": "^3.15.1",
-    "lucide": "^1.70.0"
+    "lucide": "^1.70.0",
+    "monaco-editor": "0.57.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

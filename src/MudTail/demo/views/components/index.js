@@ -7,11 +7,12 @@ import { LOADING_PAGE, PROGRESS_PAGE } from './feedback.js';
 import { TREE_PAGE } from './tree.js';
 import { IMAGE_EDITOR_PAGE } from './imageEditor.js';
 import { EXPLORER_PAGE } from './explorer.js';
+import { DESIGNER_PAGES } from './designer.js';
 import { PLUGINS_PAGE } from './plugins.js';
 import { COUNTDOWN_PAGE } from './countdown.js';
 import { ANIMATOR_PAGE } from './animator.js';
 
-export const COMPONENT_PAGES = [...CORE_PAGES.slice(0, 5), DATATABLE_PAGE, LOADING_PAGE, PROGRESS_PAGE, TREE_PAGE, EXPLORER_PAGE, IMAGE_EDITOR_PAGE, ...CORE_PAGES.slice(5), ...EDITORIAL_PAGES];
+export const COMPONENT_PAGES = [...CORE_PAGES.slice(0, 5), DATATABLE_PAGE, LOADING_PAGE, PROGRESS_PAGE, TREE_PAGE, EXPLORER_PAGE, IMAGE_EDITOR_PAGE, ...DESIGNER_PAGES, ...CORE_PAGES.slice(5), ...EDITORIAL_PAGES];
 // Plugins ▸ the plugin system, then one page per sample plugin.
 export const PLUGIN_PAGES = [{ ...PLUGINS_PAGE, navLabel: 'Overview' }, COUNTDOWN_PAGE, ANIMATOR_PAGE];
 export { FORM_PAGES };

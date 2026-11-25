@@ -1,0 +1,71 @@
+// MudMonaco: the editor's own chrome (language picker, read-only badge, the textarea it starts as). Monaco's
+// stylesheet is in the 'monaco' pack (packs/monaco.scss), next to this.
+
+.mud-monaco {
+  display: flex;
+  flex-direction: column;
+  block-size: 100%;
+  min-block-size: 120px;
+  background: var(--mud-palette-surface);
+  color: var(--mud-palette-text-primary);
+  border: 1px solid var(--mud-palette-lines-default);
+  border-radius: var(--mud-default-borderradius, 4px);
+  overflow: hidden;
+}
+
+.mud-monaco__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  min-block-size: 32px;
+  padding-inline: 8px;
+  border-block-end: 1px solid var(--mud-palette-lines-default);
+  font-size: 12px;
+  color: var(--mud-palette-text-secondary);
+}
+
+.mud-monaco__label { display: inline-flex; align-items: center; gap: 6px; }
+
+.mud-monaco__select {
+  font: inherit;
+  color: var(--mud-palette-text-primary);
+  background: var(--mud-palette-surface);
+  border: 1px solid var(--mud-palette-lines-inputs);
+  border-radius: var(--mud-default-borderradius, 4px);
+  padding-block: 2px;
+  padding-inline: 6px;
+}
+
+.mud-monaco__badge {
+  margin-inline-start: auto;
+  padding-inline: 6px;
+  border-radius: 999px;
+  background: rgba(var(--mud-palette-primary-rgb), 0.14);
+  color: var(--mud-palette-primary);
+  &[hidden] { display: none; }
+}
+
+.mud-monaco__body { position: relative; flex: 1; min-block-size: 0; }
+
+.mud-monaco__editor { position: absolute; inset: 0; }
+
+.mud-monaco__fallback {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  margin: 0;
+  padding: 8px 12px;
+  border: 0;
+  resize: none;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: 13px/1.5 ui-monospace, "Cascadia Code", "Cascadia Mono", Consolas, "SF Mono", monospace;
+  tab-size: 2;
+  white-space: pre;
+  &:focus-visible { box-shadow: inset 0 0 0 2px rgba(var(--mud-palette-primary-rgb), 0.35); }
+}
+
+.mud-monaco--readonly .mud-monaco__fallback { color: var(--mud-palette-text-secondary); }

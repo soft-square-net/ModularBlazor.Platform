@@ -212,3 +212,94 @@
 .cp-recipe-files img { inline-size: 64px; block-size: 64px; object-fit: cover; border-radius: 4px; }
 .cp-recipe-files span { display: grid; min-inline-size: 0; font-size: 0.8125rem; }
 .cp-recipe-files small { color: var(--mud-palette-text-secondary); }
+
+// Design canvas, Code editor and Style tokens pages (the Content Designer's packs)
+.cp-designer {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  block-size: 620px;
+  border: 1px solid var(--mud-palette-lines-default);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--mud-palette-surface);
+}
+.cp-designer__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-block-end: 1px solid var(--mud-palette-lines-default);
+}
+.cp-designer__seg {
+  display: inline-flex;
+  border: 1px solid var(--mud-palette-lines-inputs);
+  border-radius: 6px;
+  overflow: hidden;
+  button {
+    padding: 3px 12px;
+    border: 0;
+    border-inline-start: 1px solid var(--mud-palette-lines-inputs);
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-secondary);
+    font: inherit;
+    font-size: 0.8125rem;
+    cursor: pointer;
+    &:first-child { border-inline-start: 0; }
+    &[aria-pressed="true"] { background: rgba(var(--mud-palette-primary-rgb), 0.12); color: var(--mud-palette-primary); font-weight: 600; }
+  }
+}
+.cp-designer__sep { inline-size: 1px; block-size: 18px; background: var(--mud-palette-lines-default); }
+.cp-designer__zoom, .cp-designer__toggles { display: inline-flex; align-items: center; gap: 4px; }
+.cp-designer__toggles { gap: 14px; }
+.cp-designer__pct { min-inline-size: 3.5em; text-align: center; font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
+.cp-designer__check { display: inline-flex; align-items: center; gap: 4px; font-size: 0.8125rem; }
+.cp-designer__body { display: grid; grid-template-columns: 180px minmax(0, 1fr); min-block-size: 0; }
+.cp-designer__palette {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-inline-end: 1px solid var(--mud-palette-lines-default);
+  font-size: 0.8125rem;
+  overflow: auto;
+}
+.cp-designer__tool {
+  padding: 6px 10px;
+  border: 1px solid var(--mud-palette-lines-inputs);
+  border-radius: 6px;
+  background: var(--mud-palette-background);
+  cursor: grab;
+  &:hover { border-color: var(--mud-palette-primary); }
+}
+.cp-designer__hint { margin: 6px 0 0; color: var(--mud-palette-text-secondary); font-size: 0.75rem; }
+.cp-designer__stage { min-block-size: 0; }
+.cp-designer .cp-tree-log { margin: 0; padding: 6px 10px; border-block-start: 1px solid var(--mud-palette-lines-default); font-family: ui-monospace, monospace; font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cp-designer .mud-canvas__content :is(p, h1, h2, h3, blockquote, figure, aside) { margin: 0; }
+.cp-designer .mud-canvas__content figure { min-block-size: 40px; }
+.cp-designer .mud-canvas__content blockquote { padding-inline: 1rem; font-style: italic; }
+@media (max-width: 760px) {
+  .cp-designer__body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .cp-designer__palette { flex-direction: row; flex-wrap: wrap; border-inline-end: 0; border-block-end: 1px solid var(--mud-palette-lines-default); }
+  .cp-designer__hint { display: none; }
+}
+
+.cp-monaco { block-size: 300px; }
+.cp-monaco--short { block-size: 120px; }
+.cp-monaco__problems {
+  margin: 8px 0 0;
+  padding-inline-start: 18px;
+  font-size: 0.8125rem;
+  li[data-severity="error"] { color: var(--mud-palette-error); }
+  li[data-severity="warning"] { color: var(--mud-palette-warning); }
+  li[data-severity="info"] { color: var(--mud-palette-text-secondary); list-style: none; margin-inline-start: -18px; }
+}
+
+.cp-tokens__page {
+  max-inline-size: 100%;
+  margin-block-start: 12px;
+  padding: 8px;
+  border: 1px dashed var(--mud-palette-lines-inputs);
+  border-radius: 8px;
+  :is(figure, aside, p) { margin: 0; padding: 12px; border-radius: 6px; min-block-size: 64px; }
+}

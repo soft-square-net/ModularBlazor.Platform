@@ -75,6 +75,16 @@ export default {
   'datatable.op.isnull': 'فارغ',
   'datatable.op.notnull': 'غير فارغ',
 
+  'canvas.label': 'لوحة التصميم',
+  'canvas.empty': 'أفلت الكتل هنا',
+  'canvas.resizeSpan': 'اسحب لتغيير عدد الأعمدة',
+  'canvas.resizeHeight': 'اسحب لتغيير الارتفاع',
+
+  'monaco.label': 'محرر الشيفرة',
+  'monaco.language': 'اللغة',
+  'monaco.readOnly': 'للقراءة فقط',
+  'monaco.lang.plaintext': 'نص عادي',
+
   'dock.emptyTitle': 'لا توجد نوافذ مفتوحة',
   'dock.emptyText': 'افتح نافذة من قائمة «عرض»، أو استعد التخطيط الافتراضي.',
   'dock.reset': 'إعادة ضبط تخطيط النوافذ',

@@ -16,6 +16,8 @@ src/                  the library (everything published)
   explorer/           MudExplorer: a Windows 11 style file explorer (tabs, address bar, command bar, navigation and
                       details panes, six views, selection, rename, drag and drop) and its parts: MudFileView,
                       MudCommandBar, MudAddressBar, MudContextMenu, and the pure model (sorting, selection, history)
+  designer/           MudCanvas: the Content Designer's design surface (geometry.js = the pure gesture rules)
+  monaco/             MudMonaco: the self-hosted Monaco editor (runtime.js = Monaco's modules, languages.js = pure parts)
   locales/            message packs for MudTail's own UI (ar.js: Arabic)
   styles/             SCSS sources (mudtail.scss entry) and the Tailwind preset (tailwind.css)
 demo/                 the showcase; it uses the library only through `mudtail`
@@ -39,12 +41,13 @@ dist/                 build output (git-ignored)
 
 | File | For |
 | --- | --- |
-| `dist/mudtail.js` | ES module for apps that bundle (gsap and lucide stay external, resolved from its dependencies) |
+| `dist/mudtail.js` | ES module for apps that bundle (gsap, lucide and monaco-editor stay external, resolved from its dependencies) |
 | `dist/mudtail.blazor.js` | Self-contained ES module (gsap bundled) for Blazor's `JS.InvokeAsync("import", ...)` |
 | `dist/mudtail.css` | Component styles and `--mud-palette-*` tokens, light and dark: everything, in one sheet |
 | `dist/mudtail.core.css` | The same without the packs below: what an app loads up front |
-| `dist/packs/*.css` | `site` (editorial, sports, gallery, the `mud-site` shell), `dock`, `tree`, `image-editor`, `explorer`; each needs the core sheet |
-| `dist/chunks/*.js` | The code of `dock`, `tree`, `image-editor` and `explorer`, which `mudtail.blazor.js` imports on first use |
+| `dist/packs/*.css` | `site` (editorial, sports, gallery, the `mud-site` shell), `dock`, `tree`, `image-editor`, `explorer`, `designer`, `editorial` (the `data-mb-*` style tokens), `monaco` (with Monaco's own stylesheet); each needs the core sheet |
+| `dist/chunks/*.js` | The code of `dock`, `tree`, `image-editor`, `explorer`, `designer` and `monaco` (Monaco itself is one more chunk), which `mudtail.blazor.js` imports on first use |
+| `dist/monaco/*.worker.js` | Monaco's web workers (editor, JSON, CSS, HTML), served next to the chunks; see `setMonacoBase` |
 | `dist/tailwind.css` | Tailwind v4 preset mapping the tokens to utilities |
 
 ## Theme tokens
@@ -559,6 +562,118 @@ await _dock.InvokeVoidAsync("dispose");   // in DisposeAsync: also disposes the 
 
 The handle's methods are `addPanel(key, groupId?, zone?)`, `show`, `openDocument`, `close`, `activate`, `getPanelState`, `setPanelState`, `resetLayout`, `clearSaved`, `serialize`, `load` and `dispose`.
 
+## Content Designer packs
+
+Three packs serve the Content Designer (and anything else that needs them). Users who never open a designer never
+download them: each is a chunk and a stylesheet, loaded by `create('canvas' | 'monaco', …)` or `load(area)`. The
+showcase has a page for each: **Design canvas**, **Code editor** and **Style tokens**.
+
+### Design canvas (MudCanvas, pack `designer`)
+
+A port of VsDock's post designer (`post-designer.js`). A page in a device frame: Mobile 375, Tablet 768, Desktop
+1280, AMP 375. It has:
+- a selection box with the block's type, and drop markers: a bar before or after a block, or the whole container for
+  "inside";
+- a span handle on the block's inline end (it snaps to the parent grid's columns) and a height handle for
+  `data-can-h` blocks;
+- in-place plain-text editing (double-click), zoom 25–300 % (Ctrl+wheel around the pointer, Ctrl + = / − / 0) and
+  panning with the middle button;
+- keys: Alt+↑ / Alt+↓ move the selection, Delete removes it, Escape clears it, Ctrl+Z / Ctrl+Y / Ctrl+D.
+
+**RTL.** The frame carries the page's own direction (`dir`, `lang`), apart from the app's. In RTL the right edge of a
+block means "before", and the span handle sits on the left and widens to the left.
+
+**One call per gesture.** Hit-testing, markers and live previews happen in JavaScript while the pointer moves. The host
+hears the result once: `select`, `drop`, `resize`, `edit`, `move`, `delete`, `command`, `zoom`. It owns the model and
+re-renders; the canvas redraws its overlay when the DOM changes.
+
+```js
+const canvas = new MudCanvas({ device: 'tablet', zoom: 80, dir: 'rtl', lang: 'ar', onGesture: (name, payload) => apply(name, payload) });
+host.appendChild(canvas.getElement());
+canvas.content.replaceChildren(render(model));   // blocks: data-block-id, data-block-type, data-container, data-empty,
+                                                 // data-has-text, data-can-h, draggable="true" (VsDock's PostBlockNode)
+```
+
+Toolbox items anywhere on the page are `[data-block-new="<key>"][draggable="true"]`. The pure rules (drop position,
+span snapping, zoom steps, the key map) are in `src/designer/geometry.js`, tested by `geometry.test.js`.
+
+From Blazor, `create('canvas', host, options, dotNetRef)` does one of two things:
+- it mounts a JS root component in the frame (`component`);
+- or, with `adopt: true`, it decorates markup that Blazor rendered itself.
+
+Every gesture is one `OnMudEvent(name, payload)`. The handle has `setDevice`, `setZoom`, `zoomIn`, `zoomOut`,
+`resetZoom`, `setDirection`, `setShowHidden`, `select`, `reveal`, `refresh`, `setParameters` and `dispose`.
+
+### Code editor (MudMonaco, pack `monaco`)
+
+The Monaco editor, self-hosted: no CDN. `src/monaco/runtime.js` imports Monaco's ES modules:
+- `editor.main` without the TypeScript service;
+- JSON, HTML and CSS with their language services;
+- colouring for a short list of other languages.
+
+In the Blazor build that file is a chunk of its own, and Monaco's workers are `dist/monaco/*.worker.js`.
+- **Fallback.** The editor starts as a textarea, so typing works at once. It stays one when Monaco can't load, or
+  with `monaco: false`.
+- **Picker and modes.** A language picker (`languages`: true, a list, or false) and read-only mode (`readOnly`).
+- **JSON Schema.** `schema` (or `setSchema`) validates the editor's JSON against a JSON Schema, such as the ones
+  DynamicFields exports. `getProblems()` lists the markers.
+- **Theme.** Colours come from the palette and follow light and dark mode.
+
+```js
+const editor = new MudMonaco({ value, language: 'json', schema, readOnly: false, onChange: (text) => save(text) });
+host.appendChild(editor.getElement());
+await editor.ready;   // true: Monaco runs; false: the textarea stayed
+```
+
+- **Workers.** `setMonacoBase(url)` (Blazor module) or `setMonacoWorkerBase(url)` says where the workers are.
+  - On another origin (the WebApi), each worker starts from a same-origin blob that imports it. So the files need CORS,
+    like the chunks.
+  - Without a base, workers are left to the bundler (`new URL(…, import.meta.url)`), as in the demo.
+- **Stylesheet.** The stylesheets Monaco's modules import are dropped from the Blazor build. The `monaco` pack carries
+  Monaco's `editor.main.css` instead.
+- **Blazor.** `create('monaco', host, options, dotNetRef)` raises `OnMudEvent("change" | "language" | "ready", …)`.
+  The handle has `getValue`, `setValue`, `setLanguage`, `setReadOnly`, `setSchema`, `getProblems`, `format`, `focus`
+  and `dispose`.
+
+### Style tokens (pack `editorial`)
+
+The CSS behind DynamicFields' style properties and the designer's per-view placement. A renderer writes attributes,
+never classes:
+- `data-mb-<token>` for the base (Mobile);
+- `data-mb-<token>-<sm|md|lg|xl>` where a view changes it (Tablet is `md`, Desktop `lg`).
+
+| Token | Values |
+| --- | --- |
+| `width` | `content` · `wide` · `full` · `half` · `third` |
+| `align` | `start` · `center` · `end` |
+| `spacing` | `none` · `sm` · `md` · `lg` · `xl` |
+| `tone` | `default` · `muted` · `accent` · `inverse` (palette colours) |
+| `size` | `sm` · `md` · `lg` · `xl` |
+| `level` | `h1` … `h6` |
+| `aspect` | `auto` · `1-1` · `4-3` · `3-2` · `16-9` · `21-9` · `3-4` · `9-16` |
+| `columns` | `1` · `2` · `3` · `4` · `5` · `6` · `12` |
+| `layout` | `standard` · `wide` · `full` |
+| `span` | `1` … `12` · `full` |
+| `order` | `-1` … `24` · `first` · `last` |
+| `hidden` | `true` · `false` (holds until a wider breakpoint sets it again) |
+
+```html
+<article data-mb-page data-mb-layout="standard">
+  <section data-mb-columns="1" data-mb-columns-md="2" data-mb-columns-lg="3">
+    <figure data-mb-aspect="16-9" data-mb-span-lg="2">…</figure>
+    <aside data-mb-hidden="true" data-mb-hidden-md="false" data-mb-tone="muted">…</aside>
+  </section>
+</article>
+```
+
+- **Container queries.** Breakpoints are container queries on the element with `data-mb-page` (640 / 768 / 1024 /
+  1280 px). The same CSS therefore lays out the canvas' device frame (itself a `data-mb-page`) and the live site,
+  whatever the window's width.
+- **RTL and colours.** Every rule is a logical property, so pages mirror in RTL. The scales are `--mb-*` variables on
+  the page element, and the colours come from the MudTail palette.
+- **Hidden blocks in the designer.** In the canvas (`data-mb-reveal-hidden` on the frame), hidden blocks stay visible,
+  faded, so they can still be selected.
+
 ## Plugins
 
 You can extend MudTail with your own components, `data-mud` behaviours, icons, texts, styles and design tokens, written in plain JavaScript with GSAP and Tailwind. A plugin is one object:
@@ -690,15 +805,17 @@ Component events come back to .NET as one callback:
 
 ### Code loaded on first use
 
-`mudtail.blazor.js` leaves its four largest components out of the entry: **dock**, **tree**, **image-editor** and
-**explorer** (which uses the tree) sit in `chunks/` next to it, with a stylesheet each in `packs/`. `create('dock', …)`
-and the other three return a promise of the handle the first time, while the chunk loads; Blazor's `InvokeAsync`
-awaits it either way. Everything else, including the data table, is in the entry.
+`mudtail.blazor.js` leaves its largest components out of the entry: **dock**, **tree**, **image-editor**,
+**explorer** (which uses the tree), **designer** (the canvas, with the `designer` and `editorial` packs) and **monaco**
+sit in `chunks/` next to it, with their stylesheets in `packs/`. `create('dock', …)`, `create('canvas', …)`,
+`create('monaco', …)` and the rest return a promise of the handle the first time, while the chunk loads; Blazor's
+`InvokeAsync` awaits it either way. Everything else, including the data table, is in the entry.
 
 | Call | What it does |
 | --- | --- |
-| `load(area)` | Imports one of `dock`, `tree`, `image-editor`, `explorer` and its pack; resolves to its exports (`MudDock`, `MudTreeView`, …). `areaNames()` lists them. |
+| `load(area)` | Imports one of `dock`, `tree`, `image-editor`, `explorer`, `designer`, `monaco` and its packs; resolves to its exports (`MudDock`, `MudTreeView`, `MudCanvas`, `MudMonaco`, …). `areaNames()` lists them. |
 | `setPackBase(url)` | Where the packs are: `<url><name>.min.css`. Call it before `init`; `null` (the default) loads no pack, for when the app ships the full `mudtail.css`. |
+| `setMonacoBase(url)` | Where Monaco's workers are: `<url>editor.worker.js`, `json.worker.js`, …. Call it before the first editor. |
 | `loadPack(name)` | Adds one pack's `<link data-mud-pack>` once; resolves when it has loaded. `removePacks()` takes them all out. |
 
 Plugins get `load` and `loadPack` on the host object too. An app that bundles `dist/mudtail.js` gets everything in its

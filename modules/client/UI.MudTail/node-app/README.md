@@ -9,10 +9,12 @@ every layout and module shares, so a layout only adds its own shell on top.
 | Source | Output | What it is |
 | --- | --- | --- |
 | `src/framework/mudtail.css` | `../wwwroot/css/mudtail.min.css` | Tailwind utilities (no preflight), the MudTail preset, MudTail's core CSS and `_host.css`. The site pack (editorial, sport, gallery, the `mud-site` shell) is Layouts.Public's |
-| `src/framework/packs/*.css` | `../wwwroot/css/packs/*.min.css` | The stylesheets of `dock`, `tree`, `image-editor` and `explorer`, added when the component is first used |
-| `src/js/module.ts` | `../wwwroot/js/module.js` + `js/chunks/` | On activation: applies the saved MudTail theme and starts `MudTail.autoInit(document.body)`. Returns the MudTail API. The four large components are chunks it imports on first use; a few chunks (`i18n`, `icons`, …) it shares with them and imports up front |
+| `src/framework/packs/*.css` | `../wwwroot/css/packs/*.min.css` | The stylesheets of `dock`, `tree`, `image-editor`, `explorer`, `designer`, `editorial` and `monaco`, added when the component is first used |
+| `src/js/module.ts` | `../wwwroot/js/module.js` + `js/chunks/` | On activation: applies the saved MudTail theme and starts `MudTail.autoInit(document.body)`. Returns the MudTail API. The large components (dock, tree, image editor, explorer, the design canvas, the code editor and Monaco itself) are chunks it imports on first use; a few chunks (`i18n`, `icons`, …) it shares with them and imports up front |
 
-The build empties `wwwroot/js/chunks` first, since the chunk names carry hashes and old ones would be embedded in the
+| MudTail's `dist/monaco/` | `../wwwroot/js/monaco/` | Monaco's web workers (editor, JSON, CSS, HTML), copied as they are. `module.ts` points MudTail at them (`setMonacoBase`) |
+
+The build empties `wwwroot/js/chunks` and `wwwroot/js/monaco` first, since the chunk names carry hashes and old ones would be embedded in the
 package.
 
 ## Code loaded on first use
@@ -21,7 +23,16 @@ package.
 `<link>` from `css/packs/` next to the module's stylesheet. Offline, when the host runs the package from memory,
 moduleHost turns the chunks into blob urls as well and rewrites the imports to them (the host passes the package's
 other scripts with `module.js`). The packs are not loaded then: a component used for the first time offline has its
-code but not its stylesheet.
+code but not its stylesheet. Monaco's workers aren't either, so an editor opened offline edits and colours its text
+but doesn't validate it.
+
+The Content Designer's packs are on-demand like the rest:
+- `create('canvas', …)` loads the `designer` and `editorial` packs;
+- `create('monaco', …)` loads the `monaco` pack. Its first editor imports Monaco (about 4 MB, 1 MB gzipped) and
+  starts its workers from `js/monaco/`, through a same-origin blob, since the WebApi is another origin;
+- pages that only render `data-mb-*` tokens call `loadPack('editorial')`.
+
+Users who never open a designer download none of it.
 
 ## Shell helpers
 

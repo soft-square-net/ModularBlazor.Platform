@@ -1,0 +1,4 @@
+// MudTail pack 'editorial': the style tokens DynamicFields fields and the Content Designer write as data-mb-*
+// attributes (src/styles/_style-tokens.scss). No component code; it needs the core stylesheet for the palette.
+
+@use "../style-tokens" as *;
