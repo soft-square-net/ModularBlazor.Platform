@@ -81,8 +81,44 @@ public abstract class DatabaseProviderAdapter
         }
     }
 
+    /// <summary>
+    /// The same lock as <see cref="LockAsync"/>, without waiting: null when another session holds it. Used for leader
+    /// election (one replica runs a job, the others skip the cycle).
+    /// </summary>
+    public async Task<IAsyncDisposable?> TryLockAsync(string connectionString, string key, CancellationToken ct)
+    {
+        var connection = CreateConnection(connectionString);
+        try
+        {
+            await connection.OpenAsync(ct);
+            if (await TryAcquireAsync(connection, key, ct)) return new Held(this, connection, key);
+        }
+        catch
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
+        await connection.DisposeAsync();
+        return null;
+    }
+
     protected abstract string AcquireSql { get; }
     protected abstract string ReleaseSql { get; }
+
+    /// <summary>Takes the lock if it is free; the SQL returns 1 when it did.</summary>
+    protected abstract string TryAcquireSql { get; }
+
+    protected virtual async Task<bool> TryAcquireAsync(DbConnection connection, string key, CancellationToken ct)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = TryAcquireSql;
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "lockKey";
+        parameter.Value = LockKey(key);
+        command.Parameters.Add(parameter);
+        var result = await command.ExecuteScalarAsync(ct);
+        return result is not null and not DBNull && Convert.ToInt64(result) == 1;
+    }
 
     /// <summary>Lock name as the engine wants it (some cap the length or want a number).</summary>
     protected virtual object LockKey(string key) => key;
@@ -163,6 +199,7 @@ internal sealed class PostgreSqlAdapter : DatabaseProviderAdapter
 
     protected override string AcquireSql => "SELECT pg_advisory_lock(hashtext(@lockKey))";
     protected override string ReleaseSql => "SELECT pg_advisory_unlock(hashtext(@lockKey))";
+    protected override string TryAcquireSql => "SELECT CASE WHEN pg_try_advisory_lock(hashtext(@lockKey)) THEN 1 ELSE 0 END";
 }
 
 internal sealed class SqlServerAdapter : DatabaseProviderAdapter
@@ -192,6 +229,8 @@ internal sealed class SqlServerAdapter : DatabaseProviderAdapter
     protected override string AcquireSql =>
         "DECLARE @r int; EXEC @r = sp_getapplock @Resource = @lockKey, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = -1; IF @r < 0 THROW 50000, 'sp_getapplock failed', 1;";
     protected override string ReleaseSql => "EXEC sp_releaseapplock @Resource = @lockKey, @LockOwner = 'Session';";
+    protected override string TryAcquireSql =>
+        "DECLARE @r int; EXEC @r = sp_getapplock @Resource = @lockKey, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = 0; SELECT CASE WHEN @r >= 0 THEN 1 ELSE 0 END;";
 }
 
 internal sealed class MySqlAdapter : DatabaseProviderAdapter
@@ -221,6 +260,7 @@ internal sealed class MySqlAdapter : DatabaseProviderAdapter
     protected override object LockKey(string key) => $"webapi:{StableHash(key)}";
     protected override string AcquireSql => "SELECT GET_LOCK(@lockKey, -1)";
     protected override string ReleaseSql => "SELECT RELEASE_LOCK(@lockKey)";
+    protected override string TryAcquireSql => "SELECT GET_LOCK(@lockKey, 0)";
 }
 
 internal sealed class OracleAdapter : DatabaseProviderAdapter
@@ -294,4 +334,24 @@ internal sealed class OracleAdapter : DatabaseProviderAdapter
     protected override string AcquireSql =>
         "DECLARE r INTEGER; BEGIN r := DBMS_LOCK.REQUEST(id => :lockKey, lockmode => DBMS_LOCK.X_MODE, timeout => DBMS_LOCK.MAXWAIT, release_on_commit => FALSE); IF r NOT IN (0, 4) THEN RAISE_APPLICATION_ERROR(-20001, 'DBMS_LOCK.REQUEST returned ' || r); END IF; END;";
     protected override string ReleaseSql => "DECLARE r INTEGER; BEGIN r := DBMS_LOCK.RELEASE(id => :lockKey); END;";
+
+    // A PL/SQL block returns no row: a busy lock (REQUEST returns 1) raises ORA-20002, read back as "not taken".
+    protected override string TryAcquireSql =>
+        "DECLARE r INTEGER; BEGIN r := DBMS_LOCK.REQUEST(id => :lockKey, lockmode => DBMS_LOCK.X_MODE, timeout => 0, release_on_commit => FALSE); IF r = 1 THEN RAISE_APPLICATION_ERROR(-20002, 'busy'); ELSIF r NOT IN (0, 4) THEN RAISE_APPLICATION_ERROR(-20001, 'DBMS_LOCK.REQUEST returned ' || r); END IF; END;";
+
+    protected override async Task<bool> TryAcquireAsync(DbConnection connection, string key, CancellationToken ct)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = TryAcquireSql;
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "lockKey";
+        parameter.Value = LockKey(key);
+        command.Parameters.Add(parameter);
+        try
+        {
+            await command.ExecuteNonQueryAsync(ct);
+            return true;
+        }
+        catch (OracleException e) when (e.Number == 20002) { return false; }
+    }
 }

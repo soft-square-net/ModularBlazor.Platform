@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using soft.square.net.WebApi.Contracts.Tenancy;
 using soft.square.net.WebApi.Modularity;
+using soft.square.net.WebApi.Tenancy.Seeds;
 
 namespace soft.square.net.WebApi.Tenancy;
 
@@ -12,7 +13,7 @@ namespace soft.square.net.WebApi.Tenancy;
 /// <para>Unload safety: everything about a module copy is dropped, and its work cancelled and awaited, before the
 /// runtime disposes its container.</para>
 /// </summary>
-internal sealed class ModuleTenantInitializer : IModuleLifecycleObserver
+internal sealed class ModuleTenantInitializer : IModuleLifecycleObserver, ITenantReadiness
 {
     private readonly TenantDirectory _directory;
     private readonly ILogger<ModuleTenantInitializer> _log;
@@ -64,6 +65,10 @@ internal sealed class ModuleTenantInitializer : IModuleLifecycleObserver
         var task = entry.Tenants.GetOrAdd(tenant.Id, _ => Initialize(entry, tenant));
         return task.IsFaulted ? Start(entry, tenant, replace: true) : task;
     }
+
+    /// <summary>Completes when every module loaded on this replica is ready to serve <paramref name="tenant"/>.</summary>
+    public Task ReadyAsync(TenantInfo tenant, CancellationToken ct) =>
+        Task.WhenAll(_current.Keys.ToArray().Select(moduleId => ReadyAsync(moduleId, tenant))).WaitAsync(ct);
 
     private void OnTenantChanged(TenantInfo tenant)
     {

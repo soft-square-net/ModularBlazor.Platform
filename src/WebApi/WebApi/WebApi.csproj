@@ -23,6 +23,8 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.11.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.11.0" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.20.0" />
+    <!-- Leader lock of the tenant seed reconciler when the host has Redis (ConnectionStrings:redis). -->
+    <PackageReference Include="StackExchange.Redis" Version="2.13.17" />
   </ItemGroup>
 
   <ItemGroup>
