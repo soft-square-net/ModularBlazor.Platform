@@ -1,0 +1,36 @@
+@using soft.square.net.ModularBlazor.Abstractions.Live
+@implements IDisposable
+@inject IServiceProvider Services
+@inject IStringLocalizer<DefaultLayout> L
+
+@*
+  The live connection, small, in the toolbar: a green "Live" while connected, an amber "Reconnecting" while the
+  channel is trying again (pages may be behind until it is back and they resync). Nothing while offline (signed out),
+  or with a host that has no live channel.
+*@
+@if (_channel is { State: not LiveState.Offline } channel)
+{
+  var connected = channel.State == LiveState.Connected;
+  <span class="shell-badge shell-badge--@(connected ? "success" : "warning") shell-live" role="status"
+        data-live="@channel.State.ToString().ToLowerInvariant()"
+        title="@(connected ? L["Live updates are on"] : L["Live updates are reconnecting"])">
+    @(connected ? L["Live"] : L["Reconnecting"])
+  </span>
+}
+
+@code {
+  private ILiveChannel? _channel;
+
+  protected override void OnInitialized()
+  {
+    _channel = Services.GetService(typeof(ILiveChannel)) as ILiveChannel;
+    if (_channel is not null) _channel.StateChanged += OnStateChanged;
+  }
+
+  private void OnStateChanged(LiveState state) => _ = InvokeAsync(StateHasChanged);
+
+  public void Dispose()
+  {
+    if (_channel is not null) _channel.StateChanged -= OnStateChanged;
+  }
+}

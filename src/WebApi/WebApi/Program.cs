@@ -2,6 +2,7 @@ using Carter;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
+using soft.square.net.WebApi.Live;
 using soft.square.net.WebApi.Localization;
 using soft.square.net.WebApi.Lookups;
 using soft.square.net.WebApi.Messaging;
@@ -35,6 +36,9 @@ builder.Services.AddPlatformLookups();
 // Authentication (JWT from the identity service; dev tokens via dotnet user-jwts), a fallback policy that requires a
 // signed-in caller, and permissions evaluated against per-tenant grants (IAccessScopes / IGrantStore for modules).
 builder.AddPlatformSecurity("broker");
+// Live: the SignalR hub /hubs/live (topics user:, unit: and {module}:{kind}:{key}, authorized from grants and the
+// manifests' LiveTopics) and ILiveNotifier for modules; every replica gets every message over the broker fanout "live".
+builder.AddPlatformLive("broker");
 // Browser apps on another origin (the Blazor WebAssembly client calls the gateway from its own port): only the origins
 // in Cors:AllowedOrigins (none by default). The bearer token travels in a header, so no credentials (cookies) are allowed.
 var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
@@ -73,5 +77,6 @@ if (ModularOpenApi.IsEnabled(app.Configuration, app.Environment))
 app.MapHealthChecks("/health").AllowAnonymous();
 app.MapCarter();          // endpoints compiled into this app, including the module admin API and /api/pool
 app.MapRuntimeModules();  // endpoints of modules activated at runtime
+app.MapPlatformLive();    // the live hub (/hubs/live, WebSockets; the token in access_token)
 
 app.Run();

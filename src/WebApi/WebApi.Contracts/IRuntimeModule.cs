@@ -42,6 +42,12 @@ public sealed record ModuleManifest(string Id, string Name, string Version, stri
     public IReadOnlyList<Security.PermissionDefinition> Permissions { get; init; } = [];
 
     /// <summary>
+    /// The live topic kinds the module publishes (<c>{Id}:{kind}:{key}</c>) and the permission a subscriber needs for
+    /// each. Data the host reads at install: the live hub authorizes subscriptions from it, never through module code.
+    /// </summary>
+    public IReadOnlyList<Live.LiveTopic> LiveTopics { get; init; } = [];
+
+    /// <summary>
     /// True (default): the module can be unloaded, uninstalled and swapped to a new version or new settings while
     /// the host runs. Set it to false when the module, or a library it hosts, keeps process-wide state that pins its
     /// assemblies (static caches, global registrations). The runtime then refuses unload and uninstall with 409

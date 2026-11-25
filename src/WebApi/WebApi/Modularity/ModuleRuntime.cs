@@ -172,6 +172,7 @@ internal sealed partial class ModuleRuntime
                         Settings = settings,
                         DesiredState = previous?.DesiredState ?? ModuleState.Installed, // an upgrade keeps the module's state
                         Permissions = manifest.Permissions.ToList(),
+                        LiveTopics = manifest.LiveTopics.ToList(),
                         Lookups = lookups,
                         Subscriptions = manifest.Subscriptions.ToList(),
                         InstalledAt = DateTimeOffset.UtcNow
@@ -421,7 +422,8 @@ internal sealed partial class ModuleRuntime
                     PackageHash = hash,
                     Permissions = manifest.Permissions.ToList(),
                     Lookups = lookups,
-                    Subscriptions = manifest.Subscriptions.ToList()
+                    Subscriptions = manifest.Subscriptions.ToList(),
+                    LiveTopics = manifest.LiveTopics.ToList()
                 };
                 _store.Save(_records.Values);
                 _log.LogInformation("Installed {Kind} module {Id} {Version} ({Mode})", kind.ToLowerInvariant(), manifest.Id, manifest.Version,

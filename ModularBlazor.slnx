@@ -61,6 +61,7 @@
     <Project Path="tests/EventsFixture.Publisher/EventsFixture.Publisher.csproj" />
     <Project Path="tests/EventsFixture.Subscriber/EventsFixture.Subscriber.csproj" />
     <Project Path="tests/WebApi.IntegrationTests/WebApi.IntegrationTests.csproj" />
+    <Project Path="tests/ModularBlazor.Client.Tests/ModularBlazor.Client.Tests.csproj" />
     <Project Path="tests/WebApi.Tests/WebApi.Tests.csproj" />
   </Folder>
 </Solution>

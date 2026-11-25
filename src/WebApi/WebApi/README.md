@@ -541,6 +541,53 @@ content: article workflow ─► IAccessScopes.HasPermissionAsync(permission, [p
 - **Unload:** both modules unload and are collected (see the EF Core / Ardalis row under Unloading).
 - **Not run:** the SQL Server, MySQL and Oracle migrations.
 
+## Live updates (`Live/`, hub `/hubs/live`)
+
+One SignalR hub in the host pushes small "something changed" messages to the Blazor client, which then re-reads data
+through the module's endpoints. A module never adds hub code: it publishes through `ILiveNotifier`, and it declares in its
+manifest which topics it offers and who may receive them.
+
+```
+module (any pool) ─ILiveNotifier─► this replica's connections ─┐
+                         └──► RabbitMQ fanout "live" ─► every other replica ─► their connections (group t:{tenant}:{topic})
+browser ─WebSocket /hubs/live?access_token=… (gateway, no negotiation, no sticky session)─► Subscribe(topic, scopes)
+```
+
+- **Topics** (the tenant is always the connection's, never part of the topic). Only server-side data authorizes a
+  topic; a client sends nothing but the topic name:
+
+  | Topic | Who may subscribe |
+  |---|---|
+  | `user:{id}` | that user only |
+  | `{moduleId}:{kind}:{key}` | the permission the active module declares for the kind (`ModuleManifest.LiveTopics = [new("post", "content.view")]`), held for `{kind}:{key}` or for a scope the module's `ILiveScopeResolver` gives for that resource (its press, category) |
+  | `unit:{id}` | the permission of the `LiveTopic("unit", ...)` declared by the one active module that provides units (Organization, P1-2), held for `unit:{id}` or an ancestor its resolver gives. No provider, or more than one: refused. |
+
+  - **Authorization is data.** The host reads `LiveTopics` from the module record, written at install.
+  - **`ILiveScopeResolver`** (optional, registered in the module's own services) is resolved per subscription from the declaring module's container, in a scope of the subscriber's tenant. Only strings come back, so the module stays unloadable.
+    - Without a resolver, or when the module isn't loaded on the hub's replica (the core pool), only the exact scope counts. That fails closed.
+    - A failing resolver also fails closed.
+  - Platform roles hold only platform permissions, so they don't open module or unit topics by themselves.
+- **Publishing:** `ILiveNotifier.PublishAsync(topic, type, payload, sequence)` is scoped and uses the current tenant.
+  - The payload is a `JsonElement` the module serialized with its own options, so the host never sees a module type.
+  - `PublishToUnitAsync("root/region/desk", ...)` sends to the unit and to each ancestor. Only the unit itself gets the sequence, because the ancestors' feeds are different streams.
+  - Publish after the change is committed. Messages are best effort, and a client that missed one catches up from the module's feed (`?after={sequence}`).
+- **Revocation:** when grants change, every replica checks the affected users' subscriptions again. Topics they may no longer receive are dropped, and the client gets `Revoked(topic)` (for example at check-out).
+- **Token expiry:** the connection closes when its token expires, and the client reconnects with a fresh token.
+- **Client (`ILiveChannel`, BlzWebClient):** the channel connects while the user is signed in, reconnects with a backoff, and joins every subscription again.
+  - It drops duplicate sequences.
+  - It raises `Resync(topic, lastSequence)` after a reconnect, on a gap, and once joined when the page passed `fromSequence`.
+  - Layouts.Default 2.1 shows the channel's state in the toolbar (Live / Reconnecting).
+- **Without a broker:** messages reach this replica's connections only.
+- **Verified** by `tests/WebApi.Tests/Live` (Kestrel replicas, the real SignalR client, RabbitMQ in Docker):
+  - authorization, allowed and denied, including client-scope bypass attempts;
+  - tenant isolation;
+  - unit fan-out;
+  - revocation after a grant change;
+  - two-replica fanout;
+  - the client channel catching up after its replica went down and came back.
+
+  `tests/ModularBlazor.Client.Tests` covers the re-subscribe and resync logic and the badge (bUnit).
+
 ## Not covered yet
 
 - **Database:** a real modules schema (DB table) instead of `modules.json`.

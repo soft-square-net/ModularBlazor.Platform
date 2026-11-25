@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
-  <!-- 2.0.0: MudTail's runtime and CSS moved to the UI.MudTail module (a dependency); this module is the shell only. -->
+  <!-- 2.1.0: the live connection badge (Shell/LiveBadge). 2.0.0: MudTail's runtime and CSS moved to the UI.MudTail module (a dependency); this module is the shell only. -->
   <PropertyGroup>
-    <Version>2.0.0</Version>
+    <Version>2.1.0</Version>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="node-app\**" />

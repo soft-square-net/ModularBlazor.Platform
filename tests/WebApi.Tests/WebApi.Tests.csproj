@@ -8,7 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.15" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
+    <PackageReference Include="Testcontainers.RabbitMq" Version="4.17.0" />
     <PackageReference Include="xunit.v3" Version="3.2.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" PrivateAssets="all" />
     <PackageReference Include="Shouldly" Version="4.3.0" />
@@ -17,6 +19,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\WebApi\WebApi\WebApi.csproj" />
+    <!-- The Blazor client's live channel and its SignalR transport, against real replicas (Live/LiveEndToEndTests). The
+         BlzWebClient app is a WebAssembly executable and cannot be referenced, so its sources are linked. -->
+    <ProjectReference Include="..\..\src\ModularBlazor.Abstractions\ModularBlazor.Abstractions.csproj" />
+    <Compile Include="..\..\src\apps\blazor\ModularBlazor.BlzWebClient\Services\Live\LiveChannel.cs" Link="Live\Client\LiveChannel.cs" />
+    <Compile Include="..\..\src\apps\blazor\ModularBlazor.BlzWebClient\Services\Live\HubLiveTransport.cs" Link="Live\Client\HubLiveTransport.cs" />
   </ItemGroup>
 
   <ItemGroup>

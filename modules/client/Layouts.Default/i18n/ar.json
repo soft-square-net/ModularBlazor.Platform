@@ -26,5 +26,9 @@
   "Auto": "تلقائي",
   "Reset to the brand": "العودة إلى مظهر الجهة",
   "{0} is unavailable.": "{0} غير متاح.",
-  "Loading": "جارٍ التحميل"
+  "Loading": "جارٍ التحميل",
+  "Live": "مباشر",
+  "Reconnecting": "إعادة الاتصال",
+  "Live updates are on": "التحديثات المباشرة تعمل",
+  "Live updates are reconnecting": "جارٍ إعادة اتصال التحديثات المباشرة"
 }
