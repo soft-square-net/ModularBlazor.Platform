@@ -11,8 +11,9 @@ import statHero from './statHero.js';
 import imageEditor from './imageEditor.js';
 import plugins from './plugins.js';
 import countdown from './countdown.js';
+import designer from './designer.js';
 
-const parts = [shell, ide, components, forms, site, feedback, tree, statHero, imageEditor, plugins, countdown];
+const parts = [shell, ide, components, forms, site, feedback, tree, statHero, imageEditor, plugins, countdown, designer];
 
 export const messages = Object.assign({}, ...parts.map((p) => p.messages));
 export const patterns = parts.flatMap((p) => p.patterns ?? []);

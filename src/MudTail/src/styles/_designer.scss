@@ -1,0 +1,132 @@
+// MudCanvas: the Content Designer's design surface (see src/designer/MudCanvas.js). Same structure as VsDock's
+// designer.css, themed with MudTail tokens. The frame is the page: it carries data-mb-page, so the editorial pack's
+// container queries see the device width, not the window's.
+
+.mud-canvas {
+  --canvas-bg: color-mix(in srgb, var(--mud-palette-background) 82%, var(--mud-palette-text-primary));
+  --canvas-accent: var(--mud-palette-primary);
+  --canvas-accent-soft: rgba(var(--mud-palette-primary-rgb), 0.18);
+  --canvas-accent-contrast: var(--mud-palette-primary-contrast);
+  --canvas-hidden: var(--mud-palette-error);
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  block-size: 100%;
+  min-block-size: 0;
+  outline: 0;
+
+  &:focus-visible { box-shadow: inset 0 0 0 2px var(--canvas-accent-soft); }
+}
+
+.mud-canvas__viewport {
+  position: relative;
+  flex: 1;
+  min-block-size: 0;
+  overflow: auto;
+  padding: 24px;
+  background: var(--canvas-bg);
+
+  &--panning, &--panning * { cursor: grabbing !important; user-select: none; }
+}
+
+// The device frame: a fixed CSS width, so zooming (CSS zoom, set inline) scales the whole device.
+.mud-canvas__frame {
+  // + 0.1px: CSS zoom rounds the frame to layout units (1/64 px of the zoomed size), which can leave a 768 px Tablet
+  // frame 767.99 px wide inside, below the md container query it exists to show.
+  inline-size: calc(var(--mud-canvas-width, 1280px) + 0.1px);
+  min-block-size: calc(100% / var(--mud-canvas-zoom, 1));
+  margin-inline: auto;
+  background: var(--mud-palette-surface);
+  color: var(--mud-palette-text-primary);
+  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.35);
+  transition: inline-size 0.15s;
+  text-align: start;
+}
+
+.mud-canvas__content { min-block-size: 100%; }
+
+// Designer chrome on the blocks (none of it is on the live site).
+.mud-canvas__content {
+  [data-block-id] { cursor: default; }
+  [data-block-id]:hover { outline: 1px dashed var(--canvas-accent); outline-offset: -1px; }
+  [contenteditable] { outline: 2px solid var(--canvas-accent); outline-offset: 2px; cursor: text; }
+  [data-empty="true"]::after {
+    content: var(--mud-canvas-empty, ""); // "Drop blocks here", localized: MudCanvas sets it
+    display: block;
+    grid-column: 1 / -1;
+    min-block-size: 64px;
+    padding: 22px;
+    text-align: center;
+    color: var(--mud-palette-text-secondary);
+    font-size: 13px;
+    border: 1px dashed var(--mud-palette-lines-inputs);
+    border-radius: var(--mud-default-borderradius, 4px);
+  }
+}
+
+body.mud-canvas-dragging .mud-canvas__content * { user-select: none; }
+body.mud-canvas-resizing-x, body.mud-canvas-resizing-x * { cursor: ew-resize !important; user-select: none; }
+body.mud-canvas-resizing-y, body.mud-canvas-resizing-y * { cursor: ns-resize !important; user-select: none; }
+
+// Selection box, resize handles and drop marker: drawn by MudCanvas in the overlay, which scrolls with the viewport.
+.mud-canvas__overlay {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  inline-size: 0;
+  block-size: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.mud-canvas__selection {
+  position: absolute;
+  display: none;
+  border: 2px solid var(--canvas-accent);
+  pointer-events: none;
+}
+
+.mud-canvas__chip {
+  position: absolute;
+  inset-inline-start: -2px;
+  inset-block-start: -20px;
+  padding: 0 6px;
+  background: var(--canvas-accent);
+  color: var(--canvas-accent-contrast);
+  font: 11px/18px var(--mud-typography-default-family, inherit);
+  border-start-start-radius: 4px;
+  border-start-end-radius: 4px;
+  white-space: nowrap;
+  &:empty { display: none; }
+}
+
+.mud-canvas__handle {
+  position: absolute;
+  inline-size: 10px;
+  block-size: 10px;
+  background: var(--mud-palette-surface);
+  border: 2px solid var(--canvas-accent);
+  border-radius: 2px;
+  pointer-events: auto;
+  touch-action: none;
+
+  // The selection box takes the block's direction, so the span handle is on the block's inline end (left in RTL).
+  &--span { inset-inline-end: -7px; inset-block-start: calc(50% - 5px); cursor: ew-resize; }
+  &--height { inset-block-end: -7px; inset-inline-start: calc(50% - 5px); cursor: ns-resize; }
+}
+
+.mud-canvas__drop {
+  position: absolute;
+  display: none;
+  background: var(--canvas-accent-soft);
+  border: 2px solid var(--canvas-accent);
+  border-radius: 4px;
+  pointer-events: none;
+
+  &--bar { background: var(--canvas-accent); border: 0; border-radius: 2px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mud-canvas__frame { transition: none; }
+}

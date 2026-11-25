@@ -660,6 +660,96 @@ const factories = {
       dispose: () => { off(); dock.dispose(); },
     };
   },
+
+  /**
+   * The Content Designer's canvas (MudCanvas). The blocks are Blazor's, rendered one of two ways:
+   *   - component: a JS root component mounted in the frame (RegisterForJavaScript<PostCanvas>("app-post-canvas")),
+   *     receiving [Parameter] CanvasId; or
+   *   - adopt: true, when the host itself is Blazor markup with the canvas parts, which MudCanvas only decorates:
+   *       <div class="mud-canvas" @ref="host"><div class="mud-canvas__viewport"><div class="mud-canvas__frame">
+   *         <div class="mud-canvas__content">…blocks…</div></div><div class="mud-canvas__overlay"></div></div></div>
+   *     (no style or dir on the frame: MudCanvas sets them.)
+   * Blocks carry data-block-id, data-block-type, data-container, data-empty, data-has-text, data-can-h (VsDock's
+   * PostBlockNode attributes); palette items data-block-new="<key>" with draggable="true".
+   *
+   * options: { device?: 'mobile'|'tablet'|'desktop'|'amp', devices?, zoom?, dir?: 'ltr'|'rtl'|null, lang?,
+   *            showHidden?, autoDraggable?, component?, adopt?, parameters? }
+   * Events, one per finished gesture: OnMudEvent("select" | "drop" | "resize" | "edit" | "move" | "delete" |
+   * "command" | "zoom", payload) — the payloads are listed in src/designer/MudCanvas.js.
+   */
+  async canvas(host, options, emit) {
+    const { MudCanvas } = await load('designer');
+    const { component, adopt, parameters, ...opts } = options;
+    const canvas = new MudCanvas({ ...opts, element: adopt && host instanceof Element ? host : null, onGesture: emit });
+    if (!adopt) mountInto(host, canvas.getElement());
+
+    let root = null;
+    let rootDisposed = false;
+    if (component) {
+      const blazor = globalThis.Blazor;
+      if (typeof blazor?.rootComponents?.add !== 'function') {
+        canvas.content.textContent = `Blazor root components are not available, so "${component}" cannot be shown.`;
+      } else {
+        const canvasId = `mud-canvas-${Math.random().toString(36).slice(2, 10)}`;
+        blazor.rootComponents.add(canvas.content, component, { canvasId, ...(parameters ?? {}) })
+          .then((h) => { if (rootDisposed) h.dispose(); else root = h; })
+          .catch((e) => {
+            canvas.content.textContent = `"${component}" failed to load: ${e?.message ?? e}`;
+            console.error('[MudTail] canvas component failed', component, e);
+          });
+      }
+    }
+
+    return {
+      setDevice: (device) => canvas.setDevice(device),
+      getDevice: () => canvas.getDevice(),
+      setZoom: (zoom) => canvas.setZoom(zoom),
+      getZoom: () => canvas.getZoom(),
+      zoomIn: () => canvas.zoomIn(),
+      zoomOut: () => canvas.zoomOut(),
+      resetZoom: () => canvas.resetZoom(),
+      setDirection: (dir, lang = null) => canvas.setDirection(dir || null, lang || null),
+      setShowHidden: (show) => canvas.setShowHidden(!!show),
+      select: (id) => canvas.select(id || null),
+      getSelected: () => canvas.getSelected(),
+      reveal: (id) => canvas.reveal(id),
+      refresh: () => canvas.refresh(),
+      /** Re-applies parameters to the Blazor root component (component mode). */
+      setParameters: (p) => root?.setParameters(p ?? {}),
+      dispose: () => { rootDisposed = true; root?.dispose(); canvas.dispose(); },
+    };
+  },
+
+  /**
+   * A code editor: Monaco, self-hosted, loaded on first use (a textarea until then, and for good when it fails).
+   * options: { value?, language?, readOnly?, schema? (JSON Schema object or string), languages? (true | ids | false),
+   *            minimap?, wordWrap?, fontSize?, ariaLabel?, debounce? }
+   * Events: OnMudEvent("change", text) after typing stops; OnMudEvent("language", id) from the picker;
+   *         OnMudEvent("ready", true | false) once Monaco runs (false: the textarea stayed).
+   */
+  async monaco(host, options, emit) {
+    const { MudMonaco } = await load('monaco');
+    const editor = new MudMonaco({
+      ...options,
+      onChange: (text) => emit('change', text),
+      onLanguage: (lang) => emit('language', lang),
+    });
+    mountInto(host, editor.getElement());
+    editor.ready.then((ok) => emit('ready', ok));
+    return {
+      getValue: () => editor.getValue(),
+      setValue: (text) => editor.setValue(text),
+      getLanguage: () => editor.getLanguage(),
+      setLanguage: (lang) => editor.setLanguage(lang),
+      setReadOnly: (readOnly) => editor.setReadOnly(!!readOnly),
+      setSchema: (schema) => editor.setSchema(schema ?? null),
+      getProblems: () => editor.getProblems(),
+      format: () => editor.format(),
+      focus: () => editor.focus(),
+      isMonaco: () => !!editor.editor,
+      dispose: () => editor.dispose(),
+    };
+  },
 };
 
 /** Puts a button (ElementReference) in or out of its busy state: spinner, disabled, aria-busy. */
@@ -676,7 +766,7 @@ export function pageLoading(state = true) {
 
 /**
  * Creates a component and returns its handle.
- * @param {'button'|'autocomplete'|'tabs'|'accordion'|'drawer'|'dialog'|'dock'|'datatable'|'progress'|'progressCircular'|'spinner'|'loading'|'tree'|'statCard'|'imageEditor'|'explorer'} name
+ * @param {'button'|'autocomplete'|'tabs'|'accordion'|'drawer'|'dialog'|'dock'|'datatable'|'progress'|'progressCircular'|'spinner'|'loading'|'tree'|'statCard'|'imageEditor'|'explorer'|'canvas'|'monaco'} name
  * @param {Element|null} host   Blazor ElementReference to render into (ignored for drawer/dialog)
  * @param {object} options      The component's options (see the component's constructor)
  * @param {object|null} dotNetRef DotNetObjectReference that receives OnMudEvent(name, payload)
@@ -710,10 +800,31 @@ const AREAS = {
   tree: () => import('./areas/tree.js'),
   'image-editor': () => import('./areas/image-editor.js'),
   explorer: () => import('./areas/explorer.js'),
+  designer: () => import('./areas/designer.js'),
+  monaco: () => import('./areas/monaco.js').then((mod) => { mod.setMonacoWorkerBase(monacoBase); return mod; }),
 };
 
-// The stylesheet packs each area needs (the explorer uses the tree view).
-const AREA_PACKS = { dock: ['dock'], tree: ['tree'], 'image-editor': ['image-editor'], explorer: ['tree', 'explorer'] };
+// The stylesheet packs each area needs (the explorer uses the tree view; the canvas shows pages styled by the
+// editorial tokens). 'editorial' has no code: loadPack('editorial') on pages that render tokens.
+const AREA_PACKS = {
+  dock: ['dock'],
+  tree: ['tree'],
+  'image-editor': ['image-editor'],
+  explorer: ['tree', 'explorer'],
+  designer: ['designer', 'editorial'],
+  monaco: ['monaco'],
+};
+
+let monacoBase = null;
+
+/**
+ * Where Monaco's workers are served ('…/js/monaco/': editor.worker.js, json.worker.js, css.worker.js,
+ * html.worker.js). Call it before the first editor; null leaves the language services without workers (the editor
+ * still edits and colours, without validation).
+ */
+export function setMonacoBase(url) {
+  monacoBase = url ? String(url).replace(/\/?$/, '/') : null;
+}
 
 let packBase = null;
 const packLinks = new Map(); // pack -> Promise<void>
@@ -747,7 +858,7 @@ export function removePacks() {
 }
 
 /**
- * Loads a large component's code (and its styles): 'dock' | 'tree' | 'image-editor' | 'explorer'. Resolves to its
+ * Loads a large component's code (and its styles): 'dock' | 'tree' | 'image-editor' | 'explorer' | 'designer' | 'monaco'. Resolves to its
  * exports (MudDock, MudTreeView, MudImageEditor, MudExplorer, …), for module scripts that use the classes directly.
  */
 export async function load(area) {

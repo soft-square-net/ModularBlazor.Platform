@@ -8,7 +8,8 @@
 //   - applies the saved MudTail theme (palette, radius, dark mode) to <html>, and follows the system's light/dark
 //     setting when the user chose "system";
 //   - adds the shell's icon sprite (icons.ts) to <body>: <svg><use href="#mt-i-users"/></svg> draws an icon;
-//   - tells MudTail where the large components' stylesheet packs are (css/packs/; their code is in js/chunks/);
+//   - tells MudTail where the large components' stylesheet packs are (css/packs/; their code is in js/chunks/) and
+//     where Monaco's workers are (js/monaco/);
 //   - starts the data-mud behaviours on <body>: every data-mud="…" / data-mud-reveal element that Blazor renders,
 //     in this module or any other, gets its behaviour and loses it again when Blazor removes the element.
 //
@@ -122,11 +123,12 @@ function watchMedia(queries: string[], dotNetRef: DotNetRef) {
 
 const watchers = new Set<{ dispose(): void }>();
 
-// The stylesheet packs of the large components sit next to this file (css/packs/); a blob (offline) has no such
-// neighbours, so there the components come without their styles.
-function packBase(): string | null {
+// The stylesheet packs of the large components (css/packs/) and Monaco's workers (js/monaco/) sit next to this file;
+// a blob (offline) has no such neighbours, so there the components come without their styles and the code editor
+// without its language services.
+function besideModule(path: string): string | null {
   try {
-    const url = new URL('../css/packs/', import.meta.url);
+    const url = new URL(path, import.meta.url);
     return url.protocol === 'blob:' ? null : url.href;
   } catch {
     return null;
@@ -134,7 +136,8 @@ function packBase(): string | null {
 }
 
 export default function init(ctx: ModuleContext) {
-  MudTail.setPackBase(packBase());
+  MudTail.setPackBase(besideModule('../css/packs/'));
+  MudTail.setMonacoBase(besideModule('./monaco/'));
   MudTail.init({ autoInit: true });
   addIcons(SHELL_ICONS);
   dark?.addEventListener('change', followSystem);

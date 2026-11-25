@@ -1,0 +1,5 @@
+// MudTail pack 'monaco': MudMonaco's chrome and Monaco's own stylesheet (monaco-editor/min/vs/editor/editor.main.css,
+// the same rules its ES modules import, with the codicon font inlined). Loaded with the 'monaco' chunk.
+
+@use "../monaco" as *;
+@use "../../../node_modules/monaco-editor/min/vs/editor/editor.main";

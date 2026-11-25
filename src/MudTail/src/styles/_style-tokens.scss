@@ -1,0 +1,202 @@
+@use "sass:list";
+@use "sass:map";
+
+// Editorial style tokens: the CSS behind DynamicFields' style properties (StylePresets: width, align, spacing, tone,
+// size, level, aspect, columns, layout) and the designer's per-view placement (order, hidden, span).
+//
+// A renderer never writes classes. It writes one attribute per token, and one more per breakpoint where a view
+// changes it:
+//
+//   <section data-mb-columns="1" data-mb-columns-md="2" data-mb-columns-lg="3" data-mb-spacing="lg">
+//     <figure data-mb-aspect="16-9" data-mb-span-lg="2" data-mb-order-md="-1">…</figure>
+//     <aside data-mb-hidden="true" data-mb-hidden-lg="false">…</aside>
+//   </section>
+//
+// Breakpoints are container queries on the page element (data-mb-page), not media queries: the same CSS lays the
+// page out in the designer's device frame (375 / 768 / 1280 px wide inside a wider window) and on the live site.
+// Mobile is the base, Tablet is md, Desktop is lg. Every property is logical (inline / block, start / end), so the
+// page mirrors in RTL; colours come from the MudTail palette, so brand colours follow the theme.
+
+$mb-breakpoints: (sm: 640px, md: 768px, lg: 1024px, xl: 1280px);
+
+// The page: the container every breakpoint measures, and the scales the tokens map to. A site's theme can override
+// any --mb-* variable on its page element.
+[data-mb-page] {
+  container: mb-page / inline-size;
+
+  --mb-space-none: 0;
+  --mb-space-sm: 0.5rem;
+  --mb-space-md: 1rem;
+  --mb-space-lg: 2rem;
+  --mb-space-xl: 3rem;
+  --mb-gap: var(--mb-space-md);
+
+  --mb-measure-content: 42rem;
+  --mb-measure-wide: 64rem;
+  --mb-layout-standard: 72rem;
+  --mb-layout-wide: 90rem;
+  --mb-gutter: 1rem;
+
+  --mb-text-sm: 0.875rem;
+  --mb-text-md: 1rem;
+  --mb-text-lg: 1.25rem;
+  --mb-text-xl: 1.5rem;
+
+  --mb-h1: 2.5rem;
+  --mb-h2: 2rem;
+  --mb-h3: 1.5rem;
+  --mb-h4: 1.25rem;
+  --mb-h5: 1.125rem;
+  --mb-h6: 1rem;
+
+  --mb-tone-muted-bg: color-mix(in srgb, var(--mud-palette-surface) 94%, var(--mud-palette-text-primary));
+  --mb-tone-muted-fg: var(--mud-palette-text-secondary);
+  --mb-tone-accent-bg: var(--mud-palette-primary);
+  --mb-tone-accent-fg: var(--mud-palette-primary-contrast);
+  --mb-tone-inverse-bg: var(--mud-palette-text-primary);
+  --mb-tone-inverse-fg: var(--mud-palette-surface);
+}
+
+$spacing: (none, sm, md, lg, xl);
+$sizes: (sm, md, lg, xl);
+$levels: (h1, h2, h3, h4, h5, h6);
+$level-weights: (h1: 800, h2: 700, h3: 700, h4: 600, h5: 600, h6: 600);
+$aspects: ("1-1": "1 / 1", "4-3": "4 / 3", "3-2": "3 / 2", "16-9": "16 / 9", "21-9": "21 / 9", "3-4": "3 / 4", "9-16": "9 / 16");
+$columns: (1, 2, 3, 4, 5, 6, 12);
+$max-span: 12;
+$max-order: 24;
+
+// Every token's rules for one breakpoint suffix ("" for the base, "-md" for Tablet, …). Same specificity at every
+// breakpoint, so a later (wider) breakpoint wins.
+@mixin tokens($s) {
+  // width: how much of the line a block takes. Width before align, so align's margins win.
+  [data-mb-width#{$s}="content"] { inline-size: auto; max-inline-size: var(--mb-measure-content); margin-inline: auto; }
+  [data-mb-width#{$s}="wide"] { inline-size: auto; max-inline-size: var(--mb-measure-wide); margin-inline: auto; }
+  [data-mb-width#{$s}="full"] { inline-size: auto; max-inline-size: none; margin-inline: 0; }
+  [data-mb-width#{$s}="half"] { inline-size: calc(50% - var(--mb-gap) / 2); max-inline-size: none; }
+  [data-mb-width#{$s}="third"] { inline-size: calc(100% / 3 - var(--mb-gap) * 2 / 3); max-inline-size: none; }
+
+  // align: the text, and the block itself when it is narrower than the line.
+  [data-mb-align#{$s}="start"] { text-align: start; margin-inline-end: auto; margin-inline-start: 0; justify-items: start; }
+  [data-mb-align#{$s}="center"] { text-align: center; margin-inline: auto; justify-items: center; }
+  [data-mb-align#{$s}="end"] { text-align: end; margin-inline-start: auto; margin-inline-end: 0; justify-items: end; }
+
+  // spacing: the room around a block and between its children.
+  @each $v in $spacing {
+    [data-mb-spacing#{$s}="#{$v}"] { padding-block: var(--mb-space-#{$v}); --mb-gap: var(--mb-space-#{$v}); gap: var(--mb-gap); }
+  }
+
+  // tone: brand colours from the palette.
+  [data-mb-tone#{$s}="default"] { background-color: transparent; color: inherit; }
+  @each $v in (muted, accent, inverse) {
+    [data-mb-tone#{$s}="#{$v}"] { background-color: var(--mb-tone-#{$v}-bg); color: var(--mb-tone-#{$v}-fg); }
+  }
+
+  // size: body text.
+  @each $v in $sizes {
+    [data-mb-size#{$s}="#{$v}"] { font-size: var(--mb-text-#{$v}); }
+  }
+
+  // level: how a heading looks (the element stays the one the outline needs).
+  @each $v in $levels {
+    [data-mb-level#{$s}="#{$v}"] { font-size: var(--mb-#{$v}); font-weight: map.get($level-weights, $v); line-height: 1.25; }
+  }
+
+  // aspect: media boxes; the image or video inside fills it.
+  [data-mb-aspect#{$s}="auto"] { aspect-ratio: auto; }
+  @each $k, $v in $aspects {
+    [data-mb-aspect#{$s}="#{$k}"] { aspect-ratio: #{$v}; overflow: hidden; }
+  }
+
+  // columns: a grid of equal columns.
+  @each $n in $columns {
+    [data-mb-columns#{$s}="#{$n}"] { display: grid; grid-template-columns: repeat(#{$n}, minmax(0, 1fr)); gap: var(--mb-gap); }
+  }
+
+  // layout: a region's measure.
+  [data-mb-layout#{$s}="standard"] { max-inline-size: var(--mb-layout-standard); margin-inline: auto; padding-inline: var(--mb-gutter); }
+  [data-mb-layout#{$s}="wide"] { max-inline-size: var(--mb-layout-wide); margin-inline: auto; padding-inline: var(--mb-gutter); }
+  [data-mb-layout#{$s}="full"] { max-inline-size: none; margin-inline: 0; padding-inline: 0; }
+
+  // span: columns a block takes in its parent's grid.
+  @for $n from 1 through $max-span {
+    [data-mb-span#{$s}="#{$n}"] { grid-column: span #{$n} / span #{$n}; }
+  }
+  [data-mb-span#{$s}="full"] { grid-column: 1 / -1; }
+
+  // order: the visual order in this view (the reading order stays the post's).
+  [data-mb-order#{$s}="first"] { order: -1; }
+  [data-mb-order#{$s}="last"] { order: #{$max-order + 1}; }
+  @for $n from -1 through $max-order {
+    [data-mb-order#{$s}="#{$n}"] { order: #{$n}; }
+  }
+}
+
+// Media inside an aspect box fills it.
+$aspect-boxes: '[data-mb-aspect]:not([data-mb-aspect="auto"])';
+@each $bp, $w in $mb-breakpoints {
+  $aspect-boxes: '#{$aspect-boxes}, [data-mb-aspect-#{$bp}]:not([data-mb-aspect-#{$bp}="auto"])';
+}
+:is(#{$aspect-boxes}) > :is(img, video, iframe, picture, amp-img, amp-video, amp-iframe) {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+@include tokens("");
+@each $bp, $w in $mb-breakpoints {
+  @container mb-page (min-width: #{$w}) {
+    @include tokens("-#{$bp}");
+  }
+}
+
+// hidden: a block hidden in a view. A value holds from its breakpoint until a wider one sets it again. Each width
+// range (below sm, sm to md, …) gets its own rules: "hidden here" is the last value set at or below that range.
+// `display` is never set otherwise, so a shown block keeps the display its other tokens give it.
+$mb-suffixes: ("");
+$mb-widths: (0);
+@each $bp, $w in $mb-breakpoints {
+  $mb-suffixes: list.append($mb-suffixes, "-#{$bp}");
+  $mb-widths: list.append($mb-widths, $w);
+}
+$mb-count: list.length($mb-suffixes);
+
+// The block is hidden in range $k by the value set at breakpoint $i (no breakpoint between them sets it).
+@function hidden-selector($i, $k) {
+  $sel: '[data-mb-hidden#{list.nth($mb-suffixes, $i)}="true"]';
+  @if $i < $k {
+    @for $j from $i + 1 through $k {
+      $sel: '#{$sel}:not([data-mb-hidden#{list.nth($mb-suffixes, $j)}])';
+    }
+  }
+  @return $sel;
+}
+
+@mixin hide($sel) {
+  #{$sel}:not([data-mb-reveal-hidden] *) { display: none; }
+  // In the designer (data-mb-reveal-hidden on the frame) hidden blocks stay, faded, so they can still be selected.
+  [data-mb-reveal-hidden] #{$sel} {
+    opacity: 0.35;
+    outline: 1px dashed var(--mud-palette-error);
+    outline-offset: -1px;
+  }
+}
+
+// Hidden in every view: works without a page container too.
+@include hide(hidden-selector(1, $mb-count));
+
+@for $k from 1 through $mb-count {
+  $min: list.nth($mb-widths, $k);
+  $query: '(width >= #{$min})';
+  @if $k == 1 {
+    $query: '(width < #{list.nth($mb-widths, 2)})';
+  } @else if $k < $mb-count {
+    $query: '(width >= #{$min}) and (width < #{list.nth($mb-widths, $k + 1)})';
+  }
+  @container mb-page #{$query} {
+    @for $i from 1 through $k {
+      @include hide(hidden-selector($i, $k));
+    }
+  }
+}

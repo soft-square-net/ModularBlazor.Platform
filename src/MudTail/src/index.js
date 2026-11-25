@@ -7,6 +7,8 @@ export * from './areas/dock.js';
 export * from './areas/tree.js';
 export * from './areas/image-editor.js';
 export * from './areas/explorer.js';
+export * from './areas/designer.js';
+export * from './areas/monaco.js';
 
 import { setPluginHost } from './core/plugins.js';
 import * as mudtail from './index.js';
