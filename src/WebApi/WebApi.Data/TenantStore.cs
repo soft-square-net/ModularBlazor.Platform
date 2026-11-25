@@ -16,6 +16,12 @@ public sealed class TenantRecord
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 
+    /// <summary>The tenant seed this tenant was created from (null: created by hand or from configuration).</summary>
+    public string? SeedId { get; set; }
+
+    /// <summary>The last seed version fully reconciled into this tenant (null: not yet, or not seeded).</summary>
+    public long? SeedVersion { get; set; }
+
     public TenantInfo ToInfo() => new(Id, Name, Status, Hosts.ToArray(), DatabaseServer, DatabaseName);
 }
 
@@ -98,6 +104,8 @@ public sealed class TenantStoreDbContext(DbContextOptions<TenantStoreDbContext> 
             tenant.Property(t => t.Status).HasConversion<string>().HasMaxLength(20);
             tenant.Property(t => t.DatabaseServer).HasMaxLength(100);
             tenant.Property(t => t.DatabaseName).HasMaxLength(63);
+            tenant.Property(t => t.SeedId).HasMaxLength(64);
+            tenant.HasIndex(t => t.SeedId);
 
             // PostgreSQL stores host names as text[]; elsewhere one column of newline-separated names.
             if (provider != DatabaseProvider.PostgreSql)
@@ -190,7 +198,9 @@ public sealed class TenantRegistry(TenantStoreDbContext db)
         (await db.Tenants.AsNoTracking().OrderBy(t => t.Id).ToListAsync(ct)).Select(t => t.ToInfo()).ToArray();
 
     /// <summary>Adds the tenant; false when one with this id exists already.</summary>
-    public async Task<bool> AddAsync(TenantInfo tenant, CancellationToken ct)
+    public Task<bool> AddAsync(TenantInfo tenant, CancellationToken ct) => AddCoreAsync(tenant, null, ct);
+
+    private async Task<bool> AddCoreAsync(TenantInfo tenant, string? seedId, CancellationToken ct)
     {
         if (await db.Tenants.AnyAsync(t => t.Id == tenant.Id, ct)) return false;
         var now = DateTimeOffset.UtcNow;
@@ -202,6 +212,7 @@ public sealed class TenantRegistry(TenantStoreDbContext db)
             Hosts = tenant.Hosts.ToList(),
             DatabaseServer = tenant.DatabaseServer,
             DatabaseName = tenant.DatabaseName,
+            SeedId = seedId,
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -227,7 +238,33 @@ public sealed class TenantRegistry(TenantStoreDbContext db)
         await db.SaveChangesAsync(ct);
         return record.ToInfo();
     }
+
+    /// <summary>The tenant's seed binding; null when the tenant does not exist.</summary>
+    public async Task<TenantSeedState?> SeedStateAsync(string id, CancellationToken ct) =>
+        await db.Tenants.AsNoTracking().Where(t => t.Id == id)
+            .Select(t => new TenantSeedState(t.Id, t.SeedId, t.SeedVersion))
+            .FirstOrDefaultAsync(ct);
+
+    /// <summary>
+    /// Adds a tenant bound to a seed, with no reconciled version yet (<see cref="MarkSeedVersionAsync"/> sets it once
+    /// everything is done); false when one with this id exists already.
+    /// </summary>
+    public Task<bool> AddSeededAsync(TenantInfo tenant, string seedId, CancellationToken ct) => AddCoreAsync(tenant, seedId, ct);
+
+    /// <summary>Records that <paramref name="version"/> of the tenant's seed is fully reconciled; false when the tenant does not exist.</summary>
+    public async Task<bool> MarkSeedVersionAsync(string id, string seedId, long version, CancellationToken ct)
+    {
+        var record = await db.Tenants.FirstOrDefaultAsync(t => t.Id == id, ct);
+        if (record is null) return false;
+        record.SeedId = seedId;
+        record.SeedVersion = version;
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
 }
+
+/// <summary>The seed binding of a tenant row (see <see cref="TenantRecord.SeedId"/>).</summary>
+public sealed record TenantSeedState(string TenantId, string? SeedId, long? SeedVersion);
 
 /// <summary>
 /// For <c>dotnet ef migrations add &lt;Name&gt; --project src/WebApi/WebApi.Data --context TenantStoreDbContext

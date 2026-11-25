@@ -101,6 +101,13 @@ namespace soft.square.net.WebApi.Data.TenantStore.Migrations.MySql
                         .HasMaxLength(200)
                         .HasColumnType("varchar(200)");
 
+                    b.Property<string>("SeedId")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<long?>("SeedVersion")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -110,6 +117,8 @@ namespace soft.square.net.WebApi.Data.TenantStore.Migrations.MySql
                         .HasColumnType("datetime(6)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SeedId");
 
                     b.ToTable("platform_tenants", (string)null);
                 });

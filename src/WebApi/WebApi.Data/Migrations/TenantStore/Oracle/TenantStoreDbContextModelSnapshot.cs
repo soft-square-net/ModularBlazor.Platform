@@ -104,6 +104,13 @@ namespace soft.square.net.WebApi.Data.TenantStore.Migrations.Oracle
                         .HasMaxLength(200)
                         .HasColumnType("NVARCHAR2(200)");
 
+                    b.Property<string>("SeedId")
+                        .HasMaxLength(64)
+                        .HasColumnType("NVARCHAR2(64)");
+
+                    b.Property<long?>("SeedVersion")
+                        .HasColumnType("NUMBER(19)");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -113,6 +120,8 @@ namespace soft.square.net.WebApi.Data.TenantStore.Migrations.Oracle
                         .HasColumnType("TIMESTAMP(7) WITH TIME ZONE");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SeedId");
 
                     b.ToTable("platform_tenants", (string)null);
                 });

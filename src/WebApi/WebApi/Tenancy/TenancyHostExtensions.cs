@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using soft.square.net.WebApi.Contracts.Tenancy;
 using soft.square.net.WebApi.Data;
 using soft.square.net.WebApi.Modularity;
+using soft.square.net.WebApi.Tenancy.Seeds;
 
 namespace soft.square.net.WebApi.Tenancy;
 
@@ -41,6 +42,7 @@ public static class TenancyHostExtensions
             services.AddScoped<TenantRegistry>();
             services.AddScoped<TenantSubscriptions>();
             services.TryAddSingleton(TimeProvider.System);
+            AddTenantSeeds(builder);
         }
 
         services.TryAddSingleton<ITenantChangeBus, NullTenantChangeBus>();
@@ -51,6 +53,33 @@ public static class TenancyHostExtensions
             services.AddHostedService<TenantChangeSubscriber>();
         }
         return builder;
+    }
+
+    /// <summary>
+    /// Tenant seeds (needs the tenant store): <see cref="TenantSeedReconciler"/> pulls the seeds of
+    /// <c>Platform:DeploymentId</c> from the loaded modules that serve them (<see cref="ITenantSeedSource"/>) and
+    /// reconciles them into the store, one replica at a time (Redis <c>Tenancy:Seeds:LockConnectionName</c>, default
+    /// <c>redis</c>, or the tenant store's database lock). Placement: <see cref="ITenantPlacementPolicy"/>, by default
+    /// <see cref="AcceptAsIsPlacementPolicy"/> (register another one before this call to replace it).
+    /// </summary>
+    private static void AddTenantSeeds(IHostApplicationBuilder builder)
+    {
+        var services = builder.Services;
+        services.AddOptions<TenantSeedOptions>().BindConfiguration(TenantSeedOptions.Section);
+        services.AddSingleton<TenantSeedSources>();
+        services.AddSingleton<IModuleLifecycleObserver>(sp => sp.GetRequiredService<TenantSeedSources>());
+        services.TryAddSingleton<ITenantPlacementPolicy, AcceptAsIsPlacementPolicy>();
+        services.AddSingleton<ITenantReadiness>(sp => sp.GetRequiredService<ModuleTenantInitializer>());
+        services.AddScoped<ITenantDatabaseCreator, TenantDatabaseCreator>();
+
+        var lockConnection = builder.Configuration[$"{TenantSeedOptions.Section}:{nameof(TenantSeedOptions.LockConnectionName)}"] ?? "redis";
+        if (builder.Configuration.GetConnectionString(lockConnection) is { Length: > 0 } redis)
+            services.AddSingleton<ILeaderLock>(sp => new RedisLeaderLock(redis, sp.GetRequiredService<ILogger<RedisLeaderLock>>()));
+        else
+            services.AddSingleton<ILeaderLock, DatabaseLeaderLock>();
+
+        services.AddSingleton<TenantSeedReconciler>();
+        services.AddHostedService(sp => sp.GetRequiredService<TenantSeedReconciler>());
     }
 
     /// <summary>Resolves the tenant of every request (after routing, so it can read the endpoint's metadata).</summary>
