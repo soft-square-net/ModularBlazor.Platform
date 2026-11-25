@@ -88,9 +88,13 @@ internal sealed partial class TenantSeedReconciler(
     public string? DeploymentId => configuration[TenantSeedNames.DeploymentIdKey] is { Length: > 0 } id ? id : null;
 
     /// <summary>
-    /// Runs a cycle now instead of at the next tick.
-    /// TODO(P0-1): call this from an integration handler for <see cref="TenantSeedNames.SeedChangedEvent"/> once the
-    /// integration events (IIntegrationEventHandler) are merged.
+    /// Runs a cycle now instead of at the next tick (also on the leader lock's terms: a replica that does not lead skips it).
+    /// TODO(host integration subscription): call this when <see cref="TenantSeedNames.SeedChangedEvent"/> arrives.
+    /// The integration events (P0-1) deliver only to subscriber modules, in a tenant scope of the module's container,
+    /// so the host cannot subscribe yet. It needs a host-level subscription: with the broker, a per-replica exclusive
+    /// queue bound to the <c>integration</c> exchange with the event type as routing key; without it, a hook in the
+    /// local bus. That subscription must accept an envelope without a tenant, because a seed belongs to no tenant yet.
+    /// Until then the timer (<see cref="TenantSeedOptions.Interval"/>) picks the change up.
     /// </summary>
     public void Trigger()
     {

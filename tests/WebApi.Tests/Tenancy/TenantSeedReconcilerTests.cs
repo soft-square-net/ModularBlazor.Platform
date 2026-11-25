@@ -259,6 +259,32 @@ public sealed class TenantSeedReconcilerTests : IAsyncLifetime
         _databases.Ensured.ShouldBe(["b"]);
     }
 
+    [Fact]
+    public async Task Trigger_runs_a_cycle_before_the_next_tick()
+    {
+        var reconciler = _host.GetRequiredService<TenantSeedReconciler>();
+        _host.GetRequiredService<Microsoft.Extensions.Options.IOptions<TenantSeedOptions>>().Value.Interval = TimeSpan.FromHours(1);
+        LoadSourceModule(); // before StartAsync: no trigger from the load itself
+        await reconciler.StartAsync(CancellationToken.None);
+        try
+        {
+            await Eventually(() => _source.Lists == 1); // the first cycle at start, with no seeds yet
+            _source.Seeds = [Seed()];
+
+            reconciler.Trigger();
+
+            await Eventually(() => _source.Reports.Any(r => r.Status == SeedStatus.Provisioned));
+            (await RecordAsync("acme"))!.SeedVersion.ShouldBe(1);
+        }
+        finally { await reconciler.StopAsync(CancellationToken.None); }
+    }
+
+    private static async Task Eventually(Func<bool> condition)
+    {
+        for (var i = 0; i < 250 && !condition(); i++) await Task.Delay(20);
+        condition().ShouldBeTrue();
+    }
+
     private sealed class FakeSeedSource : ITenantSeedSource
     {
         public IReadOnlyList<TenantSeed> Seeds { get; set; } = [];
