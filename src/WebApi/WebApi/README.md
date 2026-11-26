@@ -147,7 +147,9 @@ request ─► host middleware (Tenancy/): X-Tenant header, then host name (X-Fo
 - **Resolution rules:**
   - The `X-Tenant` header wins. If the host name names a different tenant, the request gets 400.
   - With a token, the `tenant` claim must match the request's tenant (403), or is the tenant when the request names none. See [Authentication and authorization](#authentication-and-authorization).
-  - An unknown tenant gets 404, a suspended one 403.
+  - An unknown tenant gets 404 (header) or 403 (token), a suspended one 403. On a `.TenantOptional()` endpoint an unknown
+    tenant is a foreign tenant instead: the request runs without a tenant and `ITenantContext.ForeignTenantId` names it
+    (no grants, no platform roles).
   - Module endpoints need a tenant (400 without one) unless they are `.TenantOptional()`. Host endpoints never need one.
   - `greeting`, `identity` and `tenancy` are tenant-optional for now.
 - **Database per tenant.** A tenant row names a server (a connection string name, e.g. `tenant-data`) and a database; no secrets in the store. The server's engine can be PostgreSQL, SQL Server, MySQL or Oracle (see below).

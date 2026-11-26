@@ -39,6 +39,20 @@ The client sends **only the topic name**. Scopes supplied by a client never coun
    ```
 
 2. For `content:post:42`, the host checks `content.view` on the scope `post:42`.
+
+   A resource visible through **several permissions** (preview.8) declares the kind once with `LiveTopic.AnyOf`;
+   holding any one of them for the resource is enough:
+
+   ```csharp
+   LiveTopics = [LiveTopic.AnyOf("post", "content.author", "content.accept", "content.publish")]
+   ```
+
+   `new LiveTopic(kind, permission)` stays as it was. `AnyOf` puts the first permission in `Permission` and the others in
+   `OrPermissions`; `Permissions` lists them all. Records installed before preview.8 read unchanged.
+
+   **A kind is declared once.** Install refuses a manifest that declares the same kind twice (use `AnyOf` instead), a
+   kind that is not lowercase `a-z`, `0-9`, `-`, the platform's `user` kind, and blank permissions. A module record
+   installed earlier that still declares a kind twice gets no topics of that kind (refused, not merged).
 3. Optionally, the module adds the resource's other scopes (its press, its category, its parent units) with an
    `ILiveScopeResolver` registered in **its own services**:
 
