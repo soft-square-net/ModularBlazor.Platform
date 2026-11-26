@@ -42,6 +42,18 @@ internal sealed class ModuleLiveTopicCatalog(ModuleRuntime runtime, TimeProvider
             : null;
     }
 
+    /// <summary>
+    /// A module's topics, one per kind. Install refuses a manifest that declares a kind twice; a record written before
+    /// that check (or edited by hand) that still does gets none of that kind: refused rather than guessed.
+    /// </summary>
+    internal static IReadOnlyList<LiveTopic> OnePerKind(string moduleId, IEnumerable<LiveTopic> topics, ILogger log)
+    {
+        var kinds = topics.GroupBy(t => t.Kind, StringComparer.OrdinalIgnoreCase).ToArray();
+        foreach (var duplicate in kinds.Where(g => g.Count() > 1))
+            log.LogWarning("Module {Module} declares the live topic kind '{Kind}' more than once; its topics are refused", moduleId, duplicate.Key);
+        return kinds.Where(g => g.Count() == 1).Select(g => g.Single()).ToArray();
+    }
+
     public async Task<DeclaredLiveTopic?> FindUnitAsync(CancellationToken ct)
     {
         await RefreshAsync(ct);
@@ -57,7 +69,7 @@ internal sealed class ModuleLiveTopicCatalog(ModuleRuntime runtime, TimeProvider
             if (clock.GetUtcNow() < _expires) return;
             _topics = (await runtime.ListAsync(ct))
                 .Where(s => s.Module.DesiredState == ModuleState.Active && s.Module.LiveTopics.Count > 0)
-                .ToDictionary(s => s.Module.Id, s => (IReadOnlyList<LiveTopic>)s.Module.LiveTopics.ToArray(), StringComparer.OrdinalIgnoreCase);
+                .ToDictionary(s => s.Module.Id, s => OnePerKind(s.Module.Id, s.Module.LiveTopics, log), StringComparer.OrdinalIgnoreCase);
             var units = _topics.SelectMany(m => m.Value.Where(t => Same(t.Kind, LiveTopics.UnitKind)).Select(t => new DeclaredLiveTopic(m.Key, t))).ToArray();
             if (units.Length > 1)
                 log.LogWarning("Modules {Modules} all declare the live topic kind 'unit'; unit topics are refused until only one does",
@@ -162,9 +174,13 @@ internal sealed class LiveTopicAuthorizer(IServiceScopeFactory scopes, ILiveTopi
         scope.ServiceProvider.GetRequiredService<ITenantScopeInitializer>().Use(tenant, "live");
         scope.ServiceProvider.GetRequiredService<ScopeUser>().Principal = user;
         var access = scope.ServiceProvider.GetRequiredService<IAccessScopes>();
-        return await access.HasPermissionAsync(declared.Topic.Permission, resource, ct)
-            ? new(true)
-            : new(false, LiveErrors.Forbidden);
+        foreach (var permission in declared.Topic.Permissions)
+        {
+            // Any one permission is enough; a blank one (a damaged record) never is.
+            if (!string.IsNullOrWhiteSpace(permission) && await access.HasPermissionAsync(permission, resource, ct))
+                return new(true);
+        }
+        return new(false, LiveErrors.Forbidden);
     }
 
     /// <summary>The first segment (lowercase: user, unit or a module id) and the rest; printable, bounded, no blanks.</summary>

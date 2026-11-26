@@ -35,11 +35,54 @@ request ─► host middleware (Tenancy/): X-Tenant header, then host name (X-Fo
 - The `X-Tenant` header wins. If the host name names a different tenant, the request gets **400**.
 - With a token, the `tenant` claim must match the request's tenant (**403**), or is the tenant when the request names
   none.
-- An unknown tenant gets **404**, a suspended one **403**.
+- An unknown tenant gets **404** (header) or **403** (token claim), a suspended one **403**.
+- **Foreign tenants (preview.8).** On a `.TenantOptional()` endpoint, a tenant this deployment does not know, from the
+  token claim or the `X-Tenant` header, does not fail the request. It runs without a tenant, and
+  `ITenantContext.ForeignTenantId` names the unknown tenant (`IsForeign` is true; `ResolvedBy` is `claim` when the token
+  was issued for it, `header` when the request only named it). See [Foreign tenants](#foreign-tenants) below.
 - Module endpoints need a tenant (**400** without one) unless they are `.TenantOptional()`. Host endpoints never need
   one. `greeting`, `identity` and `tenancy` are tenant-optional for now.
 - Without a tenant store (a single local instance, no `ConnectionStrings:TenantStore`), the directory reads
   `Tenancy:Tenants` from configuration, and the tenancy write endpoints return 503.
+
+## Foreign tenants
+
+A central service (Organization in `Central` mode, for example) runs on one deployment, and users of other deployments
+call it through their own gateway. Their tokens carry a `tenant` claim that only their deployment knows. Before
+preview.8 the central host answered 403 ("The token's tenant ... does not exist") or 404 before any module code ran.
+
+Now, **only on endpoints marked `.TenantOptional()`**:
+
+| The request names | Result |
+| --- | --- |
+| a tenant this deployment knows, active | that tenant, as before |
+| a tenant this deployment knows, suspended | **403**, as before |
+| a tenant this deployment does not know (claim or header) | runs **without a tenant**, `ForeignTenantId` set |
+| an unknown header and a token for another tenant | **403** (they must agree) |
+| an unknown header on a host name that names a tenant | **400** |
+
+Endpoints that need a tenant, and host endpoints, behave as before: 404 for an unknown header, 403 for an unknown
+token tenant.
+
+A foreign caller is never a plain no-tenant caller:
+
+- `ITenantContext.ForeignTenantId` and `IsForeign` say where it came from. Code that branches on `Tenant is null` must
+  check `IsForeign` too.
+- `IAccessScopes` gives it **nothing**: no grants (not even grants stored under that tenant id) and no platform-role
+  permissions, since its token was issued for another deployment. `.RequirePermission(...)` endpoints refuse it.
+- Authorize it from the module's own data (Organization: its memberships and the connector clients it knows), using the
+  token's `sub` and the foreign tenant id. Trust the id only when `ResolvedBy` is `claim`.
+
+```csharp
+group.MapGet("/units/{id}", async (Guid id, ITenantContext tenant, HttpContext http, IOrgAccess access, CancellationToken ct) =>
+{
+    if (tenant.IsForeign && tenant.ResolvedBy != "claim") return Results.Forbid();
+    var allowed = tenant.IsForeign
+        ? await access.ForeignMemberCanReadAsync(tenant.ForeignTenantId!, http.User.FindFirst("sub")?.Value, id, ct)
+        : await access.CanReadAsync(id, ct);
+    return allowed ? Results.Ok(/* ... */) : Results.Forbid();
+}).TenantOptional();
+```
 
 ## Database per tenant, schema per module
 

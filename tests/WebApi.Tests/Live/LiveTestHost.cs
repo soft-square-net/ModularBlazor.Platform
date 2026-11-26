@@ -148,7 +148,8 @@ internal sealed class LiveTestHost : IAsyncDisposable
     {
         private readonly Dictionary<string, LiveTopic[]> _topics = new()
         {
-            ["content"] = [new LiveTopic("post", "content.view"), new LiveTopic("draft", "content.edit")],
+            ["content"] = [new LiveTopic("post", "content.view"), new LiveTopic("draft", "content.edit"),
+                LiveTopic.AnyOf("review", "content.accept", "content.publish")],
             ["org"] = unitProvider ? [new LiveTopic(LiveTopics.UnitKind, "org.units.view")] : []
         };
 
@@ -170,6 +171,7 @@ internal sealed class LiveTestHost : IAsyncDisposable
             {
                 ("content", "post", "42") => ["press:A"],
                 ("content", "draft", "42") => ["press:A"],
+                ("content", "review", "42") => ["press:A", "category:sports"],
                 ("org", "unit", "desk") => ["unit:region", "unit:root"],
                 ("org", "unit", "region") => ["unit:root"],
                 _ => []

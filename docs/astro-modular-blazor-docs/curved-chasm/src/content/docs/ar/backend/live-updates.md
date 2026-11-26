@@ -39,6 +39,20 @@ browser ─WebSocket /hubs/live?access_token=…─► Subscribe(topic)
    ```
 
 2. للموضوع `content:post:42` يتحقق المضيف من `content.view` على النطاق `post:42`.
+
+   المورد المرئي عبر **عدة صلاحيات** (preview.8) يعلن النوع مرة واحدة بـ`LiveTopic.AnyOf`، ويكفي امتلاك أي واحدة منها
+   للمورد:
+
+   ```csharp
+   LiveTopics = [LiveTopic.AnyOf("post", "content.author", "content.accept", "content.publish")]
+   ```
+
+   يبقى `new LiveTopic(kind, permission)` كما كان. يضع `AnyOf` الصلاحية الأولى في `Permission` والبقية في
+   `OrPermissions`، و`Permissions` تسردها كلها. السجلات المثبتة قبل preview.8 تقرأ دون تغيير.
+
+   **يعلن النوع مرة واحدة.** يرفض التثبيت بيانا يعلن النوع نفسه مرتين (استخدم `AnyOf` بدلا من ذلك)، ونوعا ليس بأحرف
+   صغيرة `a-z` و`0-9` و`-`، ونوع المنصة `user`، والصلاحيات الفارغة. وسجل وحدة مثبت سابقا لا يزال يعلن نوعا مرتين لا يحصل
+   على مواضيع من ذلك النوع (يرفض، لا يدمج).
 3. اختياريا، تضيف الوحدة نطاقات المورد الأخرى (مطبعته، فئته، وحداته التنظيمية الأم) بـ`ILiveScopeResolver` مسجل في
    **خدماتها هي**:
 

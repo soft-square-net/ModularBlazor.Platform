@@ -966,6 +966,27 @@ internal sealed partial class ModuleRuntime
         foreach (var pattern in manifest.Subscriptions)
             if (!Contracts.Messaging.IntegrationTypes.IsValidPattern(pattern))
                 throw new ModuleException($"Invalid integration event subscription '{pattern}': lowercase words separated by dots, '*' inside a word, '#' as a whole word.");
+        ValidateLiveTopics(manifest.LiveTopics);
+    }
+
+    /// <summary>
+    /// Live topic kinds: lowercase (a-z, 0-9, '-'), not the platform's <c>user</c>, each with at least one permission and
+    /// declared once. A kind visible through several permissions is one <see cref="Contracts.Live.LiveTopic.AnyOf"/>, so
+    /// a second declaration of the same kind is a mistake and is refused rather than merged.
+    /// </summary>
+    internal static void ValidateLiveTopics(IReadOnlyList<Contracts.Live.LiveTopic> topics)
+    {
+        foreach (var topic in topics)
+        {
+            if (string.IsNullOrEmpty(topic.Kind) || !topic.Kind.All(c => c is >= 'a' and <= 'z' or >= '0' and <= '9' or '-'))
+                throw new ModuleException($"Invalid live topic kind '{topic.Kind}': lowercase letters, digits and '-'.");
+            if (topic.Kind == Contracts.Live.LiveTopics.UserKind)
+                throw new ModuleException($"The live topic kind '{topic.Kind}' belongs to the platform.");
+            if (topic.Permissions.Count == 0 || topic.Permissions.Any(string.IsNullOrWhiteSpace))
+                throw new ModuleException($"The live topic kind '{topic.Kind}' needs at least one permission, and no blank ones.");
+        }
+        if (topics.GroupBy(t => t.Kind, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1) is { } duplicate)
+            throw new ModuleException($"The live topic kind '{duplicate.Key}' is declared more than once: declare it once, with LiveTopic.AnyOf for several permissions.");
     }
 
     /// <summary>SHA-256 over every file's relative path and content, in a stable order.</summary>
