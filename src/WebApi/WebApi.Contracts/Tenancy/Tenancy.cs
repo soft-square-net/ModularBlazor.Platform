@@ -37,10 +37,26 @@ public interface ITenantContext
 {
     TenantInfo? Tenant { get; }
 
-    /// <summary>How the tenant was found: "header", "host", "claim" or "scope".</summary>
+    /// <summary>
+    /// How the tenant was found: "header", "host", "claim" or "scope". With a <see cref="ForeignTenantId"/>, where that id
+    /// came from: "claim" (the caller's token was issued for it) or "header" (the request only named it).
+    /// </summary>
     string? ResolvedBy { get; }
 
     bool IsResolved => Tenant is not null;
+
+    /// <summary>
+    /// A tenant this deployment does not know, named by the caller's token or the <c>X-Tenant</c> header on an endpoint
+    /// marked <see cref="TenantOptionalMetadata"/>: the caller comes from another deployment's tenant (for example a
+    /// central service called through another deployment's gateway). <see cref="Tenant"/> is null and the request runs
+    /// like a platform-level call, but it is not a plain no-tenant caller: <c>IAccessScopes</c> gives it no grants and no
+    /// platform-role permissions here, so authorize it from the module's own data. Trust the id as the caller's tenant
+    /// only when <see cref="ResolvedBy"/> is "claim". Null for every other request.
+    /// </summary>
+    string? ForeignTenantId => null;
+
+    /// <summary>The caller comes from a tenant this deployment does not know (see <see cref="ForeignTenantId"/>).</summary>
+    bool IsForeign => ForeignTenantId is not null;
 
     string? TenantId => Tenant?.Id;
 
@@ -87,7 +103,9 @@ public interface IModuleActivation
 
 /// <summary>
 /// Endpoint metadata: the endpoint also works without a tenant (platform-level endpoints). Runtime-module endpoints
-/// require a tenant unless they carry this; a tenant named in the request must still exist and be active.
+/// require a tenant unless they carry this. A tenant named in the request that this deployment knows must be active
+/// (403 otherwise); one it does not know is a foreign tenant: the request runs without a tenant and
+/// <see cref="ITenantContext.ForeignTenantId"/> names it.
 /// </summary>
 public sealed class TenantOptionalMetadata
 {

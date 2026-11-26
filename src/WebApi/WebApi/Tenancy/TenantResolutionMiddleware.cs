@@ -10,7 +10,12 @@ namespace soft.square.net.WebApi.Tenancy;
 /// tenant they must agree (400);</item>
 /// <item>with a signed-in user, the token's <c>tenant</c> claim is the authority: the request's tenant must equal it (403),
 /// or it is the tenant when the request names none;</item>
-/// <item>an unknown tenant is 404, a suspended one 403.</item>
+/// <item>an unknown tenant is 404 (header) or 403 (token), a suspended one 403;</item>
+/// <item>except on an endpoint marked <see cref="TenantOptionalMetadata"/>: there a tenant this deployment does not know,
+/// named by the header or the token, is a <em>foreign</em> tenant. The request runs without a tenant and
+/// <see cref="ITenantContext.ForeignTenantId"/> names it, so the endpoint knows the caller came from another deployment's
+/// tenant; grants and platform roles give such a caller nothing here (<c>AccessScopes</c>). A tenant this deployment
+/// knows is never foreign: suspended is still 403, and a header that disagrees with the token is still 403.</item>
 /// </list>
 /// Runtime-module endpoints need a tenant (400 without one) unless they are marked <see cref="TenantOptionalMetadata"/>,
 /// and wait until the module is initialized for that tenant (migrations; 503 if that failed). Host endpoints never
@@ -25,27 +30,45 @@ internal sealed class TenantResolutionMiddleware(RequestDelegate next, TenantDir
     {
         TenantInfo? tenant = null;
         string? resolvedBy = null;
+        string? foreign = null, foreignBy = null;
+
+        var endpoint = context.GetEndpoint();
+        var tenantOptional = endpoint?.Metadata.GetMetadata<TenantOptionalMetadata>() is not null;
 
         if (context.Request.Headers.TryGetValue(TenancyNames.Header, out var header) && header.ToString() is { Length: > 0 } id)
         {
             tenant = directory.Find(id);
-            if (tenant is null) { await Problem(context, 404, $"Unknown tenant '{id}'."); return; }
-            resolvedBy = "header";
+            if (tenant is not null) resolvedBy = "header";
+            else if (tenantOptional) (foreign, foreignBy) = (id, "header");
+            else { await Problem(context, 404, $"Unknown tenant '{id}'."); return; }
         }
 
         if (directory.FindByHost(RequestHost(context)) is { } byHost)
         {
+            if (foreign is not null || (tenant is not null && !Same(tenant, byHost)))
+            {
+                await Problem(context, 400, $"The {TenancyNames.Header} header and the host name name different tenants."); return;
+            }
             if (tenant is null) (tenant, resolvedBy) = (byHost, "host");
-            else if (!Same(tenant, byHost)) { await Problem(context, 400, $"The {TenancyNames.Header} header and the host name name different tenants."); return; }
         }
 
         if (context.User.Identity?.IsAuthenticated == true && context.User.FindFirst(TenancyNames.Claim)?.Value is { Length: > 0 } claimed)
         {
-            if (tenant is null)
+            if (foreign is not null)
+            {
+                // The header named a tenant this deployment does not know: the token must be for that same tenant.
+                if (!string.Equals(foreign, claimed, StringComparison.OrdinalIgnoreCase))
+                {
+                    await Problem(context, 403, "The request's tenant is not the tenant the token was issued for."); return;
+                }
+                foreignBy = "claim";
+            }
+            else if (tenant is null)
             {
                 tenant = directory.Find(claimed);
-                if (tenant is null) { await Problem(context, 403, $"The token's tenant '{claimed}' does not exist."); return; }
-                resolvedBy = "claim";
+                if (tenant is not null) resolvedBy = "claim";
+                else if (tenantOptional) (foreign, foreignBy) = (claimed, "claim");
+                else { await Problem(context, 403, $"The token's tenant '{claimed}' does not exist."); return; }
             }
             else if (!string.Equals(tenant.Id, claimed, StringComparison.OrdinalIgnoreCase))
             {
@@ -58,13 +81,18 @@ internal sealed class TenantResolutionMiddleware(RequestDelegate next, TenantDir
             if (!tenant.IsActive) { await Problem(context, 403, $"Tenant '{tenant.Id}' is {tenant.Status.ToString().ToLowerInvariant()}."); return; }
             context.RequestServices.GetRequiredService<ITenantScopeInitializer>().Use(tenant, resolvedBy!);
         }
+        else if (foreign is not null)
+        {
+            context.RequestServices.GetRequiredService<TenantContext>().UseForeign(foreign, foreignBy!);
+            log.LogDebug("Foreign tenant {Tenant} (from the {Source}) on {Path}: the request runs without a tenant",
+                foreign, foreignBy, context.Request.Path);
+        }
 
-        var endpoint = context.GetEndpoint();
         if (endpoint?.Metadata.GetMetadata<RuntimeModuleMetadata>() is { } module)
         {
             if (tenant is null)
             {
-                if (endpoint.Metadata.GetMetadata<TenantOptionalMetadata>() is null)
+                if (!tenantOptional)
                 {
                     await Problem(context, 400, $"This endpoint needs a tenant: send the {TenancyNames.Header} header or use the tenant's host name.");
                     return;

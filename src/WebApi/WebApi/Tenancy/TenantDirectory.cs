@@ -9,11 +9,25 @@ internal sealed class TenantContext : ITenantContext, ITenantScopeInitializer
     public TenantInfo? Tenant { get; private set; }
     public string? ResolvedBy { get; private set; }
 
+    public string? ForeignTenantId { get; private set; }
+
+    public bool IsForeign => ForeignTenantId is not null;
+
     public void Use(TenantInfo tenant, string resolvedBy)
     {
         if (Tenant is not null && !string.Equals(Tenant.Id, tenant.Id, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException($"This scope already belongs to tenant '{Tenant.Id}'.");
+        if (ForeignTenantId is not null)
+            throw new InvalidOperationException($"This scope belongs to a caller from the foreign tenant '{ForeignTenantId}'.");
         Tenant = tenant;
+        ResolvedBy = resolvedBy;
+    }
+
+    /// <summary>The request named a tenant this deployment does not know, on an endpoint that works without one.</summary>
+    public void UseForeign(string tenantId, string resolvedBy)
+    {
+        if (Tenant is not null) throw new InvalidOperationException($"This scope already belongs to tenant '{Tenant.Id}'.");
+        ForeignTenantId = tenantId;
         ResolvedBy = resolvedBy;
     }
 }

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace soft.square.net.WebApi.Contracts.Live;
 
@@ -12,10 +13,40 @@ namespace soft.square.net.WebApi.Contracts.Live;
 /// <para>The kind <see cref="LiveTopics.UnitKind"/> is special: the one active module that declares it (Organization)
 /// provides the permission for the platform's <c>unit:{id}</c> topics, and its resolver gives a unit's ancestors.
 /// Without such a module, <c>unit:</c> topics are refused.</para>
+/// <para>A resource visible through several permissions declares them all with <see cref="AnyOf"/>: holding any one of
+/// them for the resource is enough. A module declares each kind once; a manifest that declares a kind twice is refused at
+/// install.</para>
 /// </summary>
 /// <param name="Kind">Lowercase name of the topic kind (a-z, 0-9, '-').</param>
 /// <param name="Permission">The permission a subscriber must hold for the resource (see <see cref="Security.IAccessScopes"/>).</param>
-public sealed record LiveTopic(string Kind, string Permission);
+public sealed record LiveTopic(string Kind, string Permission)
+{
+    /// <summary>
+    /// Further permissions, each of which is enough on its own, besides <see cref="Permission"/>. Empty for a topic with
+    /// one permission. Set it with <see cref="AnyOf"/>.
+    /// </summary>
+    public IReadOnlyList<string> OrPermissions { get; init; } = [];
+
+    /// <summary>Every permission that is enough to subscribe: <see cref="Permission"/>, then <see cref="OrPermissions"/>.</summary>
+    [JsonIgnore]
+    public IReadOnlyList<string> Permissions => [Permission, .. OrPermissions ?? []];
+
+    /// <summary>
+    /// A topic kind a subscriber may receive with any one of <paramref name="permissions"/> for the resource, e.g.
+    /// <c>LiveTopic.AnyOf("post", "content.author", "content.accept", "content.publish")</c>.
+    /// </summary>
+    public static LiveTopic AnyOf(string kind, params IEnumerable<string> permissions)
+    {
+        var all = permissions.Distinct(StringComparer.Ordinal).ToArray();
+        if (all.Length == 0) throw new ArgumentException("Name at least one permission.", nameof(permissions));
+        return new LiveTopic(kind, all[0]) { OrPermissions = all[1..] };
+    }
+
+    public bool Equals(LiveTopic? other) =>
+        other is not null && Kind == other.Kind && Permissions.SequenceEqual(other.Permissions, StringComparer.Ordinal);
+
+    public override int GetHashCode() => HashCode.Combine(Kind, string.Join('\n', Permissions));
+}
 
 /// <summary>
 /// The scopes of a live topic's resource, beyond its own <c>{kind}:{key}</c>: e.g. a post's <c>press:A</c> and

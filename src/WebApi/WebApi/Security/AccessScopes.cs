@@ -75,7 +75,8 @@ internal sealed class ScopeUser
 
 /// <summary>
 /// The scoped <see cref="IAccessScopes"/>: the caller from <see cref="ScopeUser"/> when set, else from the request; the
-/// tenant from <see cref="ITenantContext"/>.
+/// tenant from <see cref="ITenantContext"/>. A caller from a foreign tenant (<see cref="ITenantContext.ForeignTenantId"/>)
+/// holds nothing: no grants and no platform-role permissions, since its token was issued for another deployment.
 /// </summary>
 internal sealed class AccessScopes(IHttpContextAccessor http, ITenantContext tenant, GrantCache cache, PlatformRolePermissions roles,
     TimeProvider clock, ScopeUser scopeUser) : IAccessScopes
@@ -99,18 +100,19 @@ internal sealed class AccessScopes(IHttpContextAccessor http, ITenantContext ten
 
     public async Task<IReadOnlyCollection<string>> PermissionsAsync(CancellationToken ct = default)
     {
-        var platform = User is { } user ? roles.For(user) : [];
+        var platform = User is { } user && !tenant.IsForeign ? roles.For(user) : [];
         return platform.Concat((await ActiveAsync(UserId, ct)).Select(g => g.Permission)).Distinct().Order().ToArray();
     }
 
     public async Task<bool> UserHasPermissionAsync(string userId, string permission, IReadOnlyCollection<string> resourceScopes, CancellationToken ct = default) =>
         (await ActiveAsync(userId, ct)).Any(g => g.Permission == permission && g.Covers(resourceScopes));
 
-    private bool HasPlatform(string permission) => User is { } user && roles.For(user).Contains(permission);
+    private bool HasPlatform(string permission) => User is { } user && !tenant.IsForeign && roles.For(user).Contains(permission);
 
     private async Task<IEnumerable<AccessGrant>> ActiveAsync(string? userId, CancellationToken ct)
     {
-        if (userId is null || tenant.TenantId is not { } tenantId) return [];
+        // A caller from a foreign tenant has no tenant here, so no grants (and never another tenant's).
+        if (userId is null || tenant.IsForeign || tenant.TenantId is not { } tenantId) return [];
         var now = clock.GetUtcNow();
         return (await cache.GetAsync(tenantId, userId, ct)).Where(g => g.IsActiveAt(now));
     }
