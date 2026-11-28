@@ -70,7 +70,7 @@ this module checks it (at most 500 nodes and 12 levels).
 | `GET /fields`, `POST /fields`, `GET /fields/{key}`, `DELETE /fields/{key}` | List, create, read and delete (until published) fields |
 | `PUT /fields/{key}/draft`, `POST /fields/{key}/publish` | Edit the draft (with its `version`; 409 when changed); publish the next version |
 | `GET /fields/{key}/versions/{number}` | A published version, with its content and style as JSON Schema 2020-12 |
-| `POST /content/validate`, `POST /content/validate-node` | Validate a content tree, or one node: `{ valid, issues: [{ path, message }] }` |
+| `POST /content/validate`, `POST /content/validate-node` | Validate a content tree, or one node: `{ valid, issues: [{ path, message }], warnings }`. Only `issues` make content invalid (see [v2](#v2-plan)) |
 | `POST /content/translations/check`, `.../apply` | Check a translation overlay; serve the tree in a culture (see [Languages](/guides/i18n/#translating-content)) |
 | `GET /catalog/schema-org` | The curated schema.org types and properties, and the style presets |
 | `GET /catalog/starter-fields`, `POST .../install` | The starter library (`block.heading`, `block.image`, `post.article`, ...) and installing it |
@@ -103,3 +103,33 @@ and two dialogs other modules open through [module dialogs](/guides/module-dialo
 `Module.DynamicFields/edit-content` (the one generic editor for a node's values and style) and
 `Module.DynamicFields/translate-content`. Asset, Keyword and Term values get a Pick button when
 `Module.Keywords/pick-concepts` or `Module.Taxonomies/pick-terms` is installed.
+
+The field builder (`/dynamicfields/build`) uses MudTail's theme tokens only (colours, radius, shadows), so it follows
+the classic and earth styles, dark mode and RTL (PR #13). It has a sticky header with Save, Publish and Try; a section
+bar (What it is · Values · Style · What it can contain · Advanced) with a count per section, ✓ when done and ! when
+something needs attention (a value without a label or schema.org property, a child field not published); Builder and
+JSON as a segmented control; and values as cards. It was not checked in a browser yet.
+
+## v2 plan
+
+Agreed on 2026-11-28. Only phase 0 is built.
+
+| Phase | Scope | Status |
+| --- | --- | --- |
+| P0 | One style vocabulary with the Content Designer, and a `warnings` list in the validation report | **Merged** (PR #12, with ContentDesigner PR #11) |
+| P1 | A JSON Schema 2020-12 dialect with its own vocabularies, and one engine on the server and in the browser. The C# field model stays the source of truth and compiles to the dialect | Planned |
+| P2 | Typed style, a picker dialog for each kind of value (colour and font pickers in the Platform), the Studio using them | Planned |
+| P3 | A step-by-step builder (a stepper) on the restyled builder | Planned |
+| P4 | Checks in the browser, and checks that produce warnings | Planned |
+
+What P0 changed:
+
+- **`StyleVocabulary`** lists every style token and value that MudTail's `_style-tokens.scss` styles, the same table as
+  the Studio's `StyleTokens`. Every preset is tested to stay within it. Presets gained columns 5 and 12 and aspects
+  `3-4` and `9-16`; the heading level preset stays `h2`–`h6`, so a heading block cannot add a second `h1`. Published
+  field versions do not change. The table still exists in two repositories, each pinned by a test; a single source
+  comes with typed style (P2).
+- **`ContentReport.warnings`**: advice that never makes content invalid. `valid` and `issues` are unchanged, because
+  Content and NewsRoom refuse on any listed issue. No check produces a warning yet.
+- **Colours are theme tokens only** for now (no hex or inline CSS), because of the Studio's token rendering, AMP and the
+  dark theme.

@@ -6,8 +6,10 @@ description: The ContentDesigner runtime module. It arranges a post of a kind in
 > **Status: implemented** in the repository
 > [`ModularBlazor.Module.ContentDesigner`](https://github.com/soft-square-net/ModularBlazor.Module.ContentDesigner)
 > (branch `main`): the core and rendering (phase 4), the studio v1 and v2, hot reload on the live channel (6a) and the
-> newsroom content model (**6b**), plus the 3c fixes (F2, F5, F6). It still builds on Platform preview.7. **Planned:**
-> 6c, where NewsRoom contributes the Workflow status and Elsa Studio dock panes, and the move to preview.8.
+> newsroom content model (**6b**), plus the 3c fixes (F2, F5, F6), DynamicFields warnings (PR #11) and problem marks on
+> the canvas (PR #12). It still builds on Platform preview.7. **Planned:** 6c, where NewsRoom contributes the Workflow
+> status and Elsa Studio dock panes, and the move to preview.8; then [editing content values in the
+> studio](#planned-editing-content-in-the-studio).
 
 **ContentDesigner** is the newsroom's post designer. It opens a post of a known **kind** with the
 [contents](/modules/contents/) its units work on, and arranges them in four **views**: Mobile, Tablet, Desktop and AMP.
@@ -64,7 +66,15 @@ The studio (`/contentdesigner/studio/{postId}`) is built on MudDock from UI.MudT
 - The **tray** shows each content's unit, work-item stage and assignee, with filters by state and unit. The header shows
   the post's unit and categories, read only.
 - The **Problems** panel merges the designer's own findings with Content's refusals (`content.validation-failed` from
-  the feed, the live nudge and 422 `problems`), deduplicated by node id, path and message.
+  the feed, the live nudge and 422 `problems`), deduplicated by node id, path and message. DynamicFields' `issues` are
+  errors; its `warnings` (v2 phase 0) are shown as warnings and do not make a design invalid. An older DynamicFields
+  sends none.
+- **Problem marks**: after a Check, each part with a problem gets a dashed outline on the canvas, in the theme's error
+  colour or warning colour (an error wins). A problem in a node inside a content marks that content block; a problem of
+  another view does not mark the current one. Selecting a part with problems brings the Problems pane forward and
+  narrows it to that part ("Only …" chip, **Show all**). Not checked in a browser yet.
+- The style tokens are the same table as DynamicFields' `StyleVocabulary` and MudTail's `_style-tokens.scss`; a test
+  in each repository pins it.
 - **Hot reload**: the studio joins Content's post [live topic](/backend/live-updates/) and reads the feed again until it
   reaches the nudged event (F2), or polls when the topic cannot be joined.
 
@@ -90,6 +100,20 @@ in process. Organization is optional: without it the studio shows ids instead of
 
 - Move to Platform preview.8.
 - NewsRoom contributes the **Workflow status** and **Elsa Studio** dock panes.
+
+## Planned: editing content in the studio
+
+Agreed on 2026-11-28; no code yet. Today the studio edits the design only. It will also edit content values in place,
+always saving through Content's own endpoints (`PUT /contents/{id}`, `PUT /posts/{id}/root`, translations), so it never
+bypasses Content's rights.
+
+- Editing a content value needs a permission. Style tokens are allowed to whoever may arrange the post.
+- Rich text has two permissions, `content.richtext.basic` (words, bold, italic) and `content.richtext.full` (links,
+  headings, lists, quotes). Content enforces and cleans both on save.
+- Grants come from the platform grant store: Desk and moderators through their shift roles, the editor in chief as a
+  standing grant, and a writer on their own work until it is submitted. An Elsa "Grant permission" activity follows a
+  reassignment and grants until the assignee's shift ends.
+- Order: E1 plain text, E1b rich text, then files, other values and live checks; the Elsa activity last.
 - The studio's Publish works only while the post project is `InProduction` or `ReadyForDesk`.
 
 See [NewsRoom](/modules/newsroom/) for the flow these panes belong to.

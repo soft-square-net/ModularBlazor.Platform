@@ -35,9 +35,10 @@ flowchart LR
 | [`ModularBlazor.Module.Organization`](https://github.com/soft-square-net/ModularBlazor.Module.Organization) | خدمة الهيكل التنظيمي المركزية وموصلها: الوحدات والأشخاص والمناصب وبذور المستأجرين؛ وتنشر `Organization.Contracts` و`.Client`. انظر [الهيكل التنظيمي](/ar/modules/organization/) |
 | [`ModularBlazor.Module.DynamicFields`](https://github.com/soft-square-net/ModularBlazor.Module.DynamicFields) | تعريفات الحقول والتحقق والحقول الجذرية للمنشورات وبادئات الروابط |
 | [`ModularBlazor.Module.ContentDesigner`](https://github.com/soft-square-net/ModularBlazor.Module.ContentDesigner) | مصمم المنشورات والاستوديو. انظر [ContentDesigner](/ar/modules/content-designer/) |
-| [`ModularBlazor.Module.NewsRoom`](https://github.com/soft-square-net/ModularBlazor.Module.NewsRoom) | المقترحات ومشاريع المنشورات. أنشئ المستودع ولم يبن شيء بعد. انظر [غرفة الأخبار](/ar/modules/newsroom/) |
+| [`ModularBlazor.Module.NewsRoom`](https://github.com/soft-square-net/ModularBlazor.Module.NewsRoom) | المقترحات ومشاريع المنشورات: N1 وN2 مدمجتان، والربط والواجهة الكاملة مخططة. انظر [غرفة الأخبار](/ar/modules/newsroom/) |
 | [`ModularBlazor.Module.Storage`](https://github.com/soft-square-net/ModularBlazor.Module.Storage) | تخزين الملفات |
-| [`ModularBlazor.Module.Elsa`](https://github.com/soft-square-net/ModularBlazor.Module.Elsa) | Elsa 3.9 وحدة تشغيل. انظر [Elsa](/ar/modules/elsa/) |
+| [`ModularBlazor.Module.Elsa`](https://github.com/soft-square-net/ModularBlazor.Module.Elsa) | Elsa 3.9 وحدة تشغيل، مع أنشطة سير عمل غرفة الأخبار (E1). انظر [Elsa](/ar/modules/elsa/) |
+| `ModularBlazor.Module.Ai` (محلي فقط، بلا مستودع بعيد بعد) | مساعد الذكاء الاصطناعي، المرحلة A1 (اقتراحات تحسين محركات البحث). انظر [الذكاء الاصطناعي والبحث](/ar/modules/ai-and-search/) |
 | [`ModularBlazor.ModuleTemplate`](https://github.com/soft-square-net/ModularBlazor.ModuleTemplate) | نقطة البدء لمستودع وحدة جديد (هيكل أولي، ما زال ينمو) |
 
 `soft-square-net/ModularBlazor` هو المستودع القديم الجامع. وهو متقادم: ما زال يحوي `ModularBlazor.Host` و`ModularBlazor.Client`

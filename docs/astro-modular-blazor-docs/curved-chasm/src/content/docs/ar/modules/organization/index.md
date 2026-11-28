@@ -17,7 +17,7 @@ description: وحدة التشغيل Organization. تحفظ خدمة مركزي�
   في الوحدات؛
 - **بذور المستأجرين**: أي الوحدات تحصل على مستأجر خاص بها، وفي أي نشر، وعلى أي خادم قاعدة بيانات.
 
-تتطلبها [المناوبات](/ar/modules/shifts/) ووحدة [غرفة الأخبار](/ar/modules/newsroom/) المخططة. وتستخدمها وحدتا المحتوى
+تتطلبها [المناوبات](/ar/modules/shifts/) ووحدة [غرفة الأخبار](/ar/modules/newsroom/). وتستخدمها وحدتا المحتوى
 وContentDesigner حين توجد.
 
 معرف الوحدة `organization`، وصلاحياتها `org.read` و`org.units.manage` و`org.members.manage` و`org.seeds.manage`.

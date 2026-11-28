@@ -5,8 +5,11 @@ sidebar:
   order: 3
 ---
 
-:::note[Status: designed]
-This is the agreed design for phases P4 (NewsRoom) and P5 (Elsa). Names may change when they are built.
+:::note[Status: Elsa side built, NewsRoom side planned]
+The **Elsa activities** and the event subscriber are merged (Elsa PR #7, step E1): see [Elsa activities](#elsa-activities).
+NewsRoom's **bindings, routing rules and read model** are step N3 and not built yet; until then Elsa reads them
+through small interfaces, and the deployment names the one project workflow in `Elsa:Newsroom:ProjectWorkflow`. The
+rest of this page is the agreed design.
 :::
 
 ## Workflow bindings
@@ -58,19 +61,24 @@ live subscriptions at once.
 
 ## Elsa activities
 
-Phase P5 adds these activities to the Elsa module. Elsa becomes an integration-event subscriber that resumes workflow
-bookmarks.
+Built in E1 (`SoftSquare.Newsroom.*`). Elsa subscribes to integration events through the platform inbox:
+`newsroom.project-approved.v1` starts one instance per tenant and project, a kill cancels it, and the other NewsRoom,
+Content and Shifts events tell waiting activities to look again. **No wait trusts an event's content or order**: each
+reads the current state, so an early, repeated or lost event changes when the workflow goes on, not what it does.
 
 | Activity | Does |
 | --- | --- |
-| Route to unit | Applies the routing rules to a content kind |
-| EnsurePostInUnitCategories | The categories rule above; on failure, back to the moderator |
-| Assign in shift | Manager delay, then least-loaded role holder in the running shift |
-| Wait for stage | Waits for a content work item to reach a stage (`content.work-item-state-changed.v1`) |
-| Deadline / Escalate | Timers on a stage, escalating to the shift lead or the unit manager |
-| Desk review | Moves the project to ReadyForDesk and waits for the desk's decision |
-| Publish | Schedules or publishes the post through Contents |
+| RouteToUnit | Applies the routing rules to a content kind |
+| EnsurePostInUnitCategories | The categories rule above (treats `*` as a match); on failure, back to the moderator |
+| WaitForRefiling | Waits for the moderator's fix after NeedsModeration |
+| AssignInShift | Manager delay, then least-loaded role holder in the running shift |
+| WaitForStage | Waits for a content work item to reach a stage |
+| Deadline | Timers on a stage, escalating to the shift lead or the unit manager (uses `Elsa.Scheduling`) |
+| DeskReview | Moves the project to ReadyForDesk and waits for the desk's decision |
+| PublishPost | Schedules or publishes the post through Contents |
 | Notify | Sends a live notification to a user or a unit |
+
+Known gap: a post published outside the workflow does not end a pending AssignInShift, WaitForStage or Deadline.
 
 ## Events
 
@@ -78,6 +86,8 @@ bookmarks.
 | --- | --- |
 | `newsroom.proposal-submitted.v1` | A proposal is submitted |
 | `newsroom.proposal-decided.v1` | A moderator approves, cancels or returns it |
+| `newsroom.project-approved.v1` | A project has its draft post (once per project); Elsa starts its workflow |
+| `newsroom.project-reapproved.v1` | A moderator fixed a project in NeedsModeration |
 | `newsroom.project-state-changed.v1` | A PostProject changes state |
 | `newsroom.work-item-assigned.v1` | A project is assigned (the shared work-item contract) |
 
@@ -86,6 +96,6 @@ subject and data, written to the outbox in the same save as the change.
 
 ## Live updates
 
-NewsRoom publishes to the unit groups of the [live hub](/backend/live-updates/), so a planning board updates as
+*Planned (N3).* NewsRoom will publish to the unit groups of the [live hub](/backend/live-updates/), so a planning board updates as
 proposals and projects move. Unit messages fan out to the ancestors, so a Department board sees its Sections' work.
 "My work" (phase P6) combines the work-item events of NewsRoom, Contents and the other modules into one list per user.
