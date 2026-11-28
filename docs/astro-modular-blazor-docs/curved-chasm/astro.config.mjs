@@ -149,6 +149,20 @@ export default defineConfig({
 					items: [{ autogenerate: { directory: 'modules' } }],
 				},
 				{
+					label: 'Module architecture',
+					translations: { ar: 'بنية الوحدات' },
+					items: [
+						'architecture',
+						'architecture/module-dependencies',
+						'architecture/context-dataflow',
+						{
+							label: 'Dataflow level 1',
+							translations: { ar: 'تدفق البيانات - المستوى 1' },
+							items: [{ autogenerate: { directory: 'architecture/dataflow' } }],
+						},
+					],
+				},
+				{
 					label: 'Reference',
 					translations: { ar: 'المرجع' },
 					items: [{ autogenerate: { directory: 'reference' } }],
