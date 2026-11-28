@@ -20,7 +20,8 @@ html, body {
 
 a { color: var(--accent); }
 h1 { margin-top: 0; }
-code { background: #eef0f4; padding: 1px 5px; border-radius: 4px; }
+/* A tint of the text's own colour, so the chip reads in light and dark. */
+code { background: color-mix(in srgb, currentColor 9%, transparent); padding: 1px 5px; border-radius: 4px; }
 .error-text { color: var(--danger); }
 .hint { color: var(--muted); font-size: .9rem; }
 
@@ -86,7 +87,7 @@ code { background: #eef0f4; padding: 1px 5px; border-radius: 4px; }
 /* ---------- shared bits ---------- */
 table.modules { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: 8px; overflow: hidden; }
 table.modules th, table.modules td { text-align: start; padding: .6rem .8rem; border-bottom: 1px solid var(--border); }
-table.modules th { background: #eef0f4; font-size: .85rem; }
+table.modules th { background: color-mix(in srgb, currentColor 7%, transparent); font-size: .85rem; }
 small { color: var(--muted); }
 .badge { padding: 2px 8px; border-radius: 999px; font-size: .78rem; }
 .badge-on { background: #dcf5e4; color: #14693a; }
@@ -95,10 +96,12 @@ small { color: var(--muted); }
 .card-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; }
 .card-tile .value { font-size: 1.8rem; font-weight: 700; }
 
+/* A pale yellow bar in both themes, so its text and links take fixed dark colours. */
 #blazor-error-ui {
-    background: #fff3cd; bottom: 0; box-shadow: 0 -1px 2px rgba(0, 0, 0, .2); display: none;
+    background: #fff3cd; color: #1d2330; bottom: 0; box-shadow: 0 -1px 2px rgba(0, 0, 0, .2); display: none;
     inset-inline-start: 0; padding: .6rem 1.25rem; position: fixed; width: 100%; z-index: 1000;
 }
+#blazor-error-ui a { color: #1d4ec0; font-weight: 600; margin-inline-start: .5rem; }
 #blazor-error-ui .dismiss { cursor: pointer; position: absolute; inset-inline-end: .75rem; top: .5rem; }
 
 /* ---------- BlzWebClient pages (MudTail markup; colours from the --mud-palette-* tokens of Layouts.Default) ---------- */

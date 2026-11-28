@@ -1,5 +1,11 @@
 // MudButton Styling & Variants
 
+// A <button> doesn't inherit its text colour: a text or outlined one with no colour class would get the browser's
+// black, in dark mode too. Layered, with no specificity, so any colour class, utility or page rule still wins.
+@layer base {
+  :where(.mud-button-text, .mud-button-outlined) { color: inherit; }
+}
+
 .mud-button-root {
   display: inline-flex;
   align-items: center;
@@ -77,6 +83,7 @@
   &.mud-button-outlined {
     background-color: transparent;
     border: 1px solid currentColor;
+    &:hover { background-color: color-mix(in srgb, currentColor 8%, transparent); }
     &.mud-button-primary {
       color: var(--mud-palette-primary);
       border-color: rgba(var(--mud-palette-primary-rgb), 0.5);
@@ -90,12 +97,14 @@
     &.mud-button-surface {
       color: var(--mud-palette-text-primary);
       border-color: var(--mud-palette-lines-inputs);
-      &:hover { background-color: rgba(0,0,0,0.04); }
+      &:hover { background-color: color-mix(in srgb, currentColor 8%, transparent); }
     }
+    &.mud-button-error { color: var(--mud-palette-error); }
   }
 
   &.mud-button-text {
     background-color: transparent;
+    &:hover { background-color: color-mix(in srgb, currentColor 8%, transparent); }
     &.mud-button-primary {
       color: var(--mud-palette-primary);
       &:hover { background-color: rgba(var(--mud-palette-primary-rgb), 0.08); }
@@ -106,8 +115,9 @@
     }
     &.mud-button-surface {
       color: var(--mud-palette-text-primary);
-      &:hover { background-color: rgba(0,0,0,0.04); }
+      &:hover { background-color: color-mix(in srgb, currentColor 8%, transparent); }
     }
+    &.mud-button-error { color: var(--mud-palette-error); }
   }
 }
 
