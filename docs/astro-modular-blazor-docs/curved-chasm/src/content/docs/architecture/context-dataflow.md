@@ -180,6 +180,7 @@ flowchart LR
   AI -->|F18| DF
   ORG <-->|F19| Central
   SH -->|F20| Central
+  NR -->|F21| SH
 
   classDef custom fill:#202f43,stroke:#5da9e9,color:#e5f0ff
   classDef ext fill:#3a1f2b,stroke:#e07a9a,color:#ffe5ee
@@ -201,12 +202,13 @@ flowchart LR
 | F12 | `categories`, `contents`, `posts/{id}`, `posts/{id}/events`, `public/{publicId}` | → `CategoryDto`, `ContentSummary`, `PostDetail`, `FeedPage`, `PublishedPost` |
 | F13 | `content/jsonld`, `content/validate` | `JsonLdRequest`, `ContentTree` → `JsonLdReport`, `ContentReport` |
 | F14 | `posts/{id}/unit`, `schedule`, `publish`, `contents/{id}/assign`, `automation/*` | `UnitAssignment`, `ScheduleRequest`, `ContentAssignment` → `PostDetail` |
-| F15 | `GET projects/{id}`, `POST projects/{id}/state` | `StateReport` → `ProjectDto` |
-| F16 | `shifts?from&to`, `shifts/ended`, `overdue`, `shifts/{id}/automation` | → `ShiftDto[]`, `EndedShiftDto[]`, `ShiftAutomationInfo` |
+| F15 | `bindings/resolve`, `projects/{id}`, `projects/{id}/state`, `routing/route`, `workload/query` | `StateReport`, `RouteRequest`, `WorkloadRequest` → `BindingResolution`, `ProjectDto`, `RouteResult`, `WorkloadCounts` |
+| F16 | `shifts?from&to`, `shifts/{id}`; the poller: `shifts/ended`, `overdue` | → `ShiftDto[]`, `EndedShiftDto[]` |
 | F17 | `posts/{id}` | → `PostDetail` |
 | F18 | `fields/{key}/versions/{n}`, `content/validate-node` | `NodeValues` → `FieldVersionDto`, `ContentReport` |
 | F19 | `seeds?deployment`, `events?after=`, `links`, `seeds/{id}/reports` | → `DeploymentSeedDto`, `FeedPage`, `TenantLinkDto`; `SeedReportRequest` |
 | F20 | `IOrganizationClient`, as the caller | `CreateUnitRequest` → `OrgUnitDto` |
+| F21 | `shifts?from&to` (workload reconcile) | → `ShiftDto[]` |
 
 ## 0.3 Inside: the asset and directory modules (HTTP)
 
@@ -291,6 +293,7 @@ flowchart LR
   CO -.->|E7| NR
   CO -.->|E8| EL
   NR -.->|E9| EL
+  SH -.->|E10| NR
 
   classDef core fill:#28243f,stroke:#8b7cf6,color:#f4f2ff
   classDef custom fill:#202f43,stroke:#5da9e9,color:#e5f0ff
@@ -303,17 +306,19 @@ flowchart LR
 | E3 | `org.unit-moved.v1` | `UnitMoved` |
 | E4 | `tenancy.seed-changed.v1` | a seed change; the host reconciles the tenants |
 | E5 | `shifts.section-moved.v1` | `SectionMoved(SectionId, UnitId)` |
-| E6 | `shifts.published.v1`, `shifts.member-added.v1`, `shifts.checked-in.v1` | `ShiftPublished` (`ShiftSnapshot`), `ShiftMemberAdded`, `ShiftCheckedIn` |
-| E7 | `content.post-state-changed.v1`, `content.post-categories-changed.v1` | `ContentFeedEvent`, `PostCategoriesChanged` |
+| E6 | `shifts.published`, `member-added`, `checked-in`, `checked-out`, `handover`, `ended` (`.v1`) | `ShiftPublished` (`ShiftSnapshot`), `ShiftMemberAdded`, `ShiftCheckedIn`, `ShiftCheckedOut`, `ShiftHandover`, `ShiftEnded` |
+| E7 | `content.post-state-changed.v1`, `content.post-categories-changed.v1`, `content.work-item-*.v1`, `content.content-deleted.v1`, `content.content-archived.v1` | `ContentFeedEvent`, `PostCategoriesChanged`, `WorkItemAssigned`, `WorkItemStateChanged` |
 | E8 | `content.post-*.v1`, `content.work-item-*.v1` | `PostCreated`, `PostCategoriesChanged`, `PostUnitChanged`, `ContentFeedEvent`, `WorkItemAssigned`, `WorkItemStateChanged` |
-| E9 | `newsroom.project-approved.v1`, `newsroom.project-reapproved.v1`, `newsroom.project-state-changed.v1` | `ProjectApproved`, `ProjectStateChanged` |
+| E9 | `newsroom.project-approved.v1`, `newsroom.project-reapproved.v1`, `newsroom.project-state-changed.v1`, `newsroom.project-binding-available.v1` | `ProjectApproved`, `ProjectStateChanged` |
+| E10 | `shifts.published`, `updated`, `cancelled`, `checked-in`, `checked-out`, `ended`, `section-moved` (`.v1`) | `ShiftPublished`, `ShiftUpdated`, `ShiftCancelled`, `ShiftCheckedIn`, `ShiftCheckedOut`, `ShiftEnded`, `SectionMoved` |
 
-**Live messages** are not integration events. `content`, `shifts`, `organization`, `elsa` and `ai` call
+**Live messages** are not integration events. `content`, `shifts`, `newsroom`, `organization`, `elsa` and `ai` call
 `ILiveNotifier`, and the message reaches every replica's hub over the `live` fanout. The hub sends it as
 `LiveMessage(topic, type, payload, sequence, at)` to the subscribers of the topic. The topics are:
 
 - `content:post:{id}`
 - `shifts:shift:{id}`
+- `newsroom:board:{unit}`
 - `organization:org:{id}`
 - the unit groups `unit:{id}`
 - `user:{id}`
@@ -322,29 +327,23 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  NR("newsroom"):::custom
-  SH("shifts"):::custom
   CO("content"):::custom
   AI("ai"):::custom
-  Bind["newsroom N3: bindings,<br/>routing, read model,<br/>unit live topics"]:::planned
   Search["Module.Search (S1, S2)<br/>OpenSearch, embeddings"]:::planned
   Hooks["Webhooks module"]:::planned
   Relay["Cross-deployment<br/>relay feed"]:::planned
-  NR --- Bind
-  Bind -.-o|P1| SH
-  CO -.-o|P2| Search
-  AI -.-o|P3| Search
-  Hooks -.-o|P4| Relay
+  CO -.-o|P1| Search
+  AI -.-o|P2| Search
+  Hooks -.-o|P3| Relay
   classDef custom fill:#202f43,stroke:#5da9e9,color:#e5f0ff
   classDef planned fill:#16161d,stroke:#9a9bb3,stroke-dasharray:6 4,color:#b8b8c8
 ```
 
 | Flow | What is planned |
 |---|---|
-| P1 | NewsRoom N3 assigns work to the running shift, routes by rules and keeps a load read model per unit |
-| P2 | A Content indexer feeds per-tenant OpenSearch indices |
-| P3 | Ai grounds its compose jobs on Search and shows related posts |
-| P4 | A Webhooks module acts on tenant links, fed across deployments by a relay feed |
+| P1 | A Content indexer feeds per-tenant OpenSearch indices |
+| P2 | Ai grounds its compose jobs on Search and shows related posts |
+| P3 | A Webhooks module acts on tenant links, fed across deployments by a relay feed |
 
 ## Level-1 pages
 

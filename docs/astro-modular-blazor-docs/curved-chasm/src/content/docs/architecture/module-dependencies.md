@@ -85,7 +85,7 @@ flowchart LR
     Ollama(["OllamaSharp"]):::ext
   end
 
-  Nr --> NrC & ContC & OrgC
+  Nr --> NrC & ContC & OrgC & ShC
   Sh --> ShC & OrgCl & OrgC
   Co --> ContC & OrgC
   Cd --> OrgC
@@ -220,6 +220,7 @@ flowchart LR
   Ai ==>|H13| Df
   Ia ==>|H14| IdSrv
   Org ==>|H15| OrgC
+  Nr ==>|H16| Sh
   Ai -.-o|planned| Search
 
   classDef core fill:#28243f,stroke:#8b7cf6,color:#f4f2ff
@@ -234,18 +235,19 @@ flowchart LR
 |---|---|---|
 | H1 | content → dynamicfields | `catalog/root-post-fields`, `fields/{key}/versions/{n}`, `content/validate`, `content/validate-node` |
 | H2 | content, newsroom, contentdesigner → organization | `local/units...` |
-| H3 | newsroom → content | `posts`, `categories` |
+| H3 | newsroom → content | `posts`, `categories`, `contents?assigneeId` (workload reconcile) |
 | H4 | newsroom → dynamicfields | `catalog/root-post-fields`, `fields/...`, `content/validate-node` |
 | H5 | contentdesigner → content | `categories`, `contents`, `posts/{id}`, `posts/{id}/events`, `public/{publicId}` |
 | H6 | contentdesigner → dynamicfields | `catalog/root-post-fields`, `fields/{key}/versions/{n}`, `content/jsonld`, `content/validate` |
 | H7 | shifts → central organization | the central API as the caller (`IOrganizationClient`) |
-| H8 | elsa → content | `posts/{id}`, `publish`, `schedule`, `unit`, `contents/{id}`, `assign`, `automation/*`, `posts/publish-due` |
-| H9 | elsa → newsroom | `projects/{id}`, `projects/{id}/state` |
+| H8 | elsa → content | `posts/{id}`, `unit`, `assign`, `accept`, `transfer`, `schedule`, `publish`, `contents/{id}`, `contents/{id}/assign`, `contents/{id}/unit`; the poller: `automation/*`, `posts/publish-due` |
+| H9 | elsa → newsroom | `bindings/resolve`, `projects/{id}`, `projects/{id}/workflow`, `projects/{id}/state`, `routing/route`, `workload/query` |
 | H10 | elsa → organization | `local/units/{id}`, `members`, `categories` |
-| H11 | elsa → shifts | `shifts?from&to`, `shifts/ended`, `overdue`, `shifts/{id}/automation` |
+| H11 | elsa → shifts | `shifts?from&to`, `shifts/{id}`; the poller: `shifts/ended`, `overdue` |
 | H12 | ai → content | `posts/{id}` |
 | H13 | ai → dynamicfields | `fields/{key}/versions/{n}`, `content/validate-node` |
 | H14 | identity-admin → identity service | `api/service/*` (client credentials) |
+| H16 | newsroom → shifts | `shifts?from&to` (workload reconcile) |
 | H15 | organization connector → central service | `seeds`, `events?after=`, `links` (`Organization:BaseUrl`) |
 
 `taxonomies`, `keywords` and `storage` call no other module. They are leaves: others reach them only from the
@@ -276,6 +278,7 @@ flowchart LR
   Co -.->|E7| Nr
   Co -.->|E8| El
   Nr -.->|E9| El
+  Sh -.->|E10| Nr
   Org -.-o|planned| Hooks
 
   classDef core fill:#28243f,stroke:#8b7cf6,color:#f4f2ff
@@ -290,18 +293,19 @@ flowchart LR
 | E3 | `org.unit-moved.v1` |
 | E4 | `tenancy.seed-changed.v1` (a host subscription) |
 | E5 | `shifts.section-moved.v1` |
-| E6 | `shifts.published.v1`, `shifts.member-added.v1`, `shifts.checked-in.v1` |
-| E7 | `content.post-state-changed.v1`, `content.post-categories-changed.v1` |
+| E6 | `shifts.published`, `member-added`, `checked-in`, `checked-out`, `handover`, `ended` (`.v1`) |
+| E7 | `content.post-state-changed.v1`, `content.post-categories-changed.v1`, `content.work-item-*.v1`, `content.content-deleted.v1`, `content.content-archived.v1` |
 | E8 | `content.post-*.v1`, `content.work-item-*.v1` |
-| E9 | `newsroom.project-approved.v1`, `newsroom.project-reapproved.v1`, `newsroom.project-state-changed.v1` |
+| E9 | `newsroom.project-approved.v1`, `newsroom.project-reapproved.v1`, `newsroom.project-state-changed.v1`, `newsroom.project-binding-available.v1` |
+| E10 | `shifts.published`, `updated`, `cancelled`, `checked-in`, `checked-out`, `ended`, `section-moved` (`.v1`) |
 
 **No subscriber yet.** These events are published, but no module subscribes to them:
 
 - Organization: `org.person-changed`, `org.position-changed`, `org.tenant-seed-changed`, `org.tenant-link-changed`
   (the planned Webhooks module will act on tenant links)
-- Shifts: `shifts.updated`, `cancelled`, `member-removed`, `checked-out`, `handover`, `ended`
-- Content: `content.content-*`, `content.validation-failed`
-- NewsRoom: `newsroom.proposal-*`, `newsroom.work-item-*`
+- Shifts: `shifts.member-removed`
+- Content: `content.content-attached`, `detached`, `created`, `changed`, `state-changed`, `assigned`, and `content.validation-failed`
+- NewsRoom: no other module takes `newsroom.proposal-*`, `newsroom.project-details-changed` or `newsroom.work-item-*`; NewsRoom consumes them itself, for its live boards and its workload model
 
 The `*.work-item-assigned.v1` and `*.work-item-state-changed.v1` events of Content and NewsRoom come from the shared
 work-item contract in `WebApi.Contracts/WorkItems` (`PublishWorkItemAssigned`, `PublishWorkItemStateChanged`).

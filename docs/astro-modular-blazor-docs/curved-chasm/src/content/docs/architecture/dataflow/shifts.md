@@ -13,7 +13,7 @@ grants (`shift:{id}`) from check-in to check-out.
 flowchart LR
   Mgr(["Shift manager"]):::ext
   Member(["Member"]):::ext
-  Elsa("elsa"):::custom
+  Elsa("elsa, newsroom"):::custom
   MQi[("RabbitMQ in")]:::store
 
   subgraph Shifts["shifts (/api/shifts)"]
@@ -65,7 +65,7 @@ flowchart LR
 | F4 | `shifts/{id}/check-in`, `check-out`, `members/{userId}/check-in`, `check-out`, `PUT {id}/handover` | `HandoverRequest` → `ShiftDto` |
 | F5 | `GET/PUT units/{id}/attendance` | `UnitAttendanceRequest` → `UnitAttendanceDto` |
 | F6 | `units`, `units/resync`, `sections`, `sections/serving`, `{id}/settings`, `export`, `move-to-organization` | `MoveSectionsRequest` → `UnitDto`, `UnitResyncResult`, `SectionDto`, `SectionSettings`, `SectionsExport`, `SectionMoveReport` |
-| F7 | Elsa: `GET shifts?from&to`, `shifts/ended?since`, `overdue`, `shifts/{id}/automation` | → `ShiftDto[]`, `EndedShiftDto[]`, `ShiftAutomationInfo` |
+| F7 | Elsa's activities: `GET shifts?from&to`, `shifts/{id}`; Elsa's poller: `shifts/ended?since`, `overdue`; NewsRoom's workload reconcile: `shifts?from&to` | → `ShiftDto[]`, `EndedShiftDto[]` |
 | F8 | queue `integration.shifts.sales` | `UnitCreated`, `UnitUpdated`, `UnitMoved`, `UnitRemoved`, `MembershipChanged` → `unit_cache` |
 | F9 | `IOrganizationClient` (central, as the caller), to create section units | `CreateUnitRequest` → `OrgUnitDto` |
 | F10 | standing grants, source `shift:{id}`, scope `unit:{id}` (written at check-in; the clock rewrites them) | `AccessGrant` |
@@ -83,16 +83,16 @@ flowchart LR
 
 | Type | Data | Subscribers |
 |---|---|---|
-| `shifts.published.v1` | `ShiftPublished(ShiftSnapshot)` | elsa |
-| `shifts.updated.v1` | `ShiftUpdated(ShiftSnapshot)` | none yet |
-| `shifts.cancelled.v1` | `ShiftCancelled(ShiftSnapshot, By, At)` | none yet |
+| `shifts.published.v1` | `ShiftPublished(ShiftSnapshot)` | elsa, newsroom |
+| `shifts.updated.v1` | `ShiftUpdated(ShiftSnapshot)` | newsroom |
+| `shifts.cancelled.v1` | `ShiftCancelled(ShiftSnapshot, By, At)` | newsroom |
 | `shifts.member-added.v1` | `ShiftMemberAdded(ShiftId, UnitId, UserId, RoleKey, IsLead)` | elsa |
 | `shifts.member-removed.v1` | `ShiftMemberRemoved(...)` | none yet |
-| `shifts.checked-in.v1` | `ShiftCheckedIn(ShiftId, UnitId, UserId, RoleKeys, At, By, Status)` | elsa |
-| `shifts.checked-out.v1` | `ShiftCheckedOut(ShiftId, UnitId, UserId, At, By, Automatic, Status)` | none yet |
-| `shifts.handover.v1` | `ShiftHandover(ShiftId, UnitId, Note, By, At)` | none yet |
-| `shifts.ended.v1` | `ShiftEnded(ShiftSnapshot, By, At)` | none yet |
-| `shifts.section-moved.v1` | `SectionMoved(SectionId, UnitId)` | content |
+| `shifts.checked-in.v1` | `ShiftCheckedIn(ShiftId, UnitId, UserId, RoleKeys, At, By, Status)` | elsa, newsroom |
+| `shifts.checked-out.v1` | `ShiftCheckedOut(ShiftId, UnitId, UserId, At, By, Automatic, Status)` | elsa, newsroom |
+| `shifts.handover.v1` | `ShiftHandover(ShiftId, UnitId, Note, By, At)` | elsa |
+| `shifts.ended.v1` | `ShiftEnded(ShiftSnapshot, By, At)` | elsa, newsroom |
+| `shifts.section-moved.v1` | `SectionMoved(SectionId, UnitId)` | content, newsroom |
 
 **References:** `Organization.Contracts` and `Organization.Client`. **Live topic:** `shift`, requiring
 `shifts.view`.

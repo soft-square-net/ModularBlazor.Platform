@@ -94,6 +94,7 @@ flowchart LR
 | `content.post-changed.v1`, `content.post-state-changed.v1` | `ContentFeedEvent(FeedType, PostId, ContentId, Version, Revision, Stage, ...)` | newsroom (state-changed), elsa |
 | `content.post-categories-changed.v1` | `PostCategoriesChanged(PostId, PublicId, Version, PressId, PrimaryCategoryId, ...)` | newsroom, elsa |
 | `content.post-unit-changed.v1` | `PostUnitChanged(PostId, PublicId, Version, PressId, PrimaryCategoryId, ...)` | elsa |
-| `content.content-attached / detached / created / changed / state-changed / assigned / archived / deleted.v1` | `ContentFeedEvent` | none yet |
+| `content.content-archived.v1`, `content.content-deleted.v1` | `ContentFeedEvent` | newsroom |
+| `content.content-attached / detached / created / changed / state-changed / assigned.v1` | `ContentFeedEvent` | none yet |
 | `content.validation-failed.v1` | `ContentValidationFailed(Check, Action, ContentId, PostId, Version, ... ContentProblem[])` | none yet |
-| `content.work-item-assigned.v1`, `content.work-item-state-changed.v1` | `WorkItemAssigned`, `WorkItemStateChanged` (platform work-item contract) | elsa |
+| `content.work-item-assigned.v1`, `content.work-item-state-changed.v1` | `WorkItemAssigned`, `WorkItemStateChanged` (platform work-item contract) | elsa, newsroom |
