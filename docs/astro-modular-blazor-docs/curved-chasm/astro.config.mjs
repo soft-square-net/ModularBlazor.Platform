@@ -155,6 +155,7 @@ export default defineConfig({
 						'architecture',
 						'architecture/module-dependencies',
 						'architecture/context-dataflow',
+						'architecture/newsroom-shift-context',
 						{
 							label: 'Dataflow level 1',
 							translations: { ar: 'تدفق البيانات - المستوى 1' },
