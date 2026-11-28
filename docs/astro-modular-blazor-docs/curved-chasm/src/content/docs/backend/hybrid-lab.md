@@ -118,7 +118,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 | Broadcast convergence | Install, activate, deactivate, settings, unload and uninstall made through one replica converged on all 8 replicas; 8 queues are bound to `modules.state` |
 | Zero-downtime swap | A re-install plus a settings change under load: 300 of 300 requests returned 200, and the new settings were live on every replica |
 | Memory after swaps | Released copies often stay under `/api/admin/modules/unloading` for a while; later heap dumps showed only the active copy in each replica |
-| Tenant resolution | `X-Tenant: acme` and `Host: acme.localhost` both resolve acme; a client-sent `X-Forwarded-Host` is overwritten by the gateway; an unknown tenant gets 404, a tenant-required module route without a tenant 400 |
+| Tenant resolution | `X-Tenant: acme` and `Host: acme.localhost` both resolve acme; a client-sent `X-Forwarded-Host` is overwritten by the gateway; an unknown tenant gets 404 on a tenant-required route (on a `TenantOptional` route, preview.8 runs it as a foreign caller without a tenant), a tenant-required module route without a tenant 400 |
 | Database per tenant | `inventory`, uploaded to the core pool, migrated its schema into `tenant-acme` and `tenant-globex` on activation; rows stayed separate on both core replicas |
 | Provisioning | `POST /api/tenancy/tenants` created `tenant-initech`; both core replicas migrated into it, and all 4 sales replicas (which don't load `tenancy`) knew initech through `tenants.changed` |
 | Suspend | `PATCH …/initech {"status":"Suspended"}` gave 403 on core and all sales replicas, by header and by host name; `Active` restored 200 |

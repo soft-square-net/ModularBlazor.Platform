@@ -15,7 +15,7 @@ Use [JSON Schema Draft 2020-12](https://json-schema.org/specification) as the da
 | --- | --- | --- |
 | Field/component definitions, form schema versions, schema composition, publishing, import/export, and validation results | Domain records, domain lifecycle, persistence of submitted values, and policy for when values are required | UI components, layout/rendering, client-side convenience validation, accessibility, and interaction design |
 
-Dynamic Fields can be disabled or absent in an ERP deployment. A module may use only its static domain fields, or declare an optional capability dependency when it needs dynamic values. In the newsroom profile, published forms will define the `content` of a Post document and of each nested node (article/news, video, document, image, album and mixed posts). Contents already stores that document with a `schemaId`/`schemaVersion` per node, which is the form key/version pair here. Contents still owns the Post envelope, submitted payload values, revisions, authorization, and editorial lifecycle; Dynamic Fields owns only reusable form definitions, immutable schema versions, and validation. The module now exists (see [Status](#status)), but Contents does not call it to validate a post yet: Contents still performs only structural checks. It already uses DynamicFields for [translations](/modules/contents/#translations). See [Post document](/modules/contents/posts/#post-document-implemented).
+Dynamic Fields can be disabled or absent in an ERP deployment. A module may use only its static domain fields, or declare an optional capability dependency when it needs dynamic values. In the newsroom profile, published forms will define the `content` of a Post document and of each nested node (article/news, video, document, image, album and mixed posts). Contents already stores that document with a `schemaId`/`schemaVersion` per node, which is the form key/version pair here. Contents still owns the Post envelope, submitted payload values, revisions, authorization, and editorial lifecycle; Dynamic Fields owns only reusable form definitions, immutable schema versions, and validation. The module now exists (see [Status](#status)), and Contents uses it: its **post kinds are root post field keys**, it validates contents before review and posts before approve, schedule and publish, and it uses DynamicFields for [translations](/modules/contents/#translations). See [Post document](/modules/contents/posts/#post-document-implemented).
 
 :::note[Content versus style]
 A Post node carries separate `content` and `style` objects. Dynamic Fields validates `content` only. `style` holds responsive presentation values that Contents keeps as opaque JSON. This does not conflict with the rule that form `presentation` metadata never contains CSS or component names: `style` is Post data, not part of a form definition. Whether `style` gets its own schema (for example a theme-token allowlist) is still an open decision.
@@ -74,6 +74,29 @@ this module checks it (at most 500 nodes and 12 levels).
 | `POST /content/translations/check`, `.../apply` | Check a translation overlay; serve the tree in a culture (see [Languages](/guides/i18n/#translating-content)) |
 | `GET /catalog/schema-org` | The curated schema.org types and properties, and the style presets |
 | `GET /catalog/starter-fields`, `POST .../install` | The starter library (`block.heading`, `block.image`, `post.article`, ...) and installing it |
+| `GET /catalog/root-post-fields` | The post kinds: every field whose newest published version is a root, with its `urlPrefix` (`DynamicFields_ListRootPostFields`) |
+
+### Post kinds and URL prefixes
+
+A **root post field** is a post kind. It has a static **URL prefix** (`urlPrefix`, ASCII, may contain `/`, at most
+200 characters), required to publish a root and unique among a tenant's published roots (409 otherwise). A non-root
+field with a prefix is 409. Published URLs are `/{urlPrefix}/{slug}`. Contents caches the list per tenant; there is no
+invalidation event yet.
+
+| Starter kind | schema.org | URL prefix |
+| --- | --- | --- |
+| `post.article` | Article | `articles` |
+| `post.news` | NewsArticle | `news` |
+| `post.review` | Review | `reviews` |
+| `post.blog` | BlogPosting | `blog` |
+| `post.video` | VideoObject | `videos` |
+| `post.reportage` | ReportageNewsArticle | `reportage` |
+| `post.photo-story` | Article | `photo-stories` |
+| `post.other` | Article | `posts` |
+
+A tenant installs the starter fields before these kinds exist. A starter whose prefix is already taken is installed as
+a draft. Read prefixes from the catalog route rather than hard-coding them: fields published before the migration
+`AddUrlPrefix` got a prefix suggested from their key.
 
 The client module has the **Fields** page (`/dynamicfields`), the **field builder** with a live preview and JSON-LD,
 and two dialogs other modules open through [module dialogs](/guides/module-dialogs/):

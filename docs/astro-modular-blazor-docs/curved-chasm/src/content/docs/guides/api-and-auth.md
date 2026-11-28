@@ -84,7 +84,7 @@ the token's `tenant` claim is the authority:
 | Signed in, `X-Tenant` equal to the token's tenant | That tenant |
 | Signed in, `X-Tenant` naming another tenant | 403 |
 | `X-Tenant` and a tenant host name that disagree | 400 |
-| Unknown tenant / suspended tenant | 404 / 403 |
+| Unknown tenant / suspended tenant | 404 / 403 (on a `TenantOptional` endpoint an unknown tenant runs as a foreign caller, without a tenant: see [Foreign tenants](/backend/tenancy-data/#foreign-tenants)) |
 
 So a signed-in call needs no header. An anonymous call on a site that is per tenant (one hostname per tenant, for
 example) sends it:

@@ -5,7 +5,7 @@ sidebar:
   order: 3
 ---
 
-The runtime module prototype lives in `src/WebApi/WebApi`. How it works: [Runtime modules](/backend/runtime-modules/).
+The runtime module host is `src/WebApi/WebApi` in `ModularBlazor.Platform`. How it works: [Runtime modules](/backend/runtime-modules/).
 
 ## Admin endpoints
 

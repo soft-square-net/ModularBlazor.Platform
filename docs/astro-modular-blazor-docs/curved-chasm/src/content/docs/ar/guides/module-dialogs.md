@@ -14,7 +14,7 @@ sequenceDiagram
     participant A as Module A (a page)
     participant H as Host (BlzWebClient)
     participant B as Module B
-    A->>H: ShowAsync("Module.Shifts/pick-shift", { sectionId })
+    A->>H: ShowAsync("Module.Shifts/pick-shift", { unitId })
     H->>H: Module.Shifts in the user's catalog?
     H->>B: EnsureLoadedAsync (download on first use, dependencies first)
     H->>H: keep B's styles and scripts on the page
@@ -36,8 +36,8 @@ sequenceDiagram
 
 @*
   Contract, for other modules:
-    parameters  { sectionId?: number }
-    result      { shiftId, section, startsAt }
+    parameters  { unitId?: string }
+    result      { shiftId, unit, startsAt }
 *@
 
 <div class="mud-dialog-content">
@@ -46,18 +46,18 @@ sequenceDiagram
 <div class="mud-dialog-actions">
   <button type="button" class="mud-button-root mud-button-text mud-button-medium" @onclick="Dialog.Cancel">Cancel</button>
   <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium"
-          @onclick="() => Dialog.Close(new { shiftId = _id, section = _section, startsAt = _startsAt })">Choose</button>
+          @onclick="() => Dialog.Close(new { shiftId = _id, unit = _unit, startsAt = _startsAt })">Choose</button>
 </div>
 
 @code {
   [CascadingParameter] public IDialogReference Dialog { get; set; } = default!;
 
-  private sealed record Parameters(int? SectionId);
+  private sealed record Parameters(Guid? UnitId);
 
   protected override async Task OnAfterRenderAsync(bool firstRender)
   {
     if (!firstRender) return;
-    var sectionId = Dialog.GetParameters<Parameters>()?.SectionId;
+    var unitId = Dialog.GetParameters<Parameters>()?.UnitId;
     …
   }
 }
@@ -85,11 +85,11 @@ sequenceDiagram
 @inject IModuleDialogs Dialogs
 
 @code {
-  private sealed record PickedShift(int ShiftId, string Section, DateTimeOffset StartsAt);
+  private sealed record PickedShift(int ShiftId, string Unit, DateTimeOffset StartsAt);
 
   private async Task PickAsync()
   {
-    var result = await Dialogs.ShowAsync("Module.Shifts/pick-shift", new { sectionId = 3 },
+    var result = await Dialogs.ShowAsync("Module.Shifts/pick-shift", new { unitId = sportsDeskId },
         new DialogOptions { Title = "Pick a sports shift" });
     if (result.Canceled) return;
     var picked = result.As<PickedShift>();

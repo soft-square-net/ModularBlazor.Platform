@@ -5,7 +5,7 @@ sidebar:
   order: 3
 ---
 
-يعيش النموذج الأولي لوحدات التشغيل في `src/WebApi/WebApi`. كيف يعمل: [وحدات أثناء التشغيل](/ar/backend/runtime-modules/).
+مضيف وحدات التشغيل هو `src/WebApi/WebApi` في `ModularBlazor.Platform`. كيف يعمل: [وحدات أثناء التشغيل](/ar/backend/runtime-modules/).
 
 ## نقاط نهاية الإدارة
 

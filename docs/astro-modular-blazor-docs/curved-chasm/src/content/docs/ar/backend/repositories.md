@@ -14,7 +14,7 @@ flowchart LR
     P["ModularBlazor.Platform<br/>WebApi · Identity · BlzWebClient<br/>Hybird lab · contracts"]
     F[("GitHub Packages<br/>soft.square.net.*")]
     S["ModularBlazor.Samples<br/>Greeting · Inventory · Pulse<br/>Dashboard · Reports"]
-    M["ModularBlazor.Module.*<br/>Content · Shifts<br/>Storage · Elsa"]
+    M["ModularBlazor.Module.*<br/>Organization · Shifts · Content<br/>DynamicFields · ContentDesigner<br/>Storage · Elsa · ..."]
     W["Running WebApi<br/>/api/admin/modules<br/>/api/admin/client-modules"]
     P -- "tag v* → pack and push" --> F
     F -- "restore (PAT)" --> S
@@ -31,7 +31,11 @@ flowchart LR
 | [`ModularBlazor.Platform`](https://github.com/soft-square-net/ModularBlazor.Platform) | WebApi ووحداتها الأساسية (الهوية والمستأجرون ووحدات العميل)، وخدمة الهوية OpenIddict، وبوابة YARP، و`ModularBlazor.BlzWebClient` ووحدات العميل الأساسية، وMudTail، ومختبر Aspire ‏Hybird، وحزم العقود وModule SDK، وهذا التوثيق |
 | [`ModularBlazor.Samples`](https://github.com/soft-square-net/ModularBlazor.Samples) | وحدات تجريبية صغيرة، لكل منها مجلد تحت `samples/`: Greeting (مشروع واحد)، وInventory (بطبقات وبيانات مستأجرين)، وPulse (خط معالجة خاص وخدمة مستضافة)، وDashboard (وحدة عميل `.dll`)، وReports (وحدة عميل `.nupkg`) |
 | [`ModularBlazor.Module.Content`](https://github.com/soft-square-net/ModularBlazor.Module.Content) | منشورات غرفة الأخبار وسير عملها |
-| [`ModularBlazor.Module.Shifts`](https://github.com/soft-square-net/ModularBlazor.Module.Shifts) | المناوبات وصلاحيات المناوبة |
+| [`ModularBlazor.Module.Shifts`](https://github.com/soft-square-net/ModularBlazor.Module.Shifts) | مناوبات وحدات الهيكل التنظيمي وجداولها والحضور ومنح تسجيل الدخول؛ وتنشر `Shifts.Contracts`. انظر [المناوبات](/ar/modules/shifts/) |
+| [`ModularBlazor.Module.Organization`](https://github.com/soft-square-net/ModularBlazor.Module.Organization) | خدمة الهيكل التنظيمي المركزية وموصلها: الوحدات والأشخاص والمناصب وبذور المستأجرين؛ وتنشر `Organization.Contracts` و`.Client`. انظر [الهيكل التنظيمي](/ar/modules/organization/) |
+| [`ModularBlazor.Module.DynamicFields`](https://github.com/soft-square-net/ModularBlazor.Module.DynamicFields) | تعريفات الحقول والتحقق والحقول الجذرية للمنشورات وبادئات الروابط |
+| [`ModularBlazor.Module.ContentDesigner`](https://github.com/soft-square-net/ModularBlazor.Module.ContentDesigner) | مصمم المنشورات والاستوديو. انظر [ContentDesigner](/ar/modules/content-designer/) |
+| [`ModularBlazor.Module.NewsRoom`](https://github.com/soft-square-net/ModularBlazor.Module.NewsRoom) | المقترحات ومشاريع المنشورات. أنشئ المستودع ولم يبن شيء بعد. انظر [غرفة الأخبار](/ar/modules/newsroom/) |
 | [`ModularBlazor.Module.Storage`](https://github.com/soft-square-net/ModularBlazor.Module.Storage) | تخزين الملفات |
 | [`ModularBlazor.Module.Elsa`](https://github.com/soft-square-net/ModularBlazor.Module.Elsa) | Elsa 3.9 وحدة تشغيل. انظر [Elsa](/ar/modules/elsa/) |
 | [`ModularBlazor.ModuleTemplate`](https://github.com/soft-square-net/ModularBlazor.ModuleTemplate) | نقطة البدء لمستودع وحدة جديد (هيكل أولي، ما زال ينمو) |

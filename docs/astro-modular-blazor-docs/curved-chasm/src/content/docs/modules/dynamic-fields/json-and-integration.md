@@ -26,7 +26,7 @@ Use a versioned JSON envelope such as `platform.dynamic-fields/v1`. It contains 
 
 ## Proposed API surface
 
-These routes are a prototype contract to refine before implementation; they are not guaranteed to exist yet.
+These routes were the **original proposal** and were not built as listed. The module that exists has a simpler surface (fields, versions, `content/validate`, `content/validate-node`, the catalog and `catalog/root-post-fields`): see [Status](/modules/dynamic-fields/#status). Import/export packages are still not built.
 
 | Route | Purpose | Permission idea |
 | --- | --- | --- |
@@ -48,7 +48,7 @@ Contents remains responsible for Posts, editorial transitions, and persistence. 
 
 ```text
 Frontend ──GET form schema/version──► Dynamic Fields
-Contents ──return allowed PostKind/form mapping──► Frontend
+Contents ──return allowed post kinds (root fields)───► Frontend
 Frontend ──save Post + JSON payload + concept/asset IDs─► Contents
 Contents ──validate payload against exact form version─► Dynamic Fields
 Contents ──verify concept IDs─────────────────────────► Keyword
@@ -81,7 +81,7 @@ Suggested permissions are module-defined, tenant-scoped grants: `dynamic-fields.
 2. Build definition/component storage, tenant scoping, draft/publish lifecycle, and schema validation.
 3. Add safe component composition and deterministic import/export, including cycle and size checks.
 4. Add value validation with stable JSON Pointer errors and performance limits.
-5. Integrate Contents Post payloads with exact form-version pinning, allowlisted PostKind mappings, and explicit service authorization.
+5. Integrate Contents Post payloads with exact form-version pinning, post kinds as root field keys, and explicit service authorization. (Done except the service authorization: Contents forwards the caller's token.)
 6. Add frontend rendering in a separate client module only when requested; Dynamic Fields stays backend-only.
 
 JSON Schema 2020-12 specifies the validation dialect; pin the exact dialect in every package rather than relying on a validator's implicit default. [Dialect declaration](https://json-schema.org/understanding-json-schema/reference/schema)
