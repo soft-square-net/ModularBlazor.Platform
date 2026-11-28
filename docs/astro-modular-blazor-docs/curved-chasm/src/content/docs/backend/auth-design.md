@@ -10,6 +10,10 @@ Final, agreed with the user. Items marked *(assumed)* were recommended and never
 confirmed. **This page is the design decision.** Implementation has started: the host side of steps 1, 2 and 4 and the
 tenant middleware are on `main`, and the identity service is on a branch. See
 [Authentication: implementation](/backend/auth-implementation/) and [Tenancy and tenant data](/backend/tenancy-data/).
+
+**Updated for Shifts v2 (2026-11):** shift sections are now [Organization](/modules/organization/) units, shift
+grants start at check-in (not by the clock at the scheduled start), and Shifts' own clock checks a shift out after the
+grace. The text below says so where it applies.
 :::
 
 ## 1. Principles
@@ -65,8 +69,8 @@ tenant middleware are on `main`, and the identity service is on a branch. See
   Tenant resolution is a host middleware; the `tenancy` module keeps the directory.
 - **Membership check:** the host checks active membership on each request (cached, cleared through the broker).
   - Removing a membership revokes that tenant's refresh tokens and ends access within seconds.
-- **Scopes inside a tenant:** presses and categories. A scope is a set of (press, category) pairs, so a shift section
-  may span presses.
+- **Scopes inside a tenant:** presses, categories and Organization units (`unit:{id}` of a unit and every unit above
+  it). A Section unit serves categories from several presses, or `*` for all of them.
 - **Two levels of admin:**
   - Platform operator: installs modules, provisions tenants, manages subscriptions.
   - Tenant admin: invites by email (the user accepts), suspends or removes members, manages roles, grants and
@@ -124,7 +128,7 @@ flowchart TD
     Wait -->|No acceptance| Reminder["Elsa reminds the manager<br/>Elsa does not accept"]
     Accepted --> Delay["Start AutoAssignDelay<br/>5 minutes by default; configurable"]
     Delay --> AssignedByManager{"Manager assigns an eligible Editor<br/>before the timer expires?"}
-    AssignedByManager -->|Yes| Assigned["Assign in an active section<br/>covering the article category"]
+    AssignedByManager -->|Yes| Assigned["Assign to an Editor checked in<br/>to a shift of the post's unit"]
     AssignedByManager -->|No| AutoAssign["Elsa assigns an eligible Editor"]
     AutoAssign --> Assigned
     Assigned --> Review["Editor reviews and edits<br/>while shift and category grants are active"]
@@ -165,19 +169,19 @@ flowchart TD
 - **Check-out:**
   - It ends access early.
   - The outgoing manager chooses which unfinished work transfers.
-  - If nobody checks out by scheduled end + CheckoutGrace, Elsa checks the shift out and transfers all unfinished work
-    to the incoming queue (`transferredFrom`). Access has already ended by the clock.
+  - If nobody checks out by scheduled end + CheckoutGrace, Shifts' clock checks the members out and ends the shift;
+    Elsa then transfers all unfinished work to the incoming queue (`transferredFrom`).
 - **Settings:** AutoAssignDelay = 5m, CheckoutGrace = 15m, OwnerEditWindow = 24h.
-  - Platform defaults, tenant overrides, section overrides.
+  - Platform defaults, tenant overrides, unit overrides (nearest unit up the tree).
   - Changing them needs `newsroom.settings.manage`.
 
 ### Shift lifecycle diagram
 
 ```mermaid
 flowchart TD
-    Rota["Shifts module owns the rota<br/>schedule, manager, Desk, Editors"] --> Section["Section covers press/category pairs<br/>May span several presses"]
-    Section --> Start["Scheduled shift starts"]
-    Start --> Grants["Shift grants become valid by the clock<br/>for the section's categories"]
+    Rota["Shifts module owns the rota<br/>of each Organization unit; roles are data"] --> Section["The unit serves categories<br/>from several presses, or all"]
+    Section --> Start["Scheduled shift starts; members check in"]
+    Start --> Grants["Shift grants run from check-in<br/>on the unit's scopes and categories"]
     Grants --> Work["Editors and Desk work within<br/>their role and category scope"]
     Work --> Checkout{"Manager checks out early?"}
     Checkout -->|Yes| Choose["Outgoing manager chooses<br/>unfinished work to transfer"]
@@ -185,11 +189,11 @@ flowchart TD
     EndEarly --> Incoming["Send chosen work to incoming shift<br/>for reassignment"]
     Checkout -->|No| ScheduledEnd["Scheduled end arrives<br/>grants expire by the clock"]
     ScheduledEnd --> Grace["Wait CheckoutGrace<br/>15 minutes by default"]
-    Grace --> Auto["Elsa checks out the shift<br/>and transfers all unfinished work"]
+    Grace --> Auto["Shifts' clock checks the shift out<br/>Elsa transfers all unfinished work"]
     Auto --> Incoming
 ```
 
-The Shifts module owns rota and shift grants. The Content module owns article state. Elsa coordinates acceptance reminders, assignment timers, automatic check-out, handover, and publication scheduling.
+The Shifts module owns rota and shift grants. The Content module owns article state. Elsa coordinates acceptance reminders, assignment timers, handover, and publication scheduling; Shifts checks shifts out by its own clock.
 
 ## 9. Elsa 3 (Elsa Server inside its own runtime module)
 
@@ -215,9 +219,10 @@ The Shifts module owns rota and shift grants. The Content module owns article st
 | `WebApi.Contracts` | `RequirePermission`, `PermissionRequirement`, claim names, `ModuleManifest.Permissions`, `IAccessScopes`, `IGrantStore` |
 | `identity` runtime module *(assumed; possibly renamed `access`)* | Grant and role admin API (checks Elsa's grants against the templates), permission catalog, `/me` |
 | `tenancy` runtime module | Tenant directory, plans and module enablement admin |
-| Shifts module | Rota, sections, check-in and check-out, writing shift grants |
+| Shifts module | Rota per Organization unit, role definitions, check-in and check-out, the shift clock, writing shift grants |
+| Organization module | Units, members, positions (standing grants on unit scopes), tenant seeds |
 | Content module | States, the time windows, owner and assignee, transition API, list filters |
-| Elsa module | Orchestration: auto-assignment, reminders, automatic check-out, handover, scheduled publishing |
+| Elsa module | Orchestration: auto-assignment, reminders, handover, scheduled publishing |
 | YARP gateway | Rejecting invalid tokens, rate limits, stripping headers, BFF |
 
 ## 11. Implementation order (when asked)

@@ -5,7 +5,7 @@ description: How Contents coordinates with Shifts, Elsa, Identity, Tenancy, and 
 
 ## Editorial lifecycle
 
-The lifecycle is enforced by Contents. Shifts supplies time-bounded role grants and section coverage; Elsa waits, reminds, and issues authorized commands through module APIs.
+The lifecycle is enforced by Contents. Shifts supplies time-bounded role grants on Organization unit scopes; Elsa waits, reminds, and issues authorized commands through module APIs. The planned [NewsRoom](/modules/newsroom/) module will turn proposals into posts and hand their routing to Elsa workflows.
 
 ```mermaid
 flowchart LR
@@ -52,9 +52,9 @@ The owner edit window is 24 hours by default. Acceptance or assignment can lock 
 
 ## Shift integration
 
-Shifts owns sections, rota assignments, shift schedule, and the grants generated from the rota. A section is a set of company press/category scopes and can optionally span several presses. Manager, Desk, and Editor permissions come from the role's shift grants; these grants become inactive by clock or earlier check-out.
+[Shifts](/modules/shifts/) owns the shifts of each Organization unit, their rota, role definitions (data, not an enum) and the grants generated from the rota. A member's grants run from **check-in** to check-out, on the unit's scopes (`unit:{id}` of the unit and its ancestors) plus the categories the unit serves. A Department grant therefore covers its Sections.
 
-At shift end, access ends on the clock even if nobody checks out. Elsa waits the configurable checkout grace period (15 minutes by default), then requests automatic checkout and hands unfinished review Posts back to the Contents queue for reassignment. A manual handover is a manager action; it must end the outgoing shift's grants and transfer only the Posts selected under the agreed Shifts API contract. Contents records the transfer and preserves Post history.
+At shift end, Shifts' own clock checks out the members still in at end + grace (15 minutes by default) and ends the shift, so access ends even if nobody checks out. Elsa then reads `GET /api/shifts/shifts/ended` and hands unfinished review Posts back to the Contents queue for reassignment. A manual handover is a manager action; it must end the outgoing shift's grants and transfer only the Posts selected under the agreed Shifts API contract. Contents records the transfer and preserves Post history.
 
 ```mermaid
 sequenceDiagram
@@ -68,16 +68,16 @@ sequenceDiagram
     M->>C: Accept for active shift
     C-->>E: Persist acceptance time and shift reference
     E->>C: Query accepted queue after configurable delay
-    E->>S: Confirm active shift and section scope
+    E->>S: Confirm active shift and unit scope
     E->>C: Request auto-assignment if still unassigned
     S-->>C: Shift grants authorize assignment/review window
     C-->>A: Lock owner edits after acceptance/assignment
     C->>D: Expose approved Posts in Desk queue
     D->>C: Publish or schedule
     E->>C: Request due publication through API
-    Note over E,S: After end + grace: checkout and handover
+    Note over S: After end + grace: the shift clock checks out and ends the shift
+    E->>S: Read ended shifts
     E->>C: Return unfinished Posts to queue
-    E->>S: Check out expired shift
 ```
 
 Contents never directly queries the Shifts database, and Elsa never changes Content or Shifts rows directly. The API calls carry the tenant context; each module rechecks the tenant, caller, permission, scope, state, and version.
@@ -87,7 +87,7 @@ Contents never directly queries the Shifts database, and Elsa never changes Cont
 - Identity issues the user's token and owns the global account and tenant membership. Content uses the token subject as `OwnerId`/actor ID; it does not own passwords, user records, or membership.
 - The host resolves one tenant per request and validates the tenant context. Content data is tenant-isolated using the configured tenant database/provider strategy.
 - A tenant/company contains its own presses, categories, Posts, grants, rota sections, and workflow instances. A user may have different company roles and category scopes in multiple tenants.
-- Post records store press and category IDs as module-owned references. A section that covers categories in two presses contains two explicit press/category scope pairs, not an inferred wildcard.
+- Post records store press and category IDs as module-owned references, and an Organization unit id and path. A Section unit lists the category ids it serves (from any press), or `*` for all of them.
 - Elsa's service identity is a confidential client. It receives only the tenant grants needed for automation and sends an explicit tenant context on each API call. Service credentials belong in the secret provider, never module catalog settings or JWT payloads.
 
 ## Service/API boundary
@@ -100,7 +100,12 @@ The canonical resource is `/api/content/posts`. `/api/content/articles` and `/ap
 | `POST /presses`, `POST /categories` | `content.manage` | |
 | `GET /posts?view=Mine\|Queue\|Review\|Desk` | signed in | Each view is filtered by the caller's scopes |
 | `GET /posts/{id}` | owner, assignee or a scope that sees it | Otherwise 404 |
-| `POST /posts` | `content.author` | Body `NewPost`: `categoryId`, `title`, `body`, `postKind`, optional `document` |
+| `GET /kinds` | signed in | The tenant's post kinds (DynamicFields root post fields) with URL prefixes |
+| `POST /posts` | `content.author` | Body `NewPost`: `categoryId`, `categoryIds`, `title`, `body`, `postKind`, optional `document` |
+| `PUT /posts/{id}/root` | depends on state | The values of the post's kind root |
+| `PUT /posts/{id}/categories` | as an edit | `{ version, primaryCategoryId, categoryIds }` |
+| `PUT /posts/{id}/unit`, `PUT /contents/{id}/unit` | `content.unit.assign` | The unit must serve one of the post's categories |
+| `POST /contents/{id}/act` | depends on the stage | A pipeline action (`start`, `submit`, `review`, `accept`, `return`, `reopen`); 422 with `problems` when DynamicFields refuses |
 | `PUT /posts/{id}` | depends on state | Owner, assigned reviewer, or Desk (`content.publish`); body `PostEdit` |
 | `POST /posts/{id}/submit` | owner | `{ version }` |
 | `POST /posts/{id}/accept` | `content.accept` | `{ version, shiftId }` |
@@ -116,21 +121,30 @@ The canonical resource is `/api/content/posts`. `/api/content/articles` and `/ap
 | `POST /automation/accepted/{id}/assign` | `content.assign` | Auto-assign to an eligible editor on shift |
 | `POST /automation/shifts/{shiftId}/handover` | `content.transfer` | Returns unfinished review work to the queue; safe to repeat |
 
-Errors are problem details: 403 for a missing right, 404 for a Post the caller may not see, 409 for a stale `version`, a concurrent change or a domain rule.
+Errors are problem details: 403 for a missing right, 404 for a Post the caller may not see, 409 for a stale `version`, a concurrent change or a domain rule, 422 when DynamicFields refuses the content, 503 when DynamicFields or Organization cannot be reached.
+
+### Who assigns work
+
+The setting `Content:Newsroom:WorkflowOwnsAssignment` (default `false`) decides who accepts and assigns:
+
+- `false`: the shift's manager and Desk, as in the table above.
+- `true`: post accept, assign, transfer, return and content assign need **`content.unit.assign`** instead, which only the workflow's service identity holds. People get 403; the domain rules are unchanged.
+
+The deployment turns it on once NewsRoom bindings exist; installing NewsRoom does not flip it. `/automation/handover` and a first assignee named on `POST /contents` are not covered yet; the wave 5 cutover (E3) closes them.
 
 | Operation | Owner | Expected caller |
 | --- | --- | --- |
 | Create/edit/submit/get/list Post | Contents | Author, assignee, Desk, or authorized reader, checked per scope and state. |
 | Accept, assign, approve, return | Contents | Shift Manager, active Editor, or Desk as appropriate. |
 | Schedule/publish/publish-due | Contents | Desk; Elsa may invoke due processing using a tenant-scoped service grant. |
-| Plan/publish rota, check in/out, read effective shift timers | Shifts | Shift Manager/admin; Elsa has narrowly granted automation access for overdue checkout. |
+| Plan/publish rota, check in/out, read effective shift timers | Shifts | Unit manager (`shifts.manage` on the unit) or the shift lead; Elsa reads the ended list with `shifts.manage`. |
 | Auto-assignment and shift handover commands | Contents | Elsa service after checking persisted deadlines and current shift rules; all commands revalidate. |
 
-The API should expose stable module contracts rather than sharing internal application assemblies. If the modules later need events for search indexing, notifications, or cache invalidation, publish tenant-scoped integration events after the owning transaction commits; events complement commands and do not replace validation at the Contents boundary.
+The API exposes stable module contracts rather than sharing internal application assemblies. Contents publishes tenant-scoped [integration events](/backend/integration-events/) through the outbox in the same save as each change (`content.post-created.v1`, `work-item-state-changed`, `validation-failed`, ...; records in `Content.Contracts`), and subscribes to `shifts.section-moved.v1` and `org.unit-*.v1`. Events complement commands and do not replace validation at the Contents boundary.
 
 ## Post document and cross-module communication
 
-This section is the **target** design; today Contents stores the document after structural checks only and calls no other module.
+Most of this is built: Contents reads its kinds from Dynamic Fields, asks it to validate contents and posts (422 on refusal, 503 when it is unreachable) and reads units from Organization, all over HTTP with the caller's token. Keyword and Media checks are still the **target** design.
 
 Contents owns the Post envelope, the document JSON, revisions, and all editorial decisions. Dynamic Fields owns reusable definitions and immutable form versions. Keyword owns canonical concepts; Contents owns the tag assignments on each Post. A future Media module owns binary assets, while Contents owns their editorial use. These boundaries apply whether modules run in one process or separate pools.
 
@@ -192,6 +206,6 @@ The current code does not run Elsa workflow definitions yet. `NewsroomAutomation
 1. gets a client-credentials token as `elsa-workflows` and sends `X-Tenant` on every call;
 2. reads `GET /api/content/automation/accepted`, and for each Post whose shift's `autoAssignDelay` (from `GET /api/shifts/shifts/{id}/automation`) has passed, calls `POST /api/content/automation/accepted/{id}/assign`;
 3. calls `POST /api/content/posts/publish-due`;
-4. for each shift from `GET /api/shifts/overdue` whose `endsAt + checkoutGrace` has passed, calls the Content handover and then the Shifts check-out.
+4. reads `GET /api/shifts/shifts/ended?since=` (a cursor per tenant, kept in memory, with a five-minute overlap) and calls the Content handover for each ended shift. It no longer checks shifts out: Shifts' clock does that.
 
-This is an integration starter, **not the final set of persisted Elsa workflow definitions**. Both workflow-pool replicas run the loop, so every command must stay idempotent; the Content and Shifts endpoints recheck state and version, which makes duplicate calls safe but wasteful. Convert each business timer into an Elsa workflow, or elect one runner, before treating the design as complete. See [Elsa](/modules/elsa/#current-implementation) and [Authentication and authorization](/backend/auth-design/) for the original policy and shift decisions.
+This is an integration starter, **not the final set of persisted Elsa workflow definitions**. Both workflow-pool replicas run the loop, so every command must stay idempotent; the Content and Shifts endpoints recheck state and version, which makes duplicate calls safe but wasteful. Wave 5 replaces this poller: NewsRoom publishes `newsroom.project-approved.v1`, Elsa starts the workflow bound to the post kind and Section, and the cutover (E3) removes the poller and `/automation/*`. See [NewsRoom workflows](/modules/newsroom/workflows-and-assignment/). See [Elsa](/modules/elsa/#current-implementation) and [Authentication and authorization](/backend/auth-design/) for the original policy and shift decisions.

@@ -1,13 +1,13 @@
 ---
 title: Runtime modules
-description: How the WebApi prototype installs, activates and serves a module uploaded while the API runs, on every replica of every pool, without a restart.
+description: How the platform's WebApi host installs, activates and serves a module uploaded while the API runs, on every replica of every pool, without a restart.
 sidebar:
   order: 8
 ---
 
-The prototype in `src/WebApi/WebApi` shows that a module can be uploaded, activated and served **while the API runs**, and
-that every replica of every pool converges on the same module state. It is research code: it proves the mechanism
-and measures its limits.
+The platform's WebApi host (`src/WebApi/WebApi` in `ModularBlazor.Platform`) uploads, activates and serves a module
+**while the API runs**, and every replica of every pool converges on the same module state. This page explains the
+mechanism and its measured limits.
 
 | Project | Role |
 | --- | --- |
@@ -128,8 +128,7 @@ Each admin call writes a **desired state** to the shared catalog. Every replica 
   [Unloading runtime modules](/backend/runtime-module-unloading/).
 - **On startup** a replica converges on the catalog, so modules marked `Active` come back online.
 
-The prototype's catalog is `modules.json` plus the packages, in one folder shared by every replica; the real host
-keeps it in the modules schema.
+The catalog is `modules.json` plus the packages, in one folder shared by every replica.
 
 ## A module
 

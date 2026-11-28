@@ -6,7 +6,9 @@ sidebar:
 ---
 
 :::note[Status]
-The Elsa runtime module exists (repository `ModularBlazor.Module.Elsa`, module `elsa` 0.1.0) and runs in the Hybird lab's `workflow` pool. It hosts the Elsa engine, API and tenant adapters, but **no workflow definitions yet**: the newsroom timers run in a hosted polling service. See [Current implementation](#current-implementation).
+The Elsa runtime module exists (repository `ModularBlazor.Module.Elsa`, module `elsa` 0.1.0, Platform preview.7) and runs in the Hybird lab's `workflow` pool. It hosts the Elsa engine, API and tenant adapters, but **no workflow definitions yet**: the newsroom timers run in a hosted polling service. See [Current implementation](#current-implementation).
+
+**In progress:** the move to Platform preview.8 and a playground of its own (wave 5, step 5-0), on an unmerged branch. **Planned:** the workflows themselves (E1–E3), see [Wave 5](#wave-5-plan).
 :::
 
 ## Recommendation
@@ -15,8 +17,10 @@ Run Elsa in a **dedicated `workflow` pool**: separate WebApi processes that load
 
 - The **identity service** authenticates people and issues a token for one tenant.
 - The **WebApi host** resolves and verifies the tenant, then enforces permissions and scoped grants.
-- The **shifts module** owns sections, rotas, check-in/check-out, and the time-windowed grants produced by the rota.
-- The **Contents module** owns Posts; `PostKind` distinguishes article, news, video, reportage, and other kinds. Contents validates every Post state transition, assignment, edit, return, and publication.
+- The **Organization module** owns the unit tree (Org → Sector → Department → Section) and which categories each Section serves.
+- The **shifts module** owns the shifts of each unit, rotas, check-in/check-out, the shift clock, and the grants produced by the rota between check-in and check-out.
+- The **Contents module** owns Posts; the post kind is a DynamicFields root post field key (`post.news`, `post.article`, ...). Contents validates every Post state transition, assignment, edit, return, and publication.
+- The **NewsRoom module** (planned) owns proposals and post projects, and starts the workflows.
 - **Elsa** coordinates durable steps and timers, then asks the owning module to perform a transition through an authenticated API or message.
 
 ```mermaid
@@ -76,7 +80,7 @@ There are two architectures in the repository; do not conflate them.
 | Persistence | Elsa workflow management and runtime stores on EF Core PostgreSQL, from `ConnectionStrings:elsa`, schema `elsa`; Elsa runs its own migrations |
 | Tenancy | `ElsaPlatformTenantResolver` hands Elsa the tenant the host already resolved; `ElsaPlatformTenantsProvider` lists active tenants from `ITenantDirectory`. Elsa has no tenant list of its own |
 | Authorization | `ElsaWorkflowPermissionMiddleware` maps Elsa API calls to host grants: `workflow-instances` → `workflow.run`, other reads → `workflow.view`, other writes → `workflow.design` |
-| Automation | `NewsroomAutomationService` (a `BackgroundService`) polls the Content and Shifts APIs as client `elsa-workflows`; see [Workflow and module integrations](/modules/contents/workflow-and-integrations/#delivery-sequence) |
+| Automation | `NewsroomAutomationService` (a `BackgroundService`) polls the Content and Shifts APIs as client `elsa-workflows`: auto-assign, publish-due, and the Content handover for each shift in `GET /api/shifts/shifts/ended` (a cursor per tenant in memory, looking back `Elsa:HandoverLookback`, default one day). It no longer checks shifts out; Shifts' clock does. See [Workflow and module integrations](/modules/contents/workflow-and-integrations/#delivery-sequence) |
 
 ### Secrets and settings
 
@@ -90,7 +94,8 @@ dotnet user-secrets set "Parameters:elsa-client-secret" "<dev-secret>" --project
 
 | Issue | Why it matters | Suggested fix |
 | --- | --- | --- |
-| No Elsa workflow definitions | Timers live in a polling loop, not in durable, inspectable workflows | Model assignment delay, scheduled publish and checkout grace as Elsa workflows |
+| No Elsa workflow definitions | Timers live in a polling loop, not in durable, inspectable workflows | Wave 5 (E1–E3): event-started workflows, then remove the poller |
+| The handover cursor is in memory | After a restart, a shift older than `Elsa:HandoverLookback` that was never handed over is not retried | Persist the cursor, or let NewsRoom's workflows own the handover |
 | Both workflow replicas run the poller | Every command is sent twice; correctness relies on idempotent endpoints | Elect one runner (distributed lock in Redis or the database), or let Elsa's scheduler own the timers |
 | The secret injection is hard-coded for the module id `elsa` in `ModuleRuntime` | Any other module that needs a host secret needs a host change, and any package that claims the id `elsa` receives these secrets | A manifest-declared list of required host keys, allowlisted per module id by the operator |
 | `Elsa:PlatformApiBaseUrl` is `http://localhost:5080` in the AppHost | Breaks outside the lab | Use the gateway's service-discovery reference |
@@ -120,16 +125,16 @@ Elsa's multitenancy documentation explicitly distinguishes tenant resolution fro
 - Protect Elsa's own management API separately with least-privilege workflow administration permissions. Elsa API permissions do not replace application permissions, and Elsa API permissions do not secure HTTP-triggered workflow routes. [Elsa authentication and authorization](https://docs.elsaworkflows.io/guides/authentication.md)
 - Never use a broad `*` permission mapping for ordinary editors or Desk users. In the legacy host, `ElsaPermissionTransformation` gives generic workflow permissions based on a simple role check; that is too broad for the new scoped newsroom policy.
 
-### Press/category scope
+### Unit and category scope
 
-The current Shifts module stores a section's category IDs and writes grants with scopes such as `category:{id}`. The newsroom requirement allows a section to span categories from several presses. Therefore either make category IDs globally unique and enforce that invariant, or change the scope to include both IDs, for example `press:{pressId}:category:{categoryId}`. The content module must authorize against the same press/category pair. Tenant remains the outer boundary in either design.
+Shift grants are written on the shift's Organization **unit**: `unit:{id}` for the unit and every ancestor (`UnitScopes.For(path)`), plus `category:{id}` for each category the unit serves. Contents authorizes a post against its `press:`, `category:` and `unit:` scopes, so both sides use the same scope names. A Section serves categories from any press; category ids are unique within the tenant. Tenant remains the outer boundary.
 
 ## Workflow boundaries
 
 For the newsroom process:
 
 - When a Shift Manager accepts a submission, Elsa may start the configurable auto-assignment delay (five minutes by default). A manager's assignment wins if accepted before the timer; otherwise Elsa requests automatic assignment from the content/shifts application API. Elsa never accepts a submission on the manager's behalf; it reminds the manager if the submission is still unaccepted.
-- The shift module remains authoritative for the rota and checkout. Elsa may schedule the grace-period action (15 minutes by default), but the host enforces grant expiry from the shift clock even if Elsa is unavailable. At grace-period expiry, Elsa checks the shift out and transfers unfinished work to the incoming queue; for an early manager checkout, the outgoing manager chooses what transfers.
+- The shift module remains authoritative for the rota and checkout. Its own clock checks members out at end + grace (15 minutes by default) and ends the shift, so grants end even if Elsa is unavailable. Elsa then transfers unfinished work to the incoming queue; for an early manager checkout, the outgoing manager chooses what transfers.
 - A Desk user or Shift Manager can return work according to the active tenant/shift/category grants. The content module performs the return and records the state transition.
 - Publishing, scheduled publication, edits after publication, and re-approval remain content-module rules. Any later edit cancels a pending publication schedule, keeps the current live version available, and sends the edited version back for Desk re-approval. Elsa can orchestrate a scheduled action, but cannot bypass the content module's authorization or state checks.
 
@@ -142,6 +147,19 @@ Every command must be **idempotent** and safe under retries and races. For examp
 3. Include `TenantId`, shift/Post IDs, correlation/idempotency keys, workflow version, and initiating actor in durable workflow context.
 4. Route every delayed action back through the owning shifts/content module API or command handler. The host rechecks tenant status, current grants, and domain state at execution time. Map narrowly scoped workflow design/run permissions into Elsa's API permission claims; never grant every newsroom user a wildcard Elsa permission.
 5. Test tenant crossing, suspended tenants, checkout while a workflow is waiting, duplicate delivery, manager/automatic assignment races, and Elsa restart/replay before production.
+
+## Wave 5 plan
+
+Approved on 2026-11-28; **planned, not built**.
+
+| Step | Content |
+| --- | --- |
+| 5-0 | Platform preview.8 and a playground (PostgreSQL, RabbitMQ, the `workflow` pool, Organization, Shifts, DynamicFields and Content). Done when a trivial workflow runs for one tenant, survives a restart, and another tenant cannot see it. **In progress** |
+| E1 | An integration-event subscriber that starts workflows and resumes bookmarks. Activities: route to unit, `EnsurePostInUnitCategories` (treats `*` as a match), assign in shift, wait for stage, deadline and escalate, Desk review, publish, notify |
+| E2 | A default main workflow per post kind and a sub-workflow per content kind, in code in this module; handover to the next shift; a dry run that lists the steps without side effects |
+| E3 | Cutover: remove the poller; a paired Content PR removes `/automation/*`, shift-based accept and assign, and `AssignedShiftId` |
+
+NewsRoom starts a workflow with the integration event `newsroom.project-approved.v1`, not a direct call, so a stopped workflow pool only delays work. Elsa stays on PostgreSQL only for wave 5. See [NewsRoom](/modules/newsroom/).
 
 ### Decision in one sentence
 

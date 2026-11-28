@@ -6,7 +6,10 @@ sidebar:
 ---
 
 :::note[Status: designed, not built yet]
-NewsRoom is phase **P4** of the newsroom plan. Its repository (`ModularBlazor.Module.NewsRoom`) does not exist yet.
+NewsRoom is phase **P4** of the newsroom plan. Its repository
+([`ModularBlazor.Module.NewsRoom`](https://github.com/soft-square-net/ModularBlazor.Module.NewsRoom)) was created on
+2026-11-28 and holds only a README. The build plan (wave 5: N1 skeleton and proposals, N2 moderation and post
+projects, N3 bindings, routing and the read model, N4 the basic client) is approved but not started.
 Everything it builds on is merged: [Organization](#what-it-builds-on) units, Shifts v2 (units, roles as data,
 templates, check-in grants, the shift clock), and the Contents newsroom core (kinds as DynamicFields root fields,
 categories and units, work items, validation guards). This page describes the agreed design. The API names may still

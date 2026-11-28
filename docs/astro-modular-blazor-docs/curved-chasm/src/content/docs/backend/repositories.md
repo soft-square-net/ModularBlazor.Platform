@@ -15,7 +15,7 @@ flowchart LR
     P["ModularBlazor.Platform<br/>WebApi · Identity · BlzWebClient<br/>Hybird lab · contracts"]
     F[("GitHub Packages<br/>soft.square.net.*")]
     S["ModularBlazor.Samples<br/>Greeting · Inventory · Pulse<br/>Dashboard · Reports"]
-    M["ModularBlazor.Module.*<br/>Content · Shifts<br/>Storage · Elsa"]
+    M["ModularBlazor.Module.*<br/>Organization · Shifts · Content<br/>DynamicFields · ContentDesigner<br/>Storage · Elsa · ..."]
     W["Running WebApi<br/>/api/admin/modules<br/>/api/admin/client-modules"]
     P -- "tag v* → pack and push" --> F
     F -- "restore (PAT)" --> S
@@ -32,7 +32,11 @@ flowchart LR
 | [`ModularBlazor.Platform`](https://github.com/soft-square-net/ModularBlazor.Platform) | The WebApi and its core modules (identity, tenancy, client modules), the OpenIddict identity service, the YARP gateway, `ModularBlazor.BlzWebClient` and its core client modules, MudTail, the Hybird Aspire lab, the contract packages and the Module SDK, and this documentation |
 | [`ModularBlazor.Samples`](https://github.com/soft-square-net/ModularBlazor.Samples) | Small demo modules, one folder each under `samples/`: Greeting (single project), Inventory (layered, tenant data), Pulse (own pipeline, hosted service), Dashboard (client `.dll`), Reports (client `.nupkg`) |
 | [`ModularBlazor.Module.Content`](https://github.com/soft-square-net/ModularBlazor.Module.Content) | The newsroom's Posts and their workflow. See [Contents](/modules/contents/) |
-| [`ModularBlazor.Module.Shifts`](https://github.com/soft-square-net/ModularBlazor.Module.Shifts) | Rota and shift grants |
+| [`ModularBlazor.Module.Shifts`](https://github.com/soft-square-net/ModularBlazor.Module.Shifts) | Shifts of Organization units, rota, attendance and check-in grants; publishes `Shifts.Contracts`. See [Shifts](/modules/shifts/) |
+| [`ModularBlazor.Module.Organization`](https://github.com/soft-square-net/ModularBlazor.Module.Organization) | The central org service and its connector: units, people, positions, tenant seeds; publishes `Organization.Contracts` and `.Client`. See [Organization](/modules/organization/) |
+| [`ModularBlazor.Module.DynamicFields`](https://github.com/soft-square-net/ModularBlazor.Module.DynamicFields) | Field definitions, validation, root post fields and URL prefixes. See [Dynamic Fields](/modules/dynamic-fields/) |
+| [`ModularBlazor.Module.ContentDesigner`](https://github.com/soft-square-net/ModularBlazor.Module.ContentDesigner) | The post designer and studio. See [ContentDesigner](/modules/content-designer/) |
+| [`ModularBlazor.Module.NewsRoom`](https://github.com/soft-square-net/ModularBlazor.Module.NewsRoom) | Proposals and post projects. Created, nothing built yet. See [NewsRoom](/modules/newsroom/) |
 | [`ModularBlazor.Module.Storage`](https://github.com/soft-square-net/ModularBlazor.Module.Storage) | File storage |
 | [`ModularBlazor.Module.Elsa`](https://github.com/soft-square-net/ModularBlazor.Module.Elsa) | Elsa 3.9 as a runtime module. See [Elsa](/modules/elsa/) |
 | [`ModularBlazor.ModuleTemplate`](https://github.com/soft-square-net/ModularBlazor.ModuleTemplate) | The starting point for a new module repo (scaffold, still growing) |

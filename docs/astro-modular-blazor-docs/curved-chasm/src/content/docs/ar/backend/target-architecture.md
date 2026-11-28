@@ -30,7 +30,7 @@ Observability: OpenTelemetry traces, metrics and logs, tagged with tenant and co
 
 ## مجموعات من صورة واحدة
 
-يقرأ كل نشر للصورة ثلاثة إعدادات (مطبقة في النموذج الأولي `src/WebApi/WebApi`):
+يقرأ كل نشر للصورة ثلاثة إعدادات (مطبقة في مضيف WebApi في المنصة، `src/WebApi/WebApi`):
 
 | الإعداد | القيم | الأثر |
 | --- | --- | --- |

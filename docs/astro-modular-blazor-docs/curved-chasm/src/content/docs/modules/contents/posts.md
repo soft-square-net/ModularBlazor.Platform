@@ -5,11 +5,11 @@ description: Proposed Post aggregate, Dynamic Fields payload contract, module in
 
 ## Editorial hierarchy
 
-The company is represented by a tenant. A tenant can own several presses; each press has its own categories. A Post is classified by exactly one press/category pair. A section in Shifts may include several such pairs, including pairs from different presses.
+The company is represented by a tenant. A tenant can own several presses; each press has its own categories. A Post belongs to one press, with a primary category and up to 20 categories of that press. A post may also belong to an [Organization](/modules/organization/) unit. A Section unit serves a list of categories (or `*`, all of them), which may come from several presses; a post may be put in a unit only if the unit serves one of its categories.
 
 ### Categories are not Keyword tags
 
-The Contents module owns each press category. A category is part of the editorial domain: it determines where a Post belongs and participates in category-scoped grants, shift-section coverage, queues, and publication rules. A category ID is therefore not interchangeable with a Keyword ID.
+The Contents module owns each press category. A category is part of the editorial domain: it determines where a Post belongs and participates in category-scoped grants, the categories a Section unit serves, queues, and publication rules. A category ID is therefore not interchangeable with a Keyword ID.
 
 Contents may optionally map an editorial category to a canonical Keyword concept when they represent the same subject (for example, the “Sports” category in a press may map to the shared Sports concept). That mapping helps search and SEO, but does not replace the category, grant tag access, or automatically tag every Post in the category.
 
@@ -39,11 +39,11 @@ Use one Contents-owned Post aggregate. It has a stable **envelope** (identity, t
   "style": { "layout": "wide" },
   "children": [
     {
-      "nodeId": "p1", "postKind": "Article", "schemaId": "block.paragraph", "schemaVersion": 1,
+      "nodeId": "p1", "postKind": "post.article", "schemaId": "block.paragraph", "schemaVersion": 1,
       "content": { "text": "Opening text..." }, "style": {}, "children": []
     },
     {
-      "nodeId": "img1", "postKind": "PhotoStory", "schemaId": "block.image", "schemaVersion": 1,
+      "nodeId": "img1", "postKind": "post.photo-story", "schemaId": "block.image", "schemaVersion": 1,
       "content": { "assetId": "asset_21", "caption": "The venue" },
       "style": { "width": { "base": "100%", "md": "60%" } }, "children": []
     }
@@ -51,7 +51,7 @@ Use one Contents-owned Post aggregate. It has a stable **envelope** (identity, t
 }
 ~~~
 
-`POST /api/content/posts` takes `{ categoryId, title, body, postKind, document }`, and `PUT /api/content/posts/{id}` takes `{ version, title, body, document }`. Without a `document`, create stores a `legacy.basic` version 1 document whose `content` is `{ title, body }`. An edit without a `document` keeps the stored one, so send the document whenever its `content` mirrors the title or body.
+`POST /api/content/posts` takes `{ categoryId, categoryIds, title, body, postKind, document }`, and `PUT /api/content/posts/{id}` takes `{ version, title, body, document }`. Without a `document`, create gives the post a root of its kind (the kind's published DynamicFields root field), with `headline` taken from the title; `PUT /posts/{id}/root` edits its values. Older posts may still have a `legacy.basic` version 1 root whose `content` is `{ title, body }`. An edit without a `document` keeps the stored one, so send the document whenever its `content` mirrors the title or body.
 
 `PostDocumentRules` checks only the structure. A violation is a `DomainException`, which the endpoints return as **409**:
 
@@ -62,9 +62,9 @@ Use one Contents-owned Post aggregate. It has a stable **envelope** (identity, t
 | `nodeId` | Required, at most 64 characters, unique within the document |
 | Nesting | At most 500 nodes and 12 levels |
 | Size | At most 2 MB once serialized |
-| `postKind` of a node | A defined `PostKind` value |
+| `postKind` of a node | A kind key (DynamicFields key format); an old enum name is read as its key |
 
-The schema-specific validation of `content` by Dynamic Fields is **not built yet**. Until it is, `SchemaId` is a label the client chooses.
+On top of these structural checks, Dynamic Fields now validates the content: `validate-node` before a content moves to review or accepted, and `validate` on the post before approve, schedule and publish. A refusal is **422** with `problems` (`[{ path, message, nodeId }]`). See [Work items, checks and events](/modules/contents/#work-items-checks-and-events).
 
 Large media binaries stay outside both databases: the document holds stable asset IDs and editorial metadata.
 
@@ -135,23 +135,25 @@ Tenant (company boundary; resolved by host)
 | --- | --- |
 | `Id` | Contents-owned Post identifier. |
 | `TenantId` | Tenant partition/security boundary, set from trusted request context. Never accepted as an arbitrary body value. |
-| `PressId`, `CategoryId` | The category must belong to the selected press in this tenant. |
+| `PressId`, `PrimaryCategoryId`, categories | Every category must belong to the selected press in this tenant. The primary is stored in column `CategoryId`, all of them in `post_categories` (at most 20). |
+| `UnitId`, `UnitPath` | The Organization unit the post belongs to, and its stored path (rebased when the unit moves). Set with `content.unit.assign`. |
 | `PublicId` | Random 32-character ID set at creation; never changes. Older rows use `legacy-{Id}`. Unique index. |
-| `PostKind` | `Article`, `News`, `Video`, `Reportage`, `PhotoStory` or `Other` today. Planned: document, image, album and mixed story, each mapped by Contents to an allowed schema. |
-| `SchemaId`, `SchemaVersion` | The document's field contract (default `legacy.basic` v1). Planned: an exact published Dynamic Fields form version, chosen by the server. |
+| `PostKind` | The key of a DynamicFields root post field (`post.article`, `post.news`, `post.video`, `post.reportage`, `post.photo-story`, `post.other`, `post.review`, `post.blog` or a tenant's own). Only published kinds can be created; only kinds with a URL prefix can be published. |
+| `PublishedUrlPrefix` | The kind's URL prefix at publish time; the canonical path is `/{prefix}/{slug}`. |
+| `SchemaId`, `SchemaVersion` | The document's field contract: the kind's root field version for new posts, `legacy.basic` v1 for older ones. |
 | `DocumentJson` | The `PostDocument` (`content`, `style`, `children`). Contents stores it; Dynamic Fields will only validate it. |
 | `KeywordIds`, `AssetIds` | Planned. Stable references to Keyword concepts and Media assets; each referenced module owns its records. |
 | `OwnerId` | Stable Identity subject who created the Post. Keep it after membership removal for audit; anonymize if account deletion policy requires it. |
 | `State`, `Version` | Current editorial state and optimistic concurrency token. Every accepted state-changing command checks the current version. |
-| `AcceptedAt`, `AcceptedShiftId` | When and in which shift a manager accepted it; starts the configurable auto-assignment delay. |
-| `AssigneeId`, `AssignedShiftId` | Current reviewer and shift assignment. Assignment does not grant permanent access. |
+| `AcceptedAt`, `AcceptedShiftId` | When and in which shift a manager accepted it; starts the configurable auto-assignment delay. Planned to go when Elsa's workflows take over assignment (wave 5, E3). |
+| `AssigneeId`, `AssignedShiftId` | Current reviewer and shift assignment. Assignment does not grant permanent access. `AssignedShiftId` is planned to go in E3. |
 | `ScheduledFor`, `PublishedAt` | Scheduled publication and live publication timestamps. |
 | `PublishedTitle`, `PublishedBody`, `PublishedDocumentJson` | The snapshot served by the public permalink while a later revision is reviewed. |
 | `History` | Actor, time, action, state, reason/detail, and related shift/assignment references. |
 
-### Form-defined document content (planned)
+### Form-defined document content
 
-Posts share identity, press/category, ownership, state, and revision rules. Their variable data is the document `content`, whose shape a published Dynamic Fields form will define, avoiding an unbounded table of nullable columns. Contents will maintain a server-side mapping from each permitted `PostKind` and tenant to a form version, so a client cannot choose an arbitrary form to bypass policy or validation. Form changes create a new immutable version, and existing revisions remain pinned until explicitly migrated.
+Posts share identity, press/category, ownership, state, and revision rules. Their variable data is the document `content`, whose shape a published Dynamic Fields field defines, avoiding an unbounded table of nullable columns. The kind is the root field's key, so the server picks the root schema from the kind; only published kinds are accepted. Form changes create a new immutable version, and existing revisions remain pinned until explicitly migrated.
 
 For mixed stories, each child node names its own `schemaId` (for example a paragraph, image, video, document or album block). Only declared block kinds and their schemas are accepted. Dynamic Fields validates structure and values; Contents validates editorial and asset-reference rules. A future Media module owns binary upload, scanning, transformations, storage, and retention. The payload stores stable asset IDs and editorial metadata, never the binary itself.
 
@@ -164,7 +166,7 @@ Do not store video files or image binaries in the Contents relational database. 
 3. Draft creation outside a shift is allowed for the user's own eligible categories. It does not grant review or publication rights.
 4. The owner may edit a submitted Post during the agreed 24-hour window only while it has not been accepted/assigned. Manager acceptance or assignment locks owner edits. A return reopens author changes.
 5. Another editor's Post can be reviewed only after explicit assignment to that editor and while the corresponding shift/category grant is active.
-6. Assignment requires the manager's active `content.assign` scope and an eligible Editor on an active shift section covering that Post's press/category. Compare-and-set prevents a timer and manager action from overwriting each other.
+6. Assignment requires the manager's active `content.assign` scope and an eligible Editor checked in to an active shift whose grants cover the Post (its unit, press or category). With `Content:Newsroom:WorkflowOwnsAssignment` on, only the workflow (`content.unit.assign`) accepts and assigns. Compare-and-set prevents a timer and manager action from overwriting each other.
 7. Desk return/publish operations require category scope and a valid state. A Desk user who authored or reviewed the item may self-publish only if they also have the standing Editor permission for that company category.
 8. An edit to a scheduled version cancels its pending publication. An edit to an already published Post moves the new revision to Desk reapproval while the previous published snapshot remains live.
 9. A scheduled publish rechecks that the Post is still in the scheduled version/state and due. A stale schedule or later edit cannot publish obsolete content.
@@ -178,7 +180,7 @@ Do not store video files or image binaries in the Contents relational database. 
 | — | Author creates Post | Draft | `content.author` in Post category. |
 | Draft / Returned | Author submits | Submitted | Owner and current version match. |
 | Submitted | Shift Manager accepts | Accepted | Active `content.accept` and category coverage; store `AcceptedAt` and shift ID. |
-| Accepted | Manager assigns | InReview | Active `content.assign`; reviewer is eligible in the section. |
+| Accepted | Manager assigns | InReview | Active `content.assign`; reviewer is eligible on the shift. |
 | Accepted | Elsa assigns after delay | InReview | No manager assignment won first; eligible active Editor exists. |
 | InReview | Assigned Editor approves | Approved | Same assignee, active review grant, and current version. |
 | Submitted / Accepted / InReview / Approved / Scheduled / AwaitingDeskReapproval | Authorized user returns | Returned | `content.return`; record reason and actor. |
@@ -200,7 +202,7 @@ Do not store video files or image binaries in the Contents relational database. 
 - It serves any Post that has been published (`PublishedAt` is set). The live version therefore stays online while a later edit waits for Desk re-approval, is scheduled, or is returned.
 - `legacy-{id}` IDs keep working for rows created before `PublicId` existed.
 
-The response is `PublishedPost`: `id`, `publicId`, `permalink`, `postKind`, `pressId`, `categoryId`, `title`, `publishedAt`, `schemaId`, `schemaVersion` and `document`.
+The response is `PublishedPost`: `id`, `publicId`, `permalink`, `postKind`, `pressId`, `categoryId`, `title`, `body`, `publishedAt`, `schemaId`, `schemaVersion`, `document`, `urlPrefix` and `canonicalPath` (from the stored prefix; no DynamicFields call).
 
 ## Permission model
 
@@ -210,12 +212,13 @@ Permissions are plain module-defined names; grants live in the host's tenant gra
 | --- | --- | --- |
 | `content.author` | Category or press | Create and submit own Posts. |
 | `content.editor` | Category or press | Standing Editor role, including the agreed self-publish exception. |
-| `content.accept` | Shift-provided category scope | Manager accepts submissions into the shift's queue. |
-| `content.assign` | Shift-provided category scope | Manager assigns Posts; Elsa's service also needs explicitly provisioned tenant-wide automation scope for queue reconciliation. |
-| `content.review` | Shift-provided category scope | Review/edit only assigned Posts during the active shift. |
-| `content.return` | Shift-provided category scope | Desk or Shift Manager returns a Post. |
-| `content.publish` | Shift/standing category scope | Desk approves publication or schedules it. |
+| `content.accept` | Shift-provided unit or category scope | Manager accepts submissions into the shift's queue. |
+| `content.assign` | Shift-provided unit or category scope | Manager assigns Posts; Elsa's service also needs explicitly provisioned tenant-wide automation scope for queue reconciliation. |
+| `content.review` | Shift-provided unit or category scope | Review/edit only assigned Posts during the active shift. |
+| `content.return` | Shift-provided unit or category scope | Desk or Shift Manager returns a Post. |
+| `content.publish` | Shift or standing unit or category scope | Desk approves publication or schedules it. |
 | `content.transfer` | Shift scope; tenant-wide service grant for automation | Handover unfinished Posts safely. |
+| `content.unit.assign` | Tenant (workflow service identity) | Put a post or a content in a unit; with `WorkflowOwnsAssignment` on, also accept, assign, transfer and return. Granted to nobody by default. |
 | `content.manage` | Tenant | Manage presses and categories. |
 
 The host resolves the tenant from trusted context and compares it with token/tenant membership. Do not put press/category/shift permissions in JWT claims: grants change with the rota clock, assignment, and check-out.

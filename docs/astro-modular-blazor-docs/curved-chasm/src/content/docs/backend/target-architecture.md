@@ -31,7 +31,7 @@ Observability: OpenTelemetry traces, metrics and logs, tagged with tenant and co
 
 ## Pools from one image
 
-Each deployment of the image reads three settings (implemented in the `src/WebApi/WebApi` prototype):
+Each deployment of the image reads three settings (implemented in the platform's WebApi host, `src/WebApi/WebApi`):
 
 | Setting | Values | Effect |
 | --- | --- | --- |
