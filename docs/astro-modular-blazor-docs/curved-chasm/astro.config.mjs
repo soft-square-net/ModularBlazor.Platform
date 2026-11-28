@@ -129,6 +129,11 @@ export default defineConfig({
 					items: [{ autogenerate: { directory: 'start' } }],
 				},
 				{
+					label: 'Tutorials',
+					translations: { ar: 'دروس تطبيقية' },
+					items: [{ autogenerate: { directory: 'tutorials' } }],
+				},
+				{
 					label: 'Guides',
 					translations: { ar: 'الأدلة' },
 					items: [{ autogenerate: { directory: 'guides' } }],
