@@ -17,7 +17,7 @@ description: The Organization runtime module. One central service holds customer
   **positions** in units;
 - the **tenant seeds**: which units get a tenant of their own, in which deployment, on which database server.
 
-[Shifts](/modules/shifts/) and the planned [NewsRoom](/modules/newsroom/) module **require** it. Contents and the
+[Shifts](/modules/shifts/) and the [NewsRoom](/modules/newsroom/) module **require** it. Contents and the
 ContentDesigner use it when it is there.
 
 The module's id is `organization`. Its permissions are `org.read`, `org.units.manage`, `org.members.manage` and

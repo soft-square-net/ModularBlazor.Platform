@@ -6,9 +6,9 @@ sidebar:
 ---
 
 :::note[Status]
-The Elsa runtime module exists (repository `ModularBlazor.Module.Elsa`, module `elsa` 0.1.0, Platform preview.7) and runs in the Hybird lab's `workflow` pool. It hosts the Elsa engine, API and tenant adapters, but **no workflow definitions yet**: the newsroom timers run in a hosted polling service. See [Current implementation](#current-implementation).
+The Elsa runtime module (repository `ModularBlazor.Module.Elsa`, module `elsa`) runs on **Platform preview.8** in the `workflow` pool. See [Current implementation](#current-implementation).
 
-**In progress:** the move to Platform preview.8 and a playground of its own (wave 5, step 5-0), on an unmerged branch. **Planned:** the workflows themselves (E1–E3), see [Wave 5](#wave-5-plan).
+**Merged:** step 5-0 (preview.8, a playground and a repeatable workflow check; PR #6) and step **E1** (workflows started from integration events, with the newsroom activities; PR #7). **Planned:** E2 (default workflows per post kind and content kind) and E3 (cutover: remove the poller). See [Wave 5](#wave-5-plan).
 :::
 
 ## Recommendation
@@ -20,7 +20,7 @@ Run Elsa in a **dedicated `workflow` pool**: separate WebApi processes that load
 - The **Organization module** owns the unit tree (Org → Sector → Department → Section) and which categories each Section serves.
 - The **shifts module** owns the shifts of each unit, rotas, check-in/check-out, the shift clock, and the grants produced by the rota between check-in and check-out.
 - The **Contents module** owns Posts; the post kind is a DynamicFields root post field key (`post.news`, `post.article`, ...). Contents validates every Post state transition, assignment, edit, return, and publication.
-- The **NewsRoom module** (planned) owns proposals and post projects, and starts the workflows.
+- The **NewsRoom module** owns proposals and post projects; its `newsroom.project-approved.v1` event starts a workflow.
 - **Elsa** coordinates durable steps and timers, then asks the owning module to perform a transition through an authenticated API or message.
 
 ```mermaid
@@ -75,12 +75,35 @@ There are two architectures in the repository; do not conflate them.
 
 | Piece | Implementation |
 | --- | --- |
-| Manifest | Id and route prefix `elsa`; `HotUnload = false`; permissions `workflow.view`, `workflow.design`, `workflow.run`; settings `Elsa:Schema` (`elsa`), `Elsa:RunMigrations` (`true`), `Elsa:PollInterval` (`00:00:15`) |
-| Hosting | Implements `IModulePipeline`: Elsa's middleware and API run in a private pipeline behind `/api/elsa/{**path}`, after the host has resolved the tenant and authenticated the caller (`RequireAuthorization`) |
-| Persistence | Elsa workflow management and runtime stores on EF Core PostgreSQL, from `ConnectionStrings:elsa`, schema `elsa`; Elsa runs its own migrations |
-| Tenancy | `ElsaPlatformTenantResolver` hands Elsa the tenant the host already resolved; `ElsaPlatformTenantsProvider` lists active tenants from `ITenantDirectory`. Elsa has no tenant list of its own |
-| Authorization | `ElsaWorkflowPermissionMiddleware` maps Elsa API calls to host grants: `workflow-instances` → `workflow.run`, other reads → `workflow.view`, other writes → `workflow.design` |
-| Automation | `NewsroomAutomationService` (a `BackgroundService`) polls the Content and Shifts APIs as client `elsa-workflows`: auto-assign, publish-due, and the Content handover for each shift in `GET /api/shifts/shifts/ended` (a cursor per tenant in memory, looking back `Elsa:HandoverLookback`, default one day). It no longer checks shifts out; Shifts' clock does. See [Workflow and module integrations](/modules/contents/workflow-and-integrations/#delivery-sequence) |
+| Manifest | Id and route prefix `elsa`; `HotUnload = false`; permissions `workflow.view`, `workflow.design`, `workflow.run`; settings `Elsa:Schema` (`elsa`), `Elsa:RunMigrations` (`true`), `Elsa:PollInterval` (`00:00:15`), `Elsa:Newsroom:ProjectWorkflow` (the definition that runs approved projects) |
+| Hosting | Elsa runs in **its own service container** (`ElsaEngine`), because Elsa registers keyed services, which runtime modules do not support yet; the host lends it a fixed list of services. `IModulePipeline` runs Elsa's middleware and API (`UseEndpoints(e => e.MapWorkflowsApi())`) in a private pipeline behind `/api/elsa/{**path}`. Tenant activation enters the module's load context, so Elsa's EF migrations assembly is found |
+| Persistence | Elsa workflow management and runtime stores on EF Core PostgreSQL, from `ConnectionStrings:elsa`, schema `elsa`; Elsa runs its own migrations. The event inbox uses schema `elsa_events` (PostgreSQL only) |
+| Tenancy | The platform's tenant is pushed into Elsa for each request; no tenant means no request. Code outside a request goes in through `ElsaEngine.RunInTenantAsync`, which refuses an empty, unknown or inactive tenant (otherwise Elsa would silently store the instance under an empty tenant id). `ElsaPlatformTenantsProvider` lists active tenants from `ITenantDirectory` |
+| Authorization | An anonymous request gets **401** from the module's middleware. `ElsaWorkflowPermissionMiddleware` maps Elsa API calls to host grants, and Elsa's own permissions pass only behind that check. `execute`, `dispatch`, `bulk-dispatch`, `events`, `bookmarks`, `resume` and `tasks` need `workflow.run`; other reads `workflow.view`; other writes `workflow.design`. The full table is in the repository's `src/README.md` |
+| Events (E1) | Elsa subscribes through the platform inbox. `newsroom.project-approved.v1` starts one instance per tenant and project (a deterministic instance id), a kill cancels it, and the other NewsRoom, Content and Shifts events wake waiting activities, which then read the current state |
+| Activities (E1) | `SoftSquare.Newsroom.*`: RouteToUnit, EnsurePostInUnitCategories, WaitForRefiling, AssignInShift, WaitForStage, Deadline, DeskReview, PublishPost, Notify. See [NewsRoom workflows](/modules/newsroom/workflows-and-assignment/#elsa-activities). A module that is down or refuses the service never faults the workflow |
+| Replicas (E1) | Elsa's distributed runtime with PostgreSQL locks, deterministic instance ids, and a per-tenant sweep of overdue timers. It also works around Elsa 3.9.0: a cancel leaves bookmarks and takes no instance lock, and timers outlive the disposed container |
+| Automation (until E3) | `NewsroomAutomationService` (a `BackgroundService`) polls the Content and Shifts APIs as client `elsa-workflows`: auto-assign, publish-due, and the Content handover for each shift in `GET /api/shifts/shifts/ended` (a cursor per tenant in memory, looking back `Elsa:HandoverLookback`, default one day). It no longer checks shifts out; Shifts' clock does. See [Workflow and module integrations](/modules/contents/workflow-and-integrations/#delivery-sequence) |
+
+### Playground
+
+The repository has its own Aspire playground: identity, gateway, Blazor client, PostgreSQL, RabbitMQ, a `core` pool
+(Organization, Shifts, DynamicFields, Content) and the `workflow` pool (Elsa). `seed-grants.ps1` grants `elsa-workflows`
+in `acme` and `globex`. Two checks run against it:
+
+- `playground/check.ps1`: a tenant's workflow (write, wait for an event, write) runs and suspends; the other tenant cannot
+  list, read, run, delete or resume it, and a token of one tenant with the other's tenant header gets 403; after every
+  process and container restarts on the same volume, the event finishes the instance.
+- `playground/check-newsroom.ps1`: with `Module.NewsRoom` built, one project goes from approval to a published post and
+  a finished instance with no incidents.
+
+The playground is not in the solution, and CI does not run it.
+
+### Before deploying E1
+
+- Set `Elsa:Newsroom:ProjectWorkflow` to the definition that runs approved projects.
+- Give `elsa-workflows` three tenant-wide grants: `newsroom.workflow`, `org.read` and `dynamicfields.read`. Without the
+  last one, publishing a post answers 503.
 
 ### Secrets and settings
 
@@ -94,13 +117,14 @@ dotnet user-secrets set "Parameters:elsa-client-secret" "<dev-secret>" --project
 
 | Issue | Why it matters | Suggested fix |
 | --- | --- | --- |
-| No Elsa workflow definitions | Timers live in a polling loop, not in durable, inspectable workflows | Wave 5 (E1–E3): event-started workflows, then remove the poller |
+| No default workflow definitions yet | E1 runs the one definition a deployment names; the shift handover still lives in the polling loop | E2: default workflows per post kind and content kind; E3: remove the poller |
+| Definition ids are unique across tenants | Creating, through the API, a definition id another tenant uses answers 500 and changes nothing | Prefix ids with the tenant, or fix the store's key |
+| Untested live paths | NeedsModeration and re-approval, kill, a returned post, scheduled publishing, a refused publish, routing by tag, a second tenant and two pool replicas were not run live; a returned post, scheduled publishing and routing by tag have no test at all | Add them to `check-newsroom.ps1` |
 | The handover cursor is in memory | After a restart, a shift older than `Elsa:HandoverLookback` that was never handed over is not retried | Persist the cursor, or let NewsRoom's workflows own the handover |
 | Both workflow replicas run the poller | Every command is sent twice; correctness relies on idempotent endpoints | Elect one runner (distributed lock in Redis or the database), or let Elsa's scheduler own the timers |
 | The secret injection is hard-coded for the module id `elsa` in `ModuleRuntime` | Any other module that needs a host secret needs a host change, and any package that claims the id `elsa` receives these secrets | A manifest-declared list of required host keys, allowlisted per module id by the operator |
 | `Elsa:PlatformApiBaseUrl` is `http://localhost:5080` in the AppHost | Breaks outside the lab | Use the gateway's service-discovery reference |
 | Typed `HttpClient` held by a singleton hosted service | `HttpClient` handlers are never rotated, so DNS changes are missed | Use `IHttpClientFactory.CreateClient` per cycle |
-| Elsa's file-system distributed lock with 2 replicas | Locks are not shared across processes | Configure a Redis or PostgreSQL distributed lock provider |
 
 Relevant code: `src/WebApi.Modules.Elsa.Infrastructure/ElsaModule.cs` and `NewsroomAutomationService.cs` in `ModularBlazor.Module.Elsa`; `src/WebApi/WebApi/Modularity/ModuleRuntime.cs` (secret injection) and `src/Aspire/Hybird/AppHost.cs` (workflow pool) in `ModularBlazor.Platform`.
 
@@ -150,14 +174,14 @@ Every command must be **idempotent** and safe under retries and races. For examp
 
 ## Wave 5 plan
 
-Approved on 2026-11-28; **planned, not built**.
+Approved on 2026-11-28. 5-0 and E1 are merged; E2 and E3 are planned.
 
 | Step | Content |
 | --- | --- |
-| 5-0 | Platform preview.8 and a playground (PostgreSQL, RabbitMQ, the `workflow` pool, Organization, Shifts, DynamicFields and Content). Done when a trivial workflow runs for one tenant, survives a restart, and another tenant cannot see it. **In progress** |
-| E1 | An integration-event subscriber that starts workflows and resumes bookmarks. Activities: route to unit, `EnsurePostInUnitCategories` (treats `*` as a match), assign in shift, wait for stage, deadline and escalate, Desk review, publish, notify |
-| E2 | A default main workflow per post kind and a sub-workflow per content kind, in code in this module; handover to the next shift; a dry run that lists the steps without side effects |
-| E3 | Cutover: remove the poller; a paired Content PR removes `/automation/*`, shift-based accept and assign, and `AssignedShiftId` |
+| 5-0 | Platform preview.8 and a playground (PostgreSQL, RabbitMQ, the `workflow` pool, Organization, Shifts, DynamicFields and Content). Done when a trivial workflow runs for one tenant, survives a restart, and another tenant cannot see it. **Merged** (PR #6) |
+| E1 | An integration-event subscriber that starts workflows and resumes bookmarks. Activities: route to unit, `EnsurePostInUnitCategories` (treats `*` as a match), assign in shift, wait for stage, deadline and escalate, Desk review, publish, notify. **Merged** (PR #7) |
+| E2 | A default main workflow per post kind and a sub-workflow per content kind, in code in this module; handover to the next shift; a dry run that lists the steps without side effects. Planned |
+| E3 | Cutover: remove the poller; a paired Content PR removes `/automation/*`, shift-based accept and assign, and `AssignedShiftId`. Planned |
 
 NewsRoom starts a workflow with the integration event `newsroom.project-approved.v1`, not a direct call, so a stopped workflow pool only delays work. Elsa stays on PostgreSQL only for wave 5. See [NewsRoom](/modules/newsroom/).
 

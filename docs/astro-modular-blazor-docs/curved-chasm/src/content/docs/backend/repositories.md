@@ -36,9 +36,10 @@ flowchart LR
 | [`ModularBlazor.Module.Organization`](https://github.com/soft-square-net/ModularBlazor.Module.Organization) | The central org service and its connector: units, people, positions, tenant seeds; publishes `Organization.Contracts` and `.Client`. See [Organization](/modules/organization/) |
 | [`ModularBlazor.Module.DynamicFields`](https://github.com/soft-square-net/ModularBlazor.Module.DynamicFields) | Field definitions, validation, root post fields and URL prefixes. See [Dynamic Fields](/modules/dynamic-fields/) |
 | [`ModularBlazor.Module.ContentDesigner`](https://github.com/soft-square-net/ModularBlazor.Module.ContentDesigner) | The post designer and studio. See [ContentDesigner](/modules/content-designer/) |
-| [`ModularBlazor.Module.NewsRoom`](https://github.com/soft-square-net/ModularBlazor.Module.NewsRoom) | Proposals and post projects. Created, nothing built yet. See [NewsRoom](/modules/newsroom/) |
+| [`ModularBlazor.Module.NewsRoom`](https://github.com/soft-square-net/ModularBlazor.Module.NewsRoom) | Proposals and post projects: N1 and N2 merged, bindings and the full client planned. See [NewsRoom](/modules/newsroom/) |
 | [`ModularBlazor.Module.Storage`](https://github.com/soft-square-net/ModularBlazor.Module.Storage) | File storage |
-| [`ModularBlazor.Module.Elsa`](https://github.com/soft-square-net/ModularBlazor.Module.Elsa) | Elsa 3.9 as a runtime module. See [Elsa](/modules/elsa/) |
+| [`ModularBlazor.Module.Elsa`](https://github.com/soft-square-net/ModularBlazor.Module.Elsa) | Elsa 3.9 as a runtime module, with the newsroom workflow activities (E1). See [Elsa](/modules/elsa/) |
+| `ModularBlazor.Module.Ai` (local only, no remote yet) | The AI assistant, phase A1 (SEO suggestions). See [AI and Search](/modules/ai-and-search/) |
 | [`ModularBlazor.ModuleTemplate`](https://github.com/soft-square-net/ModularBlazor.ModuleTemplate) | The starting point for a new module repo (scaffold, still growing) |
 
 `soft-square-net/ModularBlazor` is the old, combined repository. It is obsolete: it still holds the old

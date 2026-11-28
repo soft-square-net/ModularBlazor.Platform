@@ -3,10 +3,12 @@ title: Storage
 description: The storage runtime module. It keeps each tenant's files and folders, with NTFS-style access lists, blobs on the local disk, S3 or MinIO, resumable uploads, and a Windows 11 style Explorer.
 ---
 
-> **Status: phases 1–4 of 7 are done** on branch `feat/rebuild` of the repository `ModularBlazor.Module.Storage`
-> (module `storage` 0.1.0). **Phase 5** (recycle bin, versions, purge and garbage collection) **is in progress**, and
-> phases 6–7 are planned. This page describes the committed code up to phase 4. The Files page needs MudTail's explorer
-> component, which is on the Platform branch `feat/mudtail-explorer` and not merged yet.
+> **Status: all 7 phases are done** and merged in
+> [`ModularBlazor.Module.Storage`](https://github.com/soft-square-net/ModularBlazor.Module.Storage) (branch `main`,
+> Platform 1.0.0-preview.7): the API, access lists, the blob stores, the Files page, the recycle bin and previous
+> versions, the sweeper, sharing (with people, links, public folders), the pickers for other modules, the change feed,
+> thumbnails, virus scanning, the Security dialog and the image editor. The explorer's address bar became editable in
+> PR #5. MudTail's explorer is merged in the Platform. Nothing is packed as a bundle yet.
 
 **Storage** keeps a tenant's folders and files. The tenant database is the source of truth: the tree, the versions and
 the access lists are rows. The blob store holds only the bytes. What a user may do with an item is decided by the
@@ -79,7 +81,24 @@ Dependencies:
   - One **home** per user, named by the user id. Only that user has full control.
 - **Names** follow the Windows rules. These characters are not allowed: `\ / : * ? " < > |`. Reserved names are not
   allowed, and names must be unique per folder, ignoring case.
-- **Delete** is a soft delete into the recycle bin. The recycle bin itself is phase 5.
+- **Delete** is a soft delete into the recycle bin. A deleted folder takes what is in it along; restoring puts it back
+  where it was (numbered, "a (2).txt", if the name was taken meanwhile). Each user sees what they deleted;
+  `storage.admin` sees the whole tenant's bin.
+- **Purging and blob garbage collection.** Purging (Shift+Delete, deleting in the bin, emptying it, or the sweeper after
+  `Storage:RecycleBinDays`) removes the items and releases each version's blob. A blob nothing refers to any more is
+  deleted from its store, then its row; a store that fails is retried on the next sweep.
+- **Sharing** is three things. *With people*: the Share dialog writes the person's access entries (view = read and
+  execute, edit = modify); it needs the `Share` right, and edit also needs `Modify` yourself. *Links*: "anyone with the
+  link", read-only, with an optional expiry, password (PBKDF2, sent in the `X-Share-Password` header, never in a URL)
+  and download limit; revocable, at most 20 per item. *Public folders*: everything below one has a stable anonymous
+  address, `/api/storage/public/{tenant}/{fileId}/{name}`, for Content's published pages.
+- **Virus scanning** (when `Storage:ClamAV:Host` is set): a new upload is *pending* until clamd checked it. Until it is
+  clean a file is listed but cannot be downloaded, previewed, linked, shared by a link or served from a public folder.
+  An infected file stays quarantined until deleted. The verdict belongs to the blob, so copies and versions share it.
+- **Thumbnails:** clean JPEG, PNG, GIF, WebP, BMP and TIFF files get a WebP thumbnail in the background (ImageSharp),
+  stored next to the blob and deleted with it. Listings carry a short-lived `thumbnailUrl`.
+- **The change feed** (an outbox, `storage.events`): every create, new version, rename, move, delete, restore, purge
+  and scan verdict is a row written in the same transaction, kept `Storage:EventRetentionDays`.
 - **Placement and quota.** Each tenant has a placement (a named connection, a bucket and a key prefix) and an optional
   quota. A blob remembers where it was written, so a new placement applies only to new files. The quota counts what the
   tenant keeps (every version, and a blob shared by copies only once) plus uploads in progress.
@@ -91,11 +110,12 @@ Dependencies:
 | Permission | Lets the caller |
 | --- | --- |
 | `storage.access` | Use Storage at all: their home folder, and whatever the access lists open to them |
-| `storage.admin` | Bypass the access lists (full control of every item in the tenant), set any owner, and manage Storage groups. Later also connections, quotas and the recycle bin |
+| `storage.admin` | Bypass the access lists (full control of every item in the tenant), set any owner, manage Storage groups, see and purge the whole tenant's recycle bin, and run the sweep |
+| `storage.events` | Read the change feed (`GET /events`); for a workflow service such as Elsa |
 
 Every route needs `storage.access` or `storage.admin`. There are two exceptions. Group administration (`POST`, `PUT`
 and `DELETE /groups`) needs `storage.admin`. The signed download link `GET /links/{token}` is anonymous, because the
-signature is the authorization.
+signature is the authorization. The share-link and public-folder routes (`/shares/...`, `/public/...`) are anonymous too.
 
 ### The module's own ACL
 
@@ -193,6 +213,48 @@ be at least 5 MiB. A file has at most 500 chunks, so big files use bigger chunks
 An `AceDto` has these fields: `principalKind`, `principalId`, `principalScope`, `type` (`Allow`/`Deny`), `rights`,
 `inheritance`, `inherited`, `inheritedFromId` and `inheritedFromName`.
 
+### Recycle bin, versions and maintenance
+
+| Method and route | Request → response |
+| --- | --- |
+| `POST /items/delete` with `permanent: true` | Delete without the recycle bin (needs the same rights) |
+| `GET /recycle-bin` | What the caller deleted (everything, for `storage.admin`): the item, where it was, when, by whom |
+| `POST /recycle-bin/restore`, `POST /recycle-bin/purge` | Restore or purge a batch (purge with no ids empties the visible bin); the deleter, or an admin for purge |
+| `POST /items/{id}/versions/{number}/restore` | Make an old version current again (a new version with its content; needs `CreateFiles` on the folder) |
+| `DELETE /items/{id}/versions/{number}` | Delete an old version (not the current one) |
+| `POST /maintenance/sweep` (`storage.admin`) | Run the tenant's sweep now; returns what it purged and freed |
+
+### Sharing
+
+| Method and route | Request → response |
+| --- | --- |
+| `GET /people?search=` | Storage's people (members who have opened Files), by name or email; at least 2 characters |
+| `GET /shared-with-me` | Items shared with the caller by name, with the owner and where they are |
+| `GET /items/{id}/sharing` | The Share dialog: the people, the links, whether the folder is (or is in) a public folder |
+| `POST /items/{id}/sharing/people`, `DELETE /items/{id}/sharing/people/{userId}` | Share with people (`View` or `Edit`), stop sharing |
+| `PUT /items/{id}/sharing/public` | Make a folder public, or not (`Share` and `ChangePermissions`) |
+| `POST /items/{id}/sharing/links`, `DELETE /sharing/links/{linkId}` | Create a link (expiry, password, download limit), remove one |
+
+Anonymous routes (the tenant is in the URL):
+
+| Method and route | Request → response |
+| --- | --- |
+| `GET /shares/{tenant}/{token}?folderId=` | Open a link: the shared item, or a folder in it (`X-Share-Password` when it has one); 401 for a missing or wrong password, 404 when it no longer works |
+| `GET /shares/{tenant}/{token}/files/{fileId}/link?inline=` | A short-lived download link of a file in the share; counts a download |
+| `GET /public/{tenant}/{fileId}/{name}` | A file in a public folder: a redirect to a short-lived link (cached a minute) |
+
+Downloads, links, share links and public addresses of a file that is not clean answer 409 (404 for public addresses).
+
+### Change feed
+
+`GET /events?after=&take=` (`storage.events` or `storage.admin`) returns the events after an id, oldest first (`take`
+up to 500, default 100), with `last` (the id to ask after next) and `more`. The newest `Storage:EventDelay` is held
+back, so a slower transaction's event is never skipped. An event is
+`{ id, type, itemId, kind, name, parentId, fileVersion, by, at, detail }`; `type` is one of `item.created`,
+`file.versioned`, `item.renamed`, `item.moved`, `item.deleted`, `item.restored`, `item.purged` and `file.scanned`
+(detail `clean` or `infected: {threat}`). For Elsa, grant its client `storage.events` in the tenant and poll with a
+client-credentials token and `X-Tenant`, keeping `last`.
+
 ### Errors
 
 Errors are problem-details responses. Use-case results are mapped as follows (`ResultExtensions`,
@@ -225,6 +287,12 @@ There are two kinds of settings:
 | `Storage:UploadLifetime` | `1.00:00:00` | |
 | `Storage:DownloadLinkLifetime` | `00:10:00` | |
 | `Storage:MaxCopyItems` | `10000` | |
+| `Storage:RecycleBinDays` | `30` | Days in the recycle bin before the sweeper purges; 0 keeps everything |
+| `Storage:SweepInterval` | `01:00:00` | How often every active tenant is swept; `00:00:00` turns it off. Safe to run on every replica |
+| `Storage:EventRetentionDays`, `Storage:EventDelay` | `7`, `00:00:05` | How long the change feed keeps events, and how much of its newest end it holds back |
+| `Storage:ProcessInterval` | `00:01:00` | How often pending scans and thumbnails are looked for; new uploads are processed at once |
+| `Storage:ThumbnailSize`, `Storage:ThumbnailMaxBytes` | `320`, 50 MiB | The thumbnails' longest side, and the largest image given one |
+| `Storage:ClamAV:Host`, `:Port`, `:Timeout` | empty, `3310`, `00:02:00` | clamd; an empty host means no scanning. Set clamd's `StreamMaxLength` to at least `Storage:MaxFileSize` |
 | `Storage:Local:Root` | empty, which means `%LocalAppData%/ModularBlazor/storage` | Every replica must see the same folder |
 | `Storage:Connections:{name}:Kind` | `S3` | `S3` or `Local` |
 | `…:ServiceUrl`, `…:Region` | empty, `us-east-1` | S3 endpoint (empty for Amazon S3) and region |
@@ -243,17 +311,40 @@ connection. The repository README has a full example with environment variables.
 
 | Route | Page | What it does |
 | --- | --- | --- |
-| `/files` (`?folder={id}` opens that folder) | Files | MudTail's Windows 11 style explorer. The navigation pane has places (My files, Files), a folder tree and Quick access (pinned folders, kept in the browser). The page also has the address bar, the command bar and the context menu |
+| `/files` (`?folder={id}` opens that folder) | Files | MudTail's Windows 11 style explorer. The navigation pane has places (My files, Files, Shared with me, Recycle bin), a folder tree and Quick access (pinned folders, kept in the browser). The page also has the address bar, the command bar and the context menu |
+| `/s/{tenant}/{token}` | Shared link | The `Module.Storage.Shares` client module: opens a share link without signing in (layout `public`) |
 
 Commands that work today:
 
 - Browse folders, and search within the open folder.
 - New folder, inline rename, cut/copy/paste and drag to move, delete.
 - Upload files and whole folders. The folder structure is kept, and a taken name gets a number (`KeepBoth`).
-- Download, and image previews through short-lived inline links.
+- Download, and image previews through short-lived inline links; thumbnails in the large icon views.
+- **Address bar**: type a path to go there (PR #5). It is split on `\` or `/` and walked folder by folder; names match
+  without case, by their shown (localized) or real name. A path starts at a top place: Files, Users (a home shows as
+  `Users\My files\…`), My files or a folder id; "Shared with me" and "Recycle bin" also work on their own. A path that
+  is not found, or passes through a folder the user cannot open, shows an error toast and stays in the current folder.
+- **Security**: the Windows dialog, with Permissions, Advanced (owner, every entry with where it is inherited from,
+  individual NTFS rights, disabling inheritance) and Effective access. Changes are sent with the version that was read,
+  so a concurrent change is refused rather than overwritten.
+- **Share**: add people with view or edit access, create and remove links, make a folder public, or copy a file's
+  public address.
+- **Edit** (JPEG, PNG or WebP images the user may write): MudTail's image editor. *Save* stores a new version, *Save as
+  a copy* a new file next to it. Both are ordinary uploads, so quotas and the scan apply.
+- **Recycle bin** (restore, delete, empty) and **Previous versions** (restore or delete an old version). Shift+Delete
+  skips the bin, after asking.
 
-The rights the API returns become the explorer's deny lists, so refused commands are greyed out. **Share**,
-**Security** and **Edit** are disabled until their phases.
+The rights the API returns become the explorer's deny lists, so refused commands are greyed out.
+
+### Pickers for other modules
+
+Other modules open these dialogs through [module dialogs](/guides/module-dialogs/). Keep the file's id: names change,
+the id does not. Pending or infected files cannot be chosen.
+
+| Dialog | Parameters | Result |
+| --- | --- | --- |
+| `Module.Storage/pick-files` | `{ multiple?, accept?, folderId?, publicOnly? }` | `{ ids, files: [{ id, name, size, contentType, version, folderId, publicUrl }] }` |
+| `Module.Storage/pick-folder` | `{ folderId?, rights?: "create" \| "read" }` | `{ id, name, path: [{ id, name }], publicFolder }` |
 
 ## Install and activation
 
@@ -263,14 +354,16 @@ No `.modpkg` bundle is packed yet. Until then:
 2. **Server part.** Zip the build output of `WebApi.Modules.Storage.Web`. Upload it on **Host Modules**
    (`/host-modules`) and activate it; this runs the tenant migrations. Set the connection keys as host overrides.
 3. **Client parts.** Upload them on **Client Modules** (`/client-modules`), the API client first:
-   `WebApi.Modules.Storage.Client`, then `Module.Storage`.
+   `WebApi.Modules.Storage.Client`, then `Module.Storage` and `Module.Storage.Shares`.
 4. **Grant access.** Grant `storage.access` to users and `storage.admin` to the tenant's storage admins. After that, use
    the access lists.
 
 The planned release is one bundle, `storage-<version>.modpkg`, with `module.json`, `server/`, `client/` and
 `contracts/`. It installs the server part first, then the client parts.
 
-To build and test: `dotnet build` and `dotnet test`. Restoring needs `GITHUB_PACKAGES_TOKEN` (`read:packages`). The S3
+To build and test: `dotnet build` and `dotnet test`. Restoring needs `GITHUB_PACKAGES_TOKEN` (`read:packages`).
+Thumbnails use SixLabors.ImageSharp 4, which needs a licence key at build time in `SixLaborsLicenseKey` (a CI secret):
+Debug builds only warn without it, Release builds fail. Never commit the key. The S3
 store tests run only when `STORAGE_TEST_S3_URL`, `STORAGE_TEST_S3_ACCESS_KEY` and `STORAGE_TEST_S3_SECRET_KEY` are
 set. After an endpoint change, export the OpenAPI document again with
 `Export-ModuleOpenApi.ps1 -Project …/WebApi.Modules.Storage.Web -ModuleId storage`, then regenerate the client. After a
@@ -279,7 +372,7 @@ model change, add a migration for every provider with `Add-Migration.ps1`; the R
 ## Developing with the playground
 
 ```bash
-dotnet run --project playground --launch-profile dev -p:PlatformRoot=<a Platform checkout on feat/mudtail-explorer>/
+dotnet run --project playground --launch-profile dev
 ```
 
 The playground runs PostgreSQL, MinIO, the identity service on port 5090, one WebApi on 5080 and the client on 5070.
@@ -304,25 +397,22 @@ These are the platform lab's ports, so stop the lab first.
 | --- | --- | --- |
 | 1 | Server foundation: layout, metadata, local provider, ACL engine, groups, home folders, CRUD, chunked upload and ranged download, client, tests, playground | Done |
 | 2 | S3 and MinIO, named connections, presigned downloads, quotas | Done |
-| 3 | MudTail explorer components (Platform `feat/mudtail-explorer`) | Done, not merged |
-| 4 | Explorer client v1: the Files page | Done. The Security dialog and the image editor are still to do |
-| 5 | Recycle bin, versions UI, purge and garbage collection of blobs | **In progress** (uncommitted) |
-| 6 | Sharing: share with people (writes access entries), signed links (expiring, revocable, password, download limit), public folders for published Content media | Planned |
-| 7 | Integration: `pick-files` and `pick-folder` dialogs for other modules, a `GET /events?after=` outbox feed for Elsa, background thumbnails, a virus-scan hook (ClamAV) | Planned |
+| 3 | MudTail explorer components | Done (Platform PR #29) |
+| 4 | Explorer client v1: the Files page, the Security dialog and the image editor | Done |
+| 5 | Recycle bin, versions UI, purge and garbage collection of blobs | Done |
+| 6 | Sharing: share with people (writes access entries), signed links (expiring, revocable, password, download limit), public folders for published Content media | Done |
+| 7 | Integration: `pick-files` and `pick-folder` dialogs for other modules, a `GET /events?after=` outbox feed for Elsa, background thumbnails, a virus-scan hook (ClamAV) | Done |
+
+Later: the editable address bar (PR #5). Storage is on Platform 1.0.0-preview.7 (PR #4).
 
 ## Known issues
 
 - **MinIO image.** MinIO removed its images from Docker Hub, and `quay.io/minio/minio` refuses anonymous pulls. The
   pinned tag `minio/minio:RELEASE.2025-09-07T16-13-09Z` must already be in local Docker; otherwise use
   `Playground:Blobs=local`. The README explains how to re-tag a local image.
-- **Unmerged platform dependency.** The Files page needs Layouts.Default from `feat/mudtail-explorer`.
-- **Module unload.** On a released platform, every runtime module (even the Greeting sample) reports
-  `unloaded=false` right after an unload and is collected later. This is a platform issue in `ModuleRuntime`, not a
-  Storage or AWS SDK leak. The fix is on Platform `fix/module-unload`, where Storage was checked to unload in the same
-  request. It is not merged yet.
-- **404 after sign-in.** After sign-in, the redirect to a module route such as `/files` shows 404 until the page is
-  reloaded, because the client still has the anonymous module catalog. The fix is on Platform
-  `fix/module-route-after-login`. It is not merged yet.
-- **Phase 4 gaps.** Share, Security (the ACL dialog) and Edit (the image editor) are disabled in the Explorer. The API
-  for access lists already exists.
 - **No bundle yet.** The parts are installed by hand.
+- **No client tests.** The repository has no test project for the client modules; the address bar was checked by hand
+  in the playground.
+
+The earlier platform issues (the unmerged explorer, module unload, and 404 after sign-in) are fixed on the Platform's
+`main`.
